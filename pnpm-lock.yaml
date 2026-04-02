@@ -84,6 +84,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@supabase/supabase-js':
+        specifier: ^2.49.1
+        version: 2.101.1
       bullmq:
         specifier: ^5.34.0
         version: 5.72.1
