@@ -213,6 +213,40 @@ async def list_repair_jobs(
     }
 
 
+@router.post("/{repair_job_id}/run")
+async def run_repair_job(
+    repair_job_id: UUID,
+    repo_path: str,
+    code_context: str,
+):
+    """
+    Run the repair orchestration for a job.
+
+    Triggers the beam search, evaluation, and action routing.
+    This is called by the worker when a job is ready to process.
+
+    Args:
+        repair_job_id: The repair job ID
+        repo_path: Path to the repository
+        code_context: Code context for the finding
+
+    Returns:
+        Job status after orchestration
+    """
+    from services.repair_orchestrator import RepairOrchestrator
+
+    orchestrator = RepairOrchestrator(repair_job_id)
+
+    try:
+        result = await orchestrator.run(repo_path, code_context)
+        return result
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Repair execution failed: {str(e)}",
+        )
+
+
 @router.post("/{repair_job_id}/create-pr")
 async def create_pr_from_repair(
     repair_job_id: UUID,
@@ -227,5 +261,5 @@ async def create_pr_from_repair(
     """
     raise HTTPException(
         status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Endpoint implementation pending Phase 3.1.2",
+        detail="Endpoint implementation pending Phase 3.4",
     )

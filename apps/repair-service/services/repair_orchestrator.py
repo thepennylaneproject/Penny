@@ -30,9 +30,13 @@ class RepairOrchestrator:
         self.evaluator = PatchEvaluator()
         self.beam_search: Optional[BeamSearchOrchestrator] = None
 
-    async def run(self) -> dict:
+    async def run(self, repo_path: str, code_context: str) -> dict:
         """
         Execute the repair job from start to finish.
+
+        Args:
+            repo_path: Path to repository for evaluation
+            code_context: Code context for the finding
 
         Returns:
             Job completion result
@@ -52,7 +56,9 @@ class RepairOrchestrator:
         )
 
         try:
-            # Initialize beam search
+            # Initialize components
+            from .patch_generator import PatchGenerator, PatchRequest
+
             beam_config = BeamSearchConfig(
                 beam_width=job.get("beam_width", 4),
                 max_depth=job.get("max_depth", 4),
@@ -61,37 +67,85 @@ class RepairOrchestrator:
             )
             self.beam_search = BeamSearchOrchestrator(beam_config)
 
-            # TODO: Phase 3.3 - Implement actual repair orchestration
-            # 1. Fetch code context from GitHub
-            # 2. Call LLM to generate root patch
-            # 3. Evaluate root patch
-            # 4. Run beam search refinement loop
-            # 5. Score final candidates
-            # 6. Determine action (fast_lane, ready, draft, candidate_only, blocked)
-            # 7. Update job with results
+            generator = PatchGenerator(
+                model=self.settings.CLAUDE_MODEL,
+                api_key=self.settings.ANTHROPIC_API_KEY,
+            )
+            self.evaluator = PatchEvaluator(timeout_seconds=job.get("timeout_seconds", 60))
 
-            # For now, return placeholder
+            # Build patch request
+            patch_request = PatchRequest(
+                file_path=job.get("file_path", "unknown"),
+                code_context=code_context,
+                finding_title=job.get("finding_id", "unknown"),
+                finding_description="",
+                language=job.get("language", "typescript"),
+                is_root_generation=True,
+            )
+
+            # Run beam search
+            best_candidate = await self.beam_search.run(
+                patch_request,
+                self.evaluator,
+                generator,
+            )
+
+            if not best_candidate:
+                # No valid candidates found
+                await self.supabase.update_repair_job(
+                    self.job_id,
+                    {
+                        "status": "completed",
+                        "completed_at": datetime.utcnow().isoformat(),
+                        "action": "do_not_repair",
+                        "confidence_score": 0.0,
+                    },
+                )
+
+                return {
+                    "status": "completed",
+                    "job_id": str(self.job_id),
+                    "action": "do_not_repair",
+                    "confidence_score": 0.0,
+                }
+
+            # Score best candidate
+            confidence_score = best_candidate.score
+            action = await self.determine_action(confidence_score)
+
+            # Get all candidates
+            candidates = await self.supabase.get_repair_candidates(self.job_id)
+
+            # Update job with results
             await self.supabase.update_repair_job(
                 self.job_id,
                 {
                     "status": "completed",
                     "completed_at": datetime.utcnow().isoformat(),
-                    "action": "do_not_repair",
-                    "confidence_score": 0.0,
-                    "error_message": "Repair orchestration pending Phase 3.3",
+                    "best_candidate_id": str(best_candidate.parent_id or best_candidate.parent_id),
+                    "best_score": best_candidate.score,
+                    "confidence_score": confidence_score,
+                    "action": action,
+                    "total_candidates_evaluated": self.beam_search.total_candidates,
                 },
             )
 
             return {
                 "status": "completed",
                 "job_id": str(self.job_id),
-                "action": "do_not_repair",
-                "confidence_score": 0.0,
+                "action": action,
+                "confidence_score": confidence_score,
+                "total_candidates": self.beam_search.total_candidates,
             }
 
         except Exception as e:
             # Update job with error
+            import traceback
+
             error_msg = str(e)
+            print(f"[orchestrator] Error: {error_msg}")
+            print(traceback.format_exc())
+
             await self.supabase.update_repair_job(
                 self.job_id,
                 {

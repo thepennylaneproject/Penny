@@ -40,33 +40,108 @@ class BeamSearchOrchestrator:
 
     async def run(
         self,
-        root_patch: str,
-        root_score: float,
+        request,
         evaluator,
         generator,
-    ) -> BeamSearchNode:
+    ) -> Optional[BeamSearchNode]:
         """
         Run beam search to find best patch.
 
         Args:
-            root_patch: Initial patch candidate
-            root_score: Initial patch score
+            request: Patch request (file_path, code_context, etc.)
             evaluator: Evaluator to score patches
             generator: Patch generator for refinement
 
         Returns:
-            Best candidate found
+            Best candidate found, or None if search failed
         """
-        # TODO: Implement beam search algorithm
-        # 1. Start with root patch at depth 0
-        # 2. For each depth up to max_depth:
-        #    a. Generate refinements for top beam_width candidates
-        #    b. Evaluate each refinement
-        #    c. Keep top beam_width by score
-        #    d. Check if any exceed early_stop_confidence
-        # 3. Return best candidate
+        import time
 
-        raise NotImplementedError("Beam search orchestration pending Phase 3.2")
+        start_time = time.time()
+
+        # Generate root patch
+        try:
+            root_candidate, root_usage = await generator.generate_root_patch(request)
+        except Exception as e:
+            print(f"[beam-search] Root generation failed: {e}")
+            return None
+
+        # Validate root patch syntax
+        if not await generator.validate_patch_syntax(root_candidate.patch_diff, request.language):
+            print(f"[beam-search] Root patch failed syntax validation")
+            return None
+
+        # Add root candidate to beam
+        root_node = self.add_candidate(
+            depth=0,
+            sequence_number=0,
+            patch_diff=root_candidate.patch_diff,
+            score=root_candidate.confidence,
+        )
+
+        # Beam search loop
+        for depth in range(1, self.config.max_depth + 1):
+            if time.time() - start_time > self.config.timeout_seconds:
+                print(f"[beam-search] Timeout after depth {depth}")
+                break
+
+            # Get candidates to refine
+            candidates_to_refine = self.get_candidates_at_depth(depth - 1)
+            if not candidates_to_refine:
+                break
+
+            # Generate and evaluate refinements
+            for seq, parent_candidate in enumerate(candidates_to_refine):
+                if time.time() - start_time > self.config.timeout_seconds:
+                    break
+
+                try:
+                    # Generate refinement
+                    refined_candidate, refinement_usage = await generator.refine_patch(
+                        request,
+                        parent_patch=parent_candidate.patch_diff,
+                        feedback="Previous patch did not pass all validation checks. Please refine.",
+                    )
+
+                    # Evaluate refinement
+                    eval_result = await evaluator.evaluate(
+                        patch_id=f"{depth}-{seq}",
+                        patch_diff=refined_candidate.patch_diff,
+                        repo_path="/tmp/repo",  # TODO: Pass actual repo path
+                        file_path=request.file_path,
+                        lint_command="npm run lint",  # TODO: Use from job config
+                        typecheck_command="npx tsc --noEmit",
+                        test_command="npm test",
+                    )
+
+                    # Score candidate
+                    validation_score = refined_candidate.confidence * 0.5
+                    if eval_result.lint_ok:
+                        validation_score += 20
+                    if eval_result.typecheck_ok:
+                        validation_score += 20
+                    if eval_result.tests_ok:
+                        validation_score += 20
+
+                    # Add to beam
+                    node = self.add_candidate(
+                        depth=depth,
+                        sequence_number=seq,
+                        patch_diff=refined_candidate.patch_diff,
+                        score=min(100.0, validation_score),
+                        parent_id=None,
+                        validation_results=eval_result.to_dict(),
+                    )
+
+                    # Check early stopping
+                    if node.score >= self.config.early_stop_confidence * 100:
+                        return node
+
+                except Exception as e:
+                    print(f"[beam-search] Refinement at depth {depth} seq {seq} failed: {e}")
+                    continue
+
+        return self.best_candidate
 
     def add_candidate(
         self,
