@@ -2,6 +2,7 @@
   "name": "penny",
   "version": "3.0.0",
   "description": "Penny v3.0 — Multi-agent code auditing and repair system",
+  "packageManager": "pnpm@10.25.0",
   "private": true,
   "type": "module",
   "workspaces": [
