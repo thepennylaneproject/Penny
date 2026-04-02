@@ -22,6 +22,9 @@ import {
   listAllProjects,
   upsertMaintenanceBacklogFromFindings,
 } from "./db.js";
+import { logAuditMetrics, resolveLLMTier } from "./llm-router.js";
+import { PennyObservability } from "./observability.js";
+import { getSupabaseClient } from "./supabase-client.js";
 import { getRegistry } from "./providers/registry.js";
 import {
   buildProjectManifest,
@@ -681,6 +684,11 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[penny-worker] job ${dbJobId} prep failed`, e);
+    PennyObservability.captureError(e instanceof Error ? e : new Error(msg), {
+      jobId: dbJobId,
+      stage: "prompt_load",
+      jobType: job?.job_type,
+    });
     try {
       await completeJob(pool, dbJobId, msg, {
         job_type: job.job_type,
@@ -796,6 +804,36 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           jobMetrics.llm_attempts += llm.attemptCount ?? 0;
           jobMetrics.prompt_context_chars += intelligenceContext.length;
           auditModel = llm.model || auditModel;
+
+          // Log intelligence extraction for observability
+          PennyObservability.logExecution({
+            run_id: job.id,
+            project_id: project.name,
+            agent_name: "intelligence",
+            model: llm.model,
+            latency_ms: llm.latency_ms ?? 0,
+            cost_usd: llm.costUsd ?? 0,
+            input_tokens: llm.inputTokens ?? 0,
+            output_tokens: llm.outputTokens ?? 0,
+            status: llm.fallbackCount && llm.fallbackCount > 0 ? "fallback_triggered" : "success",
+          });
+
+          // Log model usage to Supabase for cost tracking
+          const supabaseClient = getSupabaseClient();
+          if (supabaseClient) {
+            await logAuditMetrics(
+              supabaseClient,
+              job.id,
+              "intelligence",
+              {
+                model: llm.model,
+                inputTokens: llm.inputTokens ?? 0,
+                outputTokens: llm.outputTokens ?? 0,
+                latency_ms: llm.latency_ms ?? 0,
+              } as any // AuditLlmResult-like object for cost calculation
+            );
+          }
+
           const mappedFindings = llm.findings.map((f) => ({
             ...f,
             cluster,
@@ -888,6 +926,36 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           jobMetrics.prompt_context_chars += codeContextChars;
           jobMetrics.prompt_scope_file_count += pass.files.length;
           auditModel = llm.model || auditModel;
+
+          // Log audit execution for observability (Sentry + Datadog)
+          PennyObservability.logExecution({
+            run_id: job.id,
+            project_id: project.name,
+            agent_name: auditKindStr || "full",
+            model: llm.model,
+            latency_ms: llm.latency_ms ?? 0,
+            cost_usd: llm.costUsd ?? 0,
+            input_tokens: llm.inputTokens ?? 0,
+            output_tokens: llm.outputTokens ?? 0,
+            status: llm.fallbackCount && llm.fallbackCount > 0 ? "fallback_triggered" : "success",
+          });
+
+          // Log model usage to Supabase for cost tracking
+          const supabaseClient = getSupabaseClient();
+          if (supabaseClient) {
+            await logAuditMetrics(
+              supabaseClient,
+              job.id,
+              auditKindStr || "full",
+              {
+                model: llm.model,
+                inputTokens: llm.inputTokens ?? 0,
+                outputTokens: llm.outputTokens ?? 0,
+                latency_ms: llm.latency_ms ?? 0,
+              } as any // AuditLlmResult-like object for cost calculation
+            );
+          }
+
           passResults.push({
             findings: llm.findings.map((finding) => ({
               ...finding,
@@ -1066,6 +1134,12 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[penny-worker] job ${dbJobId} failed`, e);
+    PennyObservability.captureError(e instanceof Error ? e : new Error(msg), {
+      jobId: dbJobId,
+      stage: "audit_execution",
+      jobType: job?.job_type,
+      projectName: job?.project_name,
+    });
     try {
       await completeJob(pool, dbJobId, msg, {
         job_type: job.job_type,

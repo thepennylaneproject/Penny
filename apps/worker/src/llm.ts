@@ -42,6 +42,7 @@ export interface AuditLlmResult {
   attemptCount?: number;
   fallbackCount?: number;
   cacheHit?: boolean;
+  latency_ms?: number;
 }
 
 const auditResponseCache = new Map<string, AuditLlmResult>();
