@@ -156,7 +156,43 @@ CREATE POLICY "users_can_view_repair_costs"
     )
   );
 
+-- orchestration_events: Track repair lifecycle events
+CREATE TABLE orchestration_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  repair_job_id UUID NOT NULL REFERENCES repair_jobs(id) ON DELETE CASCADE,
+
+  -- Event details
+  event_type TEXT NOT NULL, -- completion, failure, pr_created, pr_merged, etc.
+  action TEXT, -- fast_lane_ready_pr, ready_pr, draft_pr, candidate_only, do_not_repair
+  confidence_score FLOAT,
+  pr_number INT,
+
+  -- Metadata
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Index for event queries
+CREATE INDEX idx_orchestration_events_job_id ON orchestration_events(repair_job_id);
+CREATE INDEX idx_orchestration_events_created_at ON orchestration_events(created_at DESC);
+
+-- RLS: orchestration_events
+ALTER TABLE orchestration_events ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "users_can_view_orchestration_events"
+  ON orchestration_events
+  FOR SELECT
+  USING (
+    repair_job_id IN (
+      SELECT id FROM repair_jobs
+      WHERE project_id IN (
+        SELECT id FROM projects
+        WHERE owner_id = auth.uid()
+      )
+    )
+  );
+
 -- Grant permissions
 GRANT SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated;
 GRANT SELECT ON repair_candidates TO anon, authenticated;
 GRANT SELECT ON repair_costs TO anon, authenticated;
+GRANT SELECT, INSERT ON orchestration_events TO anon, authenticated;
