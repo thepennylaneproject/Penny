@@ -33,6 +33,7 @@ import {
   summarizeCoverageFromManifest,
   type ProjectManifest,
 } from "./manifest.js";
+import { getRepairClient, type RepairJobRequest } from "./repair-client.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFileCache = new Map<string, string>();
@@ -659,6 +660,137 @@ function getClusterFromAuditKind(auditKind?: string): string {
   }
 }
 
+/**
+ * Trigger repair jobs for high-priority findings.
+ * Called after audit completes to submit eligible findings for automated repair.
+ *
+ * Eligibility criteria:
+ * - autofix_eligibility is not "manual_only"
+ * - Severity is high or blocker (high-risk findings)
+ * - Not a duplicate
+ * - File path available for context
+ */
+async function triggerRepairsForFindings(
+  projectId: string,
+  runId: string,
+  findings: Array<Record<string, unknown>>,
+  repoRoot: string,
+): Promise<void> {
+  const repairClient = getRepairClient();
+
+  // Check if repair service is available
+  try {
+    await repairClient.health();
+  } catch (error) {
+    console.warn(
+      `[penny-worker] Repair service unavailable, skipping repairs: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return;
+  }
+
+  // Filter for eligible findings
+  const eligible = findings.filter((finding) => {
+    // Skip if already has a repair job
+    if (finding.repair_job_id) {
+      return false;
+    }
+
+    // Check autofix eligibility
+    const autofix = String(finding.autofix_eligibility ?? "").toLowerCase();
+    if (autofix === "manual_only") {
+      return false;
+    }
+
+    // Only repair high-priority findings
+    const severity = String(finding.severity ?? "").toLowerCase();
+    if (severity !== "blocker" && severity !== "high") {
+      return false;
+    }
+
+    // Skip duplicates
+    if (finding.duplicate_of) {
+      return false;
+    }
+
+    // Need a file path for context
+    const filePath = String(finding.file_path ?? "").trim();
+    if (!filePath) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (eligible.length === 0) {
+    console.log(`[penny-worker] No eligible findings for repair in run ${runId}`);
+    return;
+  }
+
+  console.log(`[penny-worker] Submitting ${eligible.length} findings to repair service`);
+
+  // Submit each eligible finding for repair
+  for (const finding of eligible) {
+    try {
+      const filePath = String(finding.file_path ?? "").trim();
+      const title = String(finding.title ?? "Finding").trim();
+      const description = String(finding.description ?? "").trim();
+      const findingId = String(finding.finding_id ?? "").trim();
+      const severity = String(finding.severity ?? "high").trim();
+
+      // Build code context (simplified - in production would load actual file content)
+      let codeContext = "";
+      try {
+        const fullPath = join(repoRoot, filePath);
+        if (existsSync(fullPath)) {
+          codeContext = readFileSync(fullPath, "utf-8").slice(0, 10000); // First 10KB
+        }
+      } catch (error) {
+        console.warn(`[penny-worker] Failed to read file ${filePath}: ${
+          error instanceof Error ? error.message : String(error)
+        }`);
+      }
+
+      const repairRequest: RepairJobRequest = {
+        run_id: runId,
+        finding_id: findingId,
+        project_id: projectId,
+        file_path: filePath,
+        finding_title: title,
+        finding_severity: severity,
+        finding_type: "bug",
+        description: description,
+        code_context: codeContext,
+        repair_config: {
+          beam_width: 4,
+          max_depth: 4,
+          timeout_seconds: 180,
+          language: "typescript",
+        },
+      };
+
+      // Submit job (non-blocking)
+      const jobResponse = await repairClient.submitJob(repairRequest);
+
+      // Update finding with repair job ID
+      finding.repair_job_id = jobResponse.repair_job_id;
+      finding.repair_status = "submitted";
+
+      console.log(
+        `[penny-worker] Submitted repair job ${jobResponse.repair_job_id} for finding ${findingId}`
+      );
+    } catch (error) {
+      console.error(
+        `[penny-worker] Failed to submit repair for finding ${finding.finding_id}: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      // Continue with next finding on error
+    }
+  }
+}
+
 export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> {
   const job = await claimJob(pool, dbJobId);
   if (!job) {
@@ -1054,6 +1186,40 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             }`
           );
         }
+
+        // Trigger repairs for eligible findings (non-blocking)
+        // Extract project_id from the audit run payload if available
+        const projectIdFromPayload =
+          typeof payload.project_id === "string" ? payload.project_id : undefined;
+        if (projectIdFromPayload && added > 0) {
+          try {
+            await triggerRepairsForFindings(
+              projectIdFromPayload,
+              job.id,
+              merged,
+              execution.repoRoot
+            );
+            // Save findings again with repair_job_ids
+            await saveProject(pool, {
+              ...(prev ?? {}),
+              name: project.name,
+              findings: merged,
+              manifest: {
+                ...execution.manifest,
+                domains: coverageDomains,
+              },
+              decisionHistory,
+              lastUpdated: new Date().toISOString(),
+            });
+          } catch (repairError) {
+            console.warn(
+              `[penny-worker] repair trigger skipped for ${project.name}: ${
+                repairError instanceof Error ? repairError.message : String(repairError)
+              }`
+            );
+          }
+        }
+
         summaries.push(
           `${project.name}: +${added} findings, ${coverageComplete ? "coverage complete" : "coverage partial"}`
         );
