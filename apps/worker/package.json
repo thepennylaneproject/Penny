@@ -1,0 +1,31 @@
+{
+  "name": "penny-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "admin": "tsx src/scripts/admin.ts",
+    "admin:health": "tsx src/scripts/admin.ts health",
+    "admin:queue": "tsx src/scripts/admin.ts queue",
+    "admin:repair": "tsx src/scripts/admin.ts repair",
+    "admin:list-jobs": "tsx src/scripts/admin.ts list-jobs",
+    "admin:list-repairs": "tsx src/scripts/admin.ts list-repairs"
+  },
+  "dependencies": {
+    "bullmq": "^5.34.0",
+    "dotenv": "^16.4.5",
+    "ioredis": "^5.4.1",
+    "pg": "^8.13.1",
+    "redis": "^5.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/pg": "^8.11.0",
+    "get-tsconfig": "^4.13.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.0"
+  }
+}
