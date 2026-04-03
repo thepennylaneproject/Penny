@@ -34,6 +34,7 @@ import {
   type ProjectManifest,
 } from "./manifest.js";
 import { getRepairClient, type RepairJobRequest } from "./repair-client.js";
+import { authenticatedCloneUrl, isGitHubAppConfigured } from "./github-app.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFileCache = new Map<string, string>();
@@ -250,6 +251,7 @@ interface StoredProject {
   findings: unknown[];
   status?: string;
   repositoryUrl?: string;
+  github_app_installation_id?: string;
   sourceType?: string;
   sourceRef?: string;
   repoAccess?: {
@@ -600,7 +602,7 @@ async function executeProjectAudit(
   payload: Record<string, unknown>,
   pool: pg.Pool
 ): Promise<ProjectAuditExecution> {
-  const repoAccess = resolveProjectRepo(
+  const repoAccess = await resolveProjectRepo(
     project,
     typeof payload.repo_ref === "string" ? payload.repo_ref : undefined
   );
@@ -1423,13 +1425,13 @@ function readProjectExpectations(project: StoredProject, fallbackRepoRoot: strin
   return readExpectations(fallbackRepoRoot, "audits/expectations.md");
 }
 
-function resolveProjectRepo(
+async function resolveProjectRepo(
   project: StoredProject,
   repoRef?: string
-): {
+): Promise<{
   repoRoot: string;
   cleanup?: () => void;
-} {
+}> {
   const sourceType = project.sourceType ?? "portfolio_mirror";
   const sourceRef =
     project.repoAccess?.localPath ??
@@ -1450,9 +1452,14 @@ function resolveProjectRepo(
     if (!sourceRef) {
       throw new Error(`Project "${project.name}" is missing repository URL`);
     }
+    // Use GitHub App installation token when available
+    let cloneUrl = sourceRef;
+    if (isGitHubAppConfigured()) {
+      cloneUrl = await authenticatedCloneUrl(sourceRef, project.github_app_installation_id);
+    }
     const target = mkdtempSync(join(tmpdir(), "penny-worker-"));
     try {
-      execFileSync(GIT, ["clone", "--depth", "1", sourceRef, target], {
+      execFileSync(GIT, ["clone", "--depth", "1", cloneUrl, target], {
         encoding: "utf8",
         stdio: "pipe",
         timeout: 60_000,
