@@ -10,7 +10,7 @@ RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Copy source code
 COPY tsconfig.json ./
@@ -31,7 +31,7 @@ RUN apk add --no-cache tini git
 COPY package.json package-lock.json ./
 
 # Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
+RUN npm install --omit=dev && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist

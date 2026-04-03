@@ -10,13 +10,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements file
-COPY services/repair/requirements.txt .
+COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy entire repair service
-COPY services/repair/ .
+COPY . .
 
 # Expose port (Railway provides PORT env var at runtime)
 EXPOSE 8000
