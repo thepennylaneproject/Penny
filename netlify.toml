@@ -1,0 +1,17 @@
+[build]
+command = "turbo run build --filter penny-dashboard"
+publish = "apps/dashboard/.next"
+
+[build.environment]
+# Sentry DSNs are intentionally public (embedded in browser bundles).
+# Omit them from secrets scanning so the build doesn't fail when they
+# are set as Netlify env vars.
+SECRETS_SCAN_OMIT_KEYS = "SENTRY_DSN,NEXT_PUBLIC_SENTRY_DSN,PENNY_SENTRY_DSN"
+
+[[plugins]]
+package = "@netlify/plugin-nextjs"
+
+[[headers]]
+for = "/_next/static/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
