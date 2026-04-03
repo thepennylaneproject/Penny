@@ -1,8 +1,6 @@
 [build]
-# Use Docker for build (most flexible for Python + system dependencies)
 builder = "dockerfile"
-dockerfilePath = "services/repair/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-# Railway sets PORT env var; don't hardcode 8000
 restartPolicyMaxRetries = 3
