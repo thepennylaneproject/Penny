@@ -25,7 +25,7 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Install runtime dependencies only
-RUN apk add --no-cache tini
+RUN apk add --no-cache tini git
 
 # Copy package files
 COPY package.json package-lock.json ./

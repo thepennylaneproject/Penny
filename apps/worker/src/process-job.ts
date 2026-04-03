@@ -68,10 +68,15 @@ function findGit(): string {
   try {
     return execSync("which git", { encoding: "utf8" }).trim();
   } catch {
-    throw new Error("git binary not found — install Xcode Command Line Tools or git");
+    throw new Error("git binary not found — install git in the container or on the host");
   }
 }
-const GIT = findGit();
+// Lazily resolved — only called when a git clone is actually needed
+let _git: string | null = null;
+function getGit(): string {
+  if (!_git) _git = findGit();
+  return _git;
+}
 
 /**
  * Maps audit_kind to the prompt file(s) that should be loaded for that pass.
@@ -1459,13 +1464,13 @@ async function resolveProjectRepo(
     }
     const target = mkdtempSync(join(tmpdir(), "penny-worker-"));
     try {
-      execFileSync(GIT, ["clone", "--depth", "1", cloneUrl, target], {
+      execFileSync(getGit(), ["clone", "--depth", "1", cloneUrl, target], {
         encoding: "utf8",
         stdio: "pipe",
         timeout: 60_000,
       });
       if (repoRef?.trim()) {
-        execFileSync(GIT, ["-C", target, "checkout", repoRef.trim()], {
+        execFileSync(getGit(), ["-C", target, "checkout", repoRef.trim()], {
           encoding: "utf8",
           stdio: "pipe",
           timeout: 60_000,
