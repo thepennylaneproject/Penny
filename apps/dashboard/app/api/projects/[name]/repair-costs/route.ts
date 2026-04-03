@@ -6,14 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = { params: Promise<{ name: string }> };
 
 export async function GET(
   request: NextRequest,
   { params }: Params
 ) {
   try {
-    const { projectId } = await params;
+    const { name: projectId } = await params;
     // First get all repair jobs for this project
     const { data: jobs, error: jobsError } = await supabase
       .from("repair_jobs")
