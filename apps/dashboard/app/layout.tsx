@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DM_Serif_Display, Inter, JetBrains_Mono } from "next/font/google";
+import { SentryVerifyButton } from "@/components/sentry-verify-button";
 import "./globals.css";
 
 const inter = Inter({
@@ -34,7 +35,10 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${jetBrainsMono.variable} ${dmSerifDisplay.variable}`}
     >
-      <body className="antialiased min-h-screen">{children}</body>
+      <body className="antialiased min-h-screen">
+        {children}
+        <SentryVerifyButton />
+      </body>
     </html>
   );
 }
