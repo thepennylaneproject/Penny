@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import { createSupabaseServerClient } from "@/lib/supabase";
 
 type Params = { params: Promise<{ name: string }> };
 
@@ -12,6 +7,10 @@ export async function GET(
   request: NextRequest,
   { params }: Params
 ) {
+  const supabase = createSupabaseServerClient();
+  if (!supabase) {
+    return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
+  }
   try {
     const { name: projectId } = await params;
     // First get all repair jobs for this project
