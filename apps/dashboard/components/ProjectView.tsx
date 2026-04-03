@@ -15,6 +15,9 @@ import { OnboardingReviewPanel } from "./OnboardingReviewPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { BulkActionsPanel } from "./BulkActionsPanel";
 import { ProjectManagementPanel } from "./ProjectManagementPanel";
+import { ProjectRepairConfig } from "./ProjectRepairConfig";
+import { RepairCostEstimator } from "./RepairCostEstimator";
+import { useRepairCosts } from "@/hooks/use-repair-costs";
 import { STATUS_GROUPS, sortFindings } from "@/lib/constants";
 import { UI_COPY } from "@/lib/ui-copy";
 
@@ -70,6 +73,8 @@ export function ProjectView({
     bulk: false,
     linear: false,
     history: false,
+    repair: false,
+    repairConfig: false,
   });
   const [tab, setTab] = useState<ProjectTab>("findings");
   const filterStorageKey = `penny_pv_filter_${project.name}`;
@@ -109,6 +114,11 @@ export function ProjectView({
   useEffect(() => {
     setFindings(project.findings ?? []);
   }, [project.name, project.findings]);
+
+  // Fetch repair costs for this project
+  const { costs: repairCosts, totalCost } = useRepairCosts(project.name, {
+    enabled: opsHydrated.repair,
+  });
 
   const filtered = sortFindings(
     findings.filter((f) => {
@@ -472,6 +482,84 @@ export function ProjectView({
               ) : (
                 <p style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)", margin: 0 }}>
                   Expand to load audit run history.
+                </p>
+              )}
+            </div>
+          </details>
+
+          <details
+            style={{
+              border: "0.5px solid var(--ink-border-faint)",
+              borderRadius: "var(--radius-md)",
+              padding: "0.5rem 0.75rem",
+              background: "var(--ink-bg-sunken)",
+            }}
+            onToggle={(e) => {
+              if ((e.target as HTMLDetailsElement).open) {
+                setOpsHydrated((s) => ({ ...s, repair: true }));
+              }
+            }}
+          >
+            <summary
+              style={{
+                fontSize: "11px",
+                fontFamily: "var(--font-mono)",
+                color: "var(--ink-text-3)",
+                cursor: "pointer",
+              }}
+            >
+              Repair Operations
+            </summary>
+            <div style={{ marginTop: "1rem" }}>
+              {opsHydrated.repair ? (
+                <RepairCostEstimator
+                  costs={repairCosts}
+                  jobCount={repairCosts.length}
+                  averageConfidence={undefined}
+                />
+              ) : (
+                <p style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)", margin: 0 }}>
+                  Expand to load repair cost dashboard.
+                </p>
+              )}
+            </div>
+          </details>
+
+          <details
+            style={{
+              border: "0.5px solid var(--ink-border-faint)",
+              borderRadius: "var(--radius-md)",
+              padding: "0.5rem 0.75rem",
+              background: "var(--ink-bg-sunken)",
+            }}
+            onToggle={(e) => {
+              if ((e.target as HTMLDetailsElement).open) {
+                setOpsHydrated((s) => ({ ...s, repairConfig: true }));
+              }
+            }}
+          >
+            <summary
+              style={{
+                fontSize: "11px",
+                fontFamily: "var(--font-mono)",
+                color: "var(--ink-text-3)",
+                cursor: "pointer",
+              }}
+            >
+              Repair Configuration
+            </summary>
+            <div style={{ marginTop: "1rem" }}>
+              {opsHydrated.repairConfig ? (
+                <ProjectRepairConfig
+                  projectName={project.name}
+                  settings={{}}
+                  onSave={async (settings) => {
+                    // Handle save to backend
+                  }}
+                />
+              ) : (
+                <p style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)", margin: 0 }}>
+                  Expand to load repair configuration.
                 </p>
               )}
             </div>
