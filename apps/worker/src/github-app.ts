@@ -11,7 +11,7 @@
  *   4. Inject the token into the clone URL as x-access-token
  */
 
-import { createSign, createPrivateKey } from "node:crypto";
+import { createSign, createPrivateKey, type KeyObject } from "node:crypto";
 
 const GITHUB_APP_ID = process.env.GITHUB_APP_ID?.trim();
 const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY?.trim()
@@ -20,6 +20,30 @@ const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY?.trim()
 
 function base64url(buf: Buffer): string {
   return buf.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+/**
+ * Parse the private key from PEM, handling both PKCS#1 and PKCS#8 formats.
+ * Works around OpenSSL 3 / Alpine issues by extracting the DER bytes from
+ * the PEM body and passing them explicitly with the correct type flag.
+ */
+function parsePrivateKey(pem: string): KeyObject {
+  // Strip all whitespace-only lines and PEM headers, join the base64 body
+  const body = pem
+    .split("\n")
+    .map(l => l.trim())
+    .filter(l => l && !l.startsWith("-----"))
+    .join("");
+  const der = Buffer.from(body, "base64");
+
+  // Detect format from the PEM header
+  const isPkcs8 = pem.includes("BEGIN PRIVATE KEY");
+  try {
+    return createPrivateKey({ key: der, format: "der", type: isPkcs8 ? "pkcs8" : "pkcs1" });
+  } catch {
+    // Fallback: try the other type
+    return createPrivateKey({ key: der, format: "der", type: isPkcs8 ? "pkcs1" : "pkcs8" });
+  }
 }
 
 /** Create a GitHub App JWT valid for ~9 minutes. */
@@ -33,10 +57,8 @@ function createAppJwt(): string {
     Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 540, iss: GITHUB_APP_ID }))
   );
   const data = `${header}.${payload}`;
-  // createPrivateKey handles both PKCS#1 (-----BEGIN RSA PRIVATE KEY-----)
-  // and PKCS#8 (-----BEGIN PRIVATE KEY-----) formats, which matters on
-  // OpenSSL 3.x (Alpine/Node 22) where raw PKCS#1 keys are rejected by createSign.
-  const privateKey = createPrivateKey(GITHUB_APP_PRIVATE_KEY);
+  // createPrivateKey handles both PKCS#1 and PKCS#8, using DER to bypass PEM formatting issues
+  const privateKey = parsePrivateKey(GITHUB_APP_PRIVATE_KEY);
   const sign = createSign("RSA-SHA256");
   sign.update(data);
   const sig = base64url(sign.sign(privateKey));
