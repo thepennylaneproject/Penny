@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import type pg from "pg";
@@ -52,6 +52,25 @@ function repoRoot(): string {
   // src/ → worker/ → apps/ → repo root (3 levels up)
   return join(__dirname, "..", "..", "..");
 }
+
+/** Resolve the absolute path to the git binary. */
+function findGit(): string {
+  const candidates = [
+    "/usr/bin/git",
+    "/usr/local/bin/git",
+    "/opt/homebrew/bin/git",
+  ];
+  for (const p of candidates) {
+    if (existsSync(p)) return p;
+  }
+  // Fall back to PATH lookup
+  try {
+    return execSync("which git", { encoding: "utf8" }).trim();
+  } catch {
+    throw new Error("git binary not found — install Xcode Command Line Tools or git");
+  }
+}
+const GIT = findGit();
 
 /**
  * Maps audit_kind to the prompt file(s) that should be loaded for that pass.
@@ -1433,13 +1452,13 @@ function resolveProjectRepo(
     }
     const target = mkdtempSync(join(tmpdir(), "penny-worker-"));
     try {
-      execFileSync("git", ["clone", "--depth", "1", sourceRef, target], {
+      execFileSync(GIT, ["clone", "--depth", "1", sourceRef, target], {
         encoding: "utf8",
         stdio: "pipe",
         timeout: 60_000,
       });
       if (repoRef?.trim()) {
-        execFileSync("git", ["-C", target, "checkout", repoRef.trim()], {
+        execFileSync(GIT, ["-C", target, "checkout", repoRef.trim()], {
           encoding: "utf8",
           stdio: "pipe",
           timeout: 60_000,
