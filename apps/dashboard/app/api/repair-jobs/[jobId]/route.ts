@@ -6,11 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type Params = { params: Promise<{ jobId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: Params
 ) {
   try {
+    const { jobId } = await params;
     const { data, error } = await supabase
       .from("repair_jobs")
       .select(
@@ -35,11 +38,11 @@ export async function GET(
         completed_at
       `
       )
-      .eq("repair_job_id", params.jobId)
+      .eq("repair_job_id", jobId)
       .single();
 
     if (error) {
-      console.error(`[repair-jobs API] Error fetching job ${params.jobId}:`, error);
+      console.error(`[repair-jobs API] Error fetching job ${jobId}:`, error);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -54,7 +57,7 @@ export async function GET(
     const { count } = await supabase
       .from("repair_candidates")
       .select("id", { count: "exact", head: true })
-      .eq("repair_job_id", params.jobId);
+      .eq("repair_job_id", jobId);
 
     return NextResponse.json({
       ...data,

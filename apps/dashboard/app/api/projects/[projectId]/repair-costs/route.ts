@@ -6,20 +6,23 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type Params = { params: Promise<{ projectId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { projectId: string } }
+  { params }: Params
 ) {
   try {
+    const { projectId } = await params;
     // First get all repair jobs for this project
     const { data: jobs, error: jobsError } = await supabase
       .from("repair_jobs")
       .select("id")
-      .eq("project_id", params.projectId);
+      .eq("project_id", projectId);
 
     if (jobsError) {
       console.error(
-        `[repair-costs API] Error fetching jobs for project ${params.projectId}:`,
+        `[repair-costs API] Error fetching jobs for project ${projectId}:`,
         jobsError
       );
       return NextResponse.json({ error: jobsError.message }, { status: 400 });
@@ -51,7 +54,7 @@ export async function GET(
 
     if (costsError) {
       console.error(
-        `[repair-costs API] Error fetching costs for project ${params.projectId}:`,
+        `[repair-costs API] Error fetching costs for project ${projectId}:`,
         costsError
       );
       return NextResponse.json({ error: costsError.message }, { status: 400 });

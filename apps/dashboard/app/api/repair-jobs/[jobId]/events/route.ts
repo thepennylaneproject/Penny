@@ -6,11 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+type Params = { params: Promise<{ jobId: string }> };
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: { jobId: string } }
+  { params }: Params
 ) {
   try {
+    const { jobId } = await params;
     const { data, error } = await supabase
       .from("orchestration_events")
       .select(
@@ -24,12 +27,12 @@ export async function GET(
         created_at
       `
       )
-      .eq("repair_job_id", params.jobId)
+      .eq("repair_job_id", jobId)
       .order("created_at", { ascending: false });
 
     if (error) {
       console.error(
-        `[orchestration-events API] Error fetching events for ${params.jobId}:`,
+        `[orchestration-events API] Error fetching events for ${jobId}:`,
         error
       );
       return NextResponse.json({ error: error.message }, { status: 400 });
