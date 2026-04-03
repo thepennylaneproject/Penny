@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Badge } from "./Badge";
 import { ProgressBar } from "./ProgressBar";
 
 export interface RepairJob {
@@ -93,13 +92,15 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
           </p>
         </div>
         <div className="flex gap-2">
-          <Badge className={statusColors[job.status]}>
+          <span
+            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${statusColors[job.status]}`}
+          >
             {job.status === "in_progress" ? `${job.status}...` : job.status}
-          </Badge>
+          </span>
           {actionInfo && (
-            <Badge className="bg-indigo-100 text-indigo-800">
+            <span className="inline-flex items-center rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
               {actionInfo.emoji} {actionInfo.label}
-            </Badge>
+            </span>
           )}
         </div>
       </div>
@@ -115,11 +116,7 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
               {confidencePercent.toFixed(1)}%
             </span>
           </div>
-          <ProgressBar
-            value={confidencePercent}
-            max={100}
-            className="h-2"
-          />
+          <ProgressBar value={confidencePercent} max={100} />
 
           {/* Breakdown details */}
           {job.confidence_breakdown && (

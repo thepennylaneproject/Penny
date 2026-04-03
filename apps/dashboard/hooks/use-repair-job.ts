@@ -53,8 +53,21 @@ export function useRepairJob(
 
     try {
       const response = await apiFetch(`/api/repair-jobs/${jobId}`);
-      setJob(response as RepairJobStatus);
-      return response as RepairJobStatus;
+      if (!response.ok) {
+        const errBody = (await response.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        const msg =
+          typeof errBody.error === "string"
+            ? errBody.error
+            : `Request failed (${response.status})`;
+        setError(msg);
+        setJob(null);
+        return;
+      }
+      const data = (await response.json()) as RepairJobStatus;
+      setJob(data);
+      return data;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);

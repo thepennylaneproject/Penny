@@ -10,12 +10,10 @@ import { useRepairJob } from "@/hooks/use-repair-job";
 import { useRepairCandidates } from "@/hooks/use-repair-candidates";
 import { useOrchestrationEvents } from "@/hooks/use-orchestration-events";
 import { RepairJobMonitor } from "./RepairJobMonitor";
-import { RepairConfigTuner } from "./RepairConfigTuner";
+import { RepairConfigTuner, type RepairConfig } from "./RepairConfigTuner";
 import { CandidateComparison } from "./CandidateComparison";
 import { PRManager } from "./PRManager";
 import { RepairHistory } from "./RepairHistory";
-import type { ProjectRepairSettings } from "./ProjectRepairConfig";
-
 interface FindingLifecyclePayload {
   linear: {
     integration_configured: boolean;
@@ -145,7 +143,7 @@ export function FindingDetail({
     }
   };
 
-  const handleSubmitRepair = async (config: ProjectRepairSettings) => {
+  const handleSubmitRepair = async (config: RepairConfig) => {
     setRepairSubmitting(true);
     try {
       const response = await apiFetch("/api/repair-jobs", {
