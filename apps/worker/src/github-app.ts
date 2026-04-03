@@ -12,6 +12,10 @@
  */
 
 import { createSign, createPrivateKey, type KeyObject } from "node:crypto";
+import { writeFileSync, unlinkSync, mkdirSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 
 const GITHUB_APP_ID = process.env.GITHUB_APP_ID?.trim();
 const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY?.trim()
@@ -119,13 +123,56 @@ async function getInstallationToken(installationId: string): Promise<string> {
 }
 
 /**
+ * Download a repo via GitHub's tarball API and extract it to `targetDir`.
+ * Uses `tar` (available everywhere — no git needed).
+ *
+ * Automatically looks up the GitHub App installation for the repo and
+ * generates a short-lived token — no per-project configuration required.
+ */
+export async function downloadRepoTarball(
+  repoUrl: string,
+  targetDir: string,
+  installationId?: string
+): Promise<void> {
+  const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
+  if (!match) throw new Error(`Cannot parse GitHub owner/repo from URL: ${repoUrl}`);
+  const [, owner, repo] = match;
+
+  const id = installationId ?? (await getInstallationId(repoUrl));
+  const token = await getInstallationToken(id);
+
+  const tarballUrl = `https://api.github.com/repos/${owner}/${repo}/tarball`;
+  const res = await fetch(tarballUrl, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
+      "User-Agent": "penny-worker",
+    },
+    redirect: "follow",
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Tarball download failed for ${owner}/${repo} (${res.status}): ${body}`);
+  }
+
+  const buf = Buffer.from(await res.arrayBuffer());
+  const tmpFile = join(tmpdir(), `penny-tarball-${Date.now()}.tar.gz`);
+  writeFileSync(tmpFile, buf);
+  mkdirSync(targetDir, { recursive: true });
+  try {
+    execFileSync("tar", ["xzf", tmpFile, "-C", targetDir, "--strip-components=1"], {
+      stdio: "pipe",
+      timeout: 60_000,
+    });
+  } finally {
+    try { unlinkSync(tmpFile); } catch { /* ignore */ }
+  }
+}
+
+/**
  * Build an authenticated HTTPS clone URL using a GitHub App installation token.
- *
- * Automatically looks up the installation ID from the repo URL — no per-project
- * configuration required as long as the app is installed on the repo.
- *
- * Input:  https://github.com/owner/repo  (or .git suffix)
- * Output: https://x-access-token:TOKEN@github.com/owner/repo.git
+ * Kept for environments where git IS available.
  */
 export async function authenticatedCloneUrl(
   repoUrl: string,

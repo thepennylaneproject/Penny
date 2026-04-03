@@ -34,7 +34,7 @@ import {
   type ProjectManifest,
 } from "./manifest.js";
 import { getRepairClient, type RepairJobRequest } from "./repair-client.js";
-import { authenticatedCloneUrl, isGitHubAppConfigured } from "./github-app.js";
+import { authenticatedCloneUrl, downloadRepoTarball, isGitHubAppConfigured } from "./github-app.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFileCache = new Map<string, string>();
@@ -1457,24 +1457,25 @@ async function resolveProjectRepo(
     if (!sourceRef) {
       throw new Error(`Project "${project.name}" is missing repository URL`);
     }
-    // Use GitHub App installation token when available
-    let cloneUrl = sourceRef;
-    if (isGitHubAppConfigured()) {
-      cloneUrl = await authenticatedCloneUrl(sourceRef, project.github_app_installation_id);
-    }
     const target = mkdtempSync(join(tmpdir(), "penny-worker-"));
     try {
-      execFileSync(getGit(), ["clone", "--depth", "1", cloneUrl, target], {
-        encoding: "utf8",
-        stdio: "pipe",
-        timeout: 60_000,
-      });
-      if (repoRef?.trim()) {
-        execFileSync(getGit(), ["-C", target, "checkout", repoRef.trim()], {
+      if (isGitHubAppConfigured()) {
+        // Use GitHub API tarball download — no git binary required
+        await downloadRepoTarball(sourceRef, target, project.github_app_installation_id);
+      } else {
+        // Fallback: plain git clone (requires git in PATH)
+        execFileSync(getGit(), ["clone", "--depth", "1", sourceRef, target], {
           encoding: "utf8",
           stdio: "pipe",
           timeout: 60_000,
         });
+        if (repoRef?.trim()) {
+          execFileSync(getGit(), ["-C", target, "checkout", repoRef.trim()], {
+            encoding: "utf8",
+            stdio: "pipe",
+            timeout: 60_000,
+          });
+        }
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
