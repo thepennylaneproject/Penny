@@ -46,12 +46,23 @@ async function loadAll(): Promise<Project[]> {
 
 async function saveAll(projects: Project[]): Promise<void> {
   const filePath = getFilePath();
-  await ensureDir(filePath);
-  await writeFile(
-    filePath,
-    JSON.stringify({ projects, updatedAt: new Date().toISOString() }, null, 2),
-    "utf-8"
-  );
+  try {
+    await ensureDir(filePath);
+    await writeFile(
+      filePath,
+      JSON.stringify({ projects, updatedAt: new Date().toISOString() }, null, 2),
+      "utf-8"
+    );
+  } catch (e: unknown) {
+    const code = e && typeof e === "object" && "code" in e ? String((e as {code: unknown}).code) : "";
+    if (code === "EROFS" || code === "EACCES" || code === "EPERM") {
+      throw new Error(
+        "Project data cannot be saved: the filesystem is read-only (likely a serverless environment). " +
+        "Set DATABASE_URL in your environment to use a persistent PostgreSQL database."
+      );
+    }
+    throw e;
+  }
 }
 
 export function createJsonRepository(): ProjectsRepository {

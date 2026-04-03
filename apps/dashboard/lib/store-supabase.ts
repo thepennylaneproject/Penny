@@ -197,20 +197,24 @@ export function createSupabaseRepository(): ProjectsRepository {
       const eventsFqn = `${quoteIdent(cfg.schema)}.${quoteIdent(cfg.eventsTable)}`;
       const snapshotsFqn = `${quoteIdent(cfg.schema)}.${quoteIdent(cfg.snapshotsTable)}`;
 
-      await db.transaction(async (q) => {
-        // FK on project is ON DELETE SET NULL — remove rows so the project leaves no audit/job history.
-        await q(`DELETE FROM public.penny_audit_runs WHERE project_name = $1`, [canonical]);
-        await q(`DELETE FROM public.penny_audit_jobs WHERE project_name = $1`, [canonical]);
-        await q(`DELETE FROM ${eventsFqn} WHERE project_name = $1`, [canonical]);
-        await q(`DELETE FROM ${snapshotsFqn} WHERE project_name = $1`, [canonical]);
-        const result = await q(
-          `DELETE FROM ${TABLE} WHERE name = $1 RETURNING name`,
-          [canonical]
-        );
-        if (result.length === 0) {
-          throw new Error(`Project ${name} not found`);
-        }
-      });
+      // Best-effort cleanup of related records. These tables may not exist in
+      // all environments (e.g. fresh Supabase project without a full schema),
+      // so we use Promise.allSettled and ignore individual failures so that a
+      // missing cleanup table never blocks the authoritative project delete.
+      await Promise.allSettled([
+        db.query(`DELETE FROM public.penny_audit_runs WHERE project_name = $1`, [canonical]),
+        db.query(`DELETE FROM public.penny_audit_jobs WHERE project_name = $1`, [canonical]),
+        db.query(`DELETE FROM ${eventsFqn} WHERE project_name = $1`, [canonical]),
+        db.query(`DELETE FROM ${snapshotsFqn} WHERE project_name = $1`, [canonical]),
+      ]);
+
+      const result = await db.query(
+        `DELETE FROM ${TABLE} WHERE name = $1 RETURNING name`,
+        [canonical]
+      );
+      if (result.length === 0) {
+        throw new Error(`Project ${name} not found`);
+      }
 
       await recordDurableEventBestEffort({
         event_type: "project_deleted",
