@@ -32,3 +32,6 @@ coverage/
 # Temporary
 *.tmp
 *.log
+
+# Supabase CLI temp files (contain real project refs — never commit)
+supabase/.temp/
