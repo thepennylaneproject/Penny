@@ -206,17 +206,26 @@ export class RepairServiceClient {
 
     for (let attempt = 0; attempt < this.maxRetries; attempt++) {
       try {
-        const response = await fetch(url, {
-          ...options,
-          timeout: 30000, // 30 second timeout
-        });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-        // Don't retry on client errors (4xx)
-        if (response.status >= 400 && response.status < 500) {
+        try {
+          const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          // Don't retry on client errors (4xx)
+          if (response.status >= 400 && response.status < 500) {
+            return response;
+          }
+
           return response;
+        } finally {
+          clearTimeout(timeoutId);
         }
-
-        return response;
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
 
