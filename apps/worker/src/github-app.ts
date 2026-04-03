@@ -28,20 +28,24 @@ function base64url(buf: Buffer): string {
  * the PEM body and passing them explicitly with the correct type flag.
  */
 function parsePrivateKey(pem: string): KeyObject {
-  // Strip all whitespace-only lines and PEM headers, join the base64 body
-  const body = pem
-    .split("\n")
-    .map(l => l.trim())
-    .filter(l => l && !l.startsWith("-----"))
-    .join("");
-  const der = Buffer.from(body, "base64");
+  // Log diagnostics to help debug Railway env var encoding issues
+  const hasRealNewlines = pem.includes("\n");
+  const hasLiteralNewlines = pem.includes("\\n");
+  const lines = pem.split("\n").map(l => l.trim()).filter(Boolean);
+  console.error(
+    `[github-app] key: ${pem.length} chars, ${lines.length} lines, ` +
+    `real_newlines=${hasRealNewlines}, literal_\\n=${hasLiteralNewlines}, ` +
+    `first="${lines[0]?.slice(0, 40)}", last="${lines[lines.length - 1]?.slice(0, 40)}"`
+  );
 
-  // Detect format from the PEM header
+  const body = lines.filter(l => !l.startsWith("-----")).join("");
+  console.error(`[github-app] base64 body: ${body.length} chars → ${Math.floor(body.length * 3 / 4)} DER bytes`);
+
+  const der = Buffer.from(body, "base64");
   const isPkcs8 = pem.includes("BEGIN PRIVATE KEY");
   try {
     return createPrivateKey({ key: der, format: "der", type: isPkcs8 ? "pkcs8" : "pkcs1" });
   } catch {
-    // Fallback: try the other type
     return createPrivateKey({ key: der, format: "der", type: isPkcs8 ? "pkcs1" : "pkcs8" });
   }
 }
