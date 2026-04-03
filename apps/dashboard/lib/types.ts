@@ -371,6 +371,8 @@ export interface Finding {
     decision: string;
     metadata?: Record<string, unknown>;
   }>;
+  /** V3.0: Active repair job ID for this finding (if in progress) */
+  repair_job_id?: string;
 }
 
 export interface ClusterSummary {

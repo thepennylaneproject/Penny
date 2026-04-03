@@ -6,6 +6,15 @@ import { isInQueuedSet } from "@/lib/finding-validation";
 import { UI_COPY } from "@/lib/ui-copy";
 import { apiFetch } from "@/lib/api-fetch";
 import { repairLedgerCaption } from "@/lib/repair-proof";
+import { useRepairJob } from "@/hooks/use-repair-job";
+import { useRepairCandidates } from "@/hooks/use-repair-candidates";
+import { useOrchestrationEvents } from "@/hooks/use-orchestration-events";
+import { RepairJobMonitor } from "./RepairJobMonitor";
+import { RepairConfigTuner } from "./RepairConfigTuner";
+import { CandidateComparison } from "./CandidateComparison";
+import { PRManager } from "./PRManager";
+import { RepairHistory } from "./RepairHistory";
+import type { ProjectRepairSettings } from "./ProjectRepairConfig";
 
 interface FindingLifecyclePayload {
   linear: {
@@ -80,9 +89,15 @@ export function FindingDetail({
   const [lifecycle, setLifecycle] = useState<FindingLifecyclePayload | null>(null);
   const [lifecycleLoading, setLifecycleLoading] = useState(true);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
+  const [repairSubmitting, setRepairSubmitting] = useState(false);
   const isQueued = isInQueuedSet(queuedFindingIds, projectName, finding.finding_id);
   const fix      = typeof finding.suggested_fix === "object" ? finding.suggested_fix : {};
   const stripe   = SEVERITY_BORDER[finding.severity ?? ""] ?? "var(--ink-border)";
+
+  // Repair job hooks (if repair_job_id exists on finding)
+  const { job, loading: jobLoading } = useRepairJob(finding.repair_job_id ?? null);
+  const { candidates } = useRepairCandidates(finding.repair_job_id ?? null);
+  const { events } = useOrchestrationEvents(finding.repair_job_id ?? null);
 
   const loadLifecycle = useCallback(async () => {
     setLifecycleError(null);
@@ -127,6 +142,32 @@ export function FindingDetail({
       await onAction(finding.finding_id, status);
     } finally {
       setActionInFlight(null);
+    }
+  };
+
+  const handleSubmitRepair = async (config: ProjectRepairSettings) => {
+    setRepairSubmitting(true);
+    try {
+      const response = await apiFetch("/api/repair-jobs", {
+        method: "POST",
+        body: JSON.stringify({
+          finding_id: finding.finding_id,
+          project_id: projectName,
+          config,
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        // Refresh lifecycle to show new repair job
+        await loadLifecycle();
+      } else {
+        const error = await response.json();
+        console.error("Failed to submit repair job:", error);
+      }
+    } catch (err) {
+      console.error("Error submitting repair job:", err);
+    } finally {
+      setRepairSubmitting(false);
     }
   };
 
@@ -453,6 +494,52 @@ export function FindingDetail({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Repair section */}
+      {finding.repair_job_id && job && (
+        <div style={{ marginBottom: "1.25rem" }}>
+          <SectionLabel>Automatic Repair</SectionLabel>
+          <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <RepairJobMonitor
+              job={job}
+              onRefresh={async () => {
+                // Re-fetch by manually refreshing
+              }}
+            />
+            {candidates.length > 0 && (
+              <CandidateComparison
+                candidates={candidates}
+                bestCandidateId={job.best_candidate_id}
+              />
+            )}
+            {job.pr_number && (
+              <PRManager
+                pr={job}
+                findingId={finding.finding_id}
+                onApprove={async () => {
+                  // Handle PR approval
+                }}
+                onMerge={async () => {
+                  // Handle PR merge
+                }}
+              />
+            )}
+            {events.length > 0 && <RepairHistory events={events} />}
+          </div>
+        </div>
+      )}
+
+      {/* Repair config tuner (if no active repair job) */}
+      {!finding.repair_job_id && (
+        <div style={{ marginBottom: "1.25rem" }}>
+          <SectionLabel>Configure Auto-Repair</SectionLabel>
+          <RepairConfigTuner
+            findingId={finding.finding_id}
+            onSubmit={handleSubmitRepair}
+            isLoading={repairSubmitting}
+          />
         </div>
       )}
 
