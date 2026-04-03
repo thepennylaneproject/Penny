@@ -11,7 +11,7 @@
  *   4. Inject the token into the clone URL as x-access-token
  */
 
-import { createSign } from "node:crypto";
+import { createSign, createPrivateKey } from "node:crypto";
 
 const GITHUB_APP_ID = process.env.GITHUB_APP_ID?.trim();
 const GITHUB_APP_PRIVATE_KEY = process.env.GITHUB_APP_PRIVATE_KEY?.trim()
@@ -33,9 +33,13 @@ function createAppJwt(): string {
     Buffer.from(JSON.stringify({ iat: now - 60, exp: now + 540, iss: GITHUB_APP_ID }))
   );
   const data = `${header}.${payload}`;
+  // createPrivateKey handles both PKCS#1 (-----BEGIN RSA PRIVATE KEY-----)
+  // and PKCS#8 (-----BEGIN PRIVATE KEY-----) formats, which matters on
+  // OpenSSL 3.x (Alpine/Node 22) where raw PKCS#1 keys are rejected by createSign.
+  const privateKey = createPrivateKey(GITHUB_APP_PRIVATE_KEY);
   const sign = createSign("RSA-SHA256");
   sign.update(data);
-  const sig = base64url(sign.sign(GITHUB_APP_PRIVATE_KEY));
+  const sig = base64url(sign.sign(privateKey));
   return `${data}.${sig}`;
 }
 
