@@ -9,7 +9,7 @@ publish = "apps/dashboard/.next"
 # NEXT_PUBLIC_* Supabase keys are intentionally embedded in the browser bundle
 # (anon key is protected by RLS; URL is required for client-side queries).
 # Sentry DSNs are intentionally public.
-SECRETS_SCAN_OMIT_KEYS = "SENTRY_DSN,NEXT_PUBLIC_SENTRY_DSN,PENNY_SENTRY_DSN,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY"
+SECRETS_SCAN_OMIT_KEYS = "SENTRY_DSN,NEXT_PUBLIC_SENTRY_DSN,PENNY_SENTRY_DSN,NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,REPAIR_SERVICE_URL"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"
