@@ -34,7 +34,7 @@ async function verifySessionCookie(
   return hex === hexSig;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (request.method === "OPTIONS") {
     return NextResponse.next();
   }
