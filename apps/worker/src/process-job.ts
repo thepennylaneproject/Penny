@@ -49,7 +49,8 @@ function readCachedPrompt(filePath: string): string {
 function repoRoot(): string {
   const env = process.env.penny_REPO_ROOT?.trim();
   if (env && existsSync(env)) return env;
-  return join(__dirname, "..", "..");
+  // src/ → worker/ → apps/ → repo root (3 levels up)
+  return join(__dirname, "..", "..", "..");
 }
 
 /**
@@ -63,21 +64,24 @@ function repoRoot(): string {
  */
 function loadClusterPrompts(auditKind?: string): { core: string; auditAgent: string } {
   const root = repoRoot();
-  const corePath = join(root, "core_system_prompt.md");
+  // core_system_prompt.md and agent files live in legacy/ after repo reorganization
+  const legacyDir = join(root, "legacy");
+  const corePath = join(legacyDir, "core_system_prompt.md");
   if (!existsSync(corePath)) {
     throw new Error(`core_system_prompt.md not found at ${corePath}`);
   }
   const core = readCachedPrompt(corePath);
 
-  const promptsDir = join(root, "audits", "prompts");
-
   /**
-   * Resolve a prompt file relative to prompts dir.
-   * Returns empty string if the file doesn't exist (never throws).
+   * Resolve a prompt file: check legacy/ first, then audits/prompts/ (for
+   * newer prompts like intelligence_extraction_prompt.md).
+   * Returns empty string if the file exists in neither location (never throws).
    */
   function prompt(filename: string): string {
-    const p = join(promptsDir, filename);
-    return readCachedPrompt(p);
+    const legacyPath = join(legacyDir, filename);
+    if (existsSync(legacyPath)) return readCachedPrompt(legacyPath);
+    const auditPath = join(root, "audits", "prompts", filename);
+    return readCachedPrompt(auditPath);
   }
 
   // Map audit_kind → prompt file(s), concatenated
