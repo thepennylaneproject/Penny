@@ -60,16 +60,37 @@ async function resolveCanonicalProjectIdentity(
 }
 
 export function createPool(): pg.Pool {
-  const url =
+  // Try environment variables in order of preference
+  let url =
     process.env.DATABASE_URL?.trim() ||
     process.env.penny_DATABASE_URL?.trim() ||
     "";
+
+  // If no direct database URL, try to construct from Supabase credentials
+  if (!url) {
+    const supabaseUrl = process.env.SUPABASE_URL?.trim();
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+
+    if (supabaseUrl && serviceRoleKey) {
+      try {
+        // Extract project ID from Supabase URL (e.g., https://abc123.supabase.co)
+        const projectId = new URL(supabaseUrl).hostname.split(".")[0];
+        // Construct Postgres connection string
+        // Format: postgresql://postgres:PASSWORD@db.PROJECT_ID.supabase.com:5432/postgres
+        url = `postgresql://postgres:${serviceRoleKey}@db.${projectId}.supabase.com:5432/postgres`;
+      } catch (e) {
+        console.warn("[penny-worker] Failed to construct Supabase connection string", e);
+      }
+    }
+  }
+
   if (!url) {
     throw new Error(
-      "DATABASE_URL or penny_DATABASE_URL is required. " +
-        "Add it to dashboard/.env.local or repo .env.local, or run from worker/ with worker/.env — see worker/README.md"
+      "Database connection required. Provide DATABASE_URL or SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. " +
+        "See railway env vars configuration."
     );
   }
+
   return new Pool({
     connectionString: url,
     ssl: url.includes("localhost") ? false : { rejectUnauthorized: false },
