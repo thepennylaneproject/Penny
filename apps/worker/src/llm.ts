@@ -28,7 +28,12 @@ export interface CoverageOut {
 }
 
 import { createHash } from "node:crypto";
-import { getRegistry } from "./providers/registry.js";
+import {
+  experimentalProvidersAllowed,
+  getRegistry,
+  resolveMaxEstimatedCostUsd,
+  type RoutingPolicy,
+} from "./providers/registry.js";
 
 export interface AuditLlmResult {
   findings: FindingOut[];
@@ -84,6 +89,7 @@ export function resolveModelChain(auditKind?: string): string[] {
   const configuredModel = process.env.penny_AUDIT_MODEL?.trim();
   const strategy = process.env.penny_ROUTING_STRATEGY?.trim().toLowerCase() || "balanced";
   const registry = getRegistry();
+  const experimentalOk = experimentalProvidersAllowed();
 
   // Explicit override — honour it, add safe tail fallbacks
   if (configuredModel) {
@@ -93,16 +99,22 @@ export function resolveModelChain(auditKind?: string): string[] {
           const { provider, modelId } = registry.inferProvider(configuredModel);
           return `${provider}:${modelId}`;
         })();
-    return dedupe([ref, "openai:mini", "aimlapi:cheap", "huggingface:small"]);
+    return dedupe([
+      ref,
+      "deepseek:chat",
+      "gemini:flash",
+      "openai:mini",
+      ...(experimentalOk ? ["aimlapi:cheap", "huggingface:small"] : []),
+    ]);
   }
 
   const ok = (name: string) => registry.getProvider(name)?.isConfigured() ?? false;
   const anthropicOk = ok("anthropic");
   const deepseekOk  = ok("deepseek");
   const geminiOk    = ok("gemini");
-  const aimlapiOk   = ok("aimlapi");
+  const aimlapiOk   = experimentalOk && ok("aimlapi");
   const openaiOk    = ok("openai");
-  // huggingface is always available (public models need no key)
+  const huggingfaceOk = experimentalOk;
 
   const HIGH_STAKES   = new Set(["security", "logic", "data", "code_debt", "investor_readiness", "intelligence"]);
   const LARGE_CONTEXT = new Set(["visual", "domain_manifest", "domain_pass", "portfolio_synthesize"]);
@@ -128,7 +140,8 @@ export function resolveModelChain(auditKind?: string): string[] {
       if (anthropicOk)                   chain.push("anthropic:haiku");
       if (aimlapiOk)                     chain.push("aimlapi:expensive");
       if (openaiOk)                      chain.push("openai:mini");
-      chain.push("aimlapi:mid", "huggingface:small");
+      if (aimlapiOk)                     chain.push("aimlapi:mid");
+      if (huggingfaceOk)                 chain.push("huggingface:small");
       break;
 
     case "aggressive":
@@ -140,14 +153,15 @@ export function resolveModelChain(auditKind?: string): string[] {
       if (geminiOk)                      chain.push("gemini:flash");
       if (aimlapiOk)                     chain.push("aimlapi:mid");
       if (openaiOk)                      chain.push("openai:mini");
-      chain.push("aimlapi:cheap", "huggingface:small");
+      if (aimlapiOk)                     chain.push("aimlapi:cheap");
+      if (huggingfaceOk)                 chain.push("huggingface:small");
       break;
 
     case "economy":
       // Free / near-free only
       if (geminiOk)                      chain.push("gemini:flash8b");
       if (aimlapiOk)                     chain.push("aimlapi:cheap");
-      chain.push("huggingface:small", "huggingface:nano");
+      if (huggingfaceOk)                 chain.push("huggingface:small", "huggingface:nano");
       if (openaiOk)                      chain.push("openai:mini");
       if (anthropicOk)                   chain.push("anthropic:haiku");
       break;
@@ -167,11 +181,24 @@ export function resolveModelChain(auditKind?: string): string[] {
       if (anthropicOk)                   chain.push("anthropic:haiku");
       if (aimlapiOk)                     chain.push("aimlapi:mid");
       if (openaiOk)                      chain.push("openai:mini");
-      chain.push("aimlapi:cheap", "huggingface:small");
+      if (aimlapiOk)                     chain.push("aimlapi:cheap");
+      if (huggingfaceOk)                 chain.push("huggingface:small");
       break;
   }
 
   return dedupe(chain);
+}
+
+export function resolveRoutingPolicy(input?: {
+  contextLabel?: string;
+  allowPremium?: boolean;
+}): RoutingPolicy {
+  return {
+    contextLabel: input?.contextLabel,
+    allowPremium: input?.allowPremium ?? false,
+    allowExperimental: experimentalProvidersAllowed(),
+    maxEstimatedCostUsd: resolveMaxEstimatedCostUsd(),
+  };
 }
 
 function dedupe(arr: string[]): string[] {
@@ -344,7 +371,10 @@ Return JSON: { "coverage": { ... }, "findings": [ ... ] } per audit-agent output
       responseFormat: "json_object",
       temperature: 0.2,
       maxTokens: 12288,
-    });
+    }, resolveRoutingPolicy({
+      contextLabel: auditKind ?? "full-audit",
+      allowPremium: false,
+    }));
   } catch (error) {
     console.error("[penny-worker] LLM call failed:", error);
     return {

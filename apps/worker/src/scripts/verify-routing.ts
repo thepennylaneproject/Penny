@@ -15,7 +15,13 @@ const workerRoot = resolve(new URL(".", import.meta.url).pathname, "../../..");
 loadDotenv({ path: resolve(workerRoot, ".env.local"), override: false });
 loadDotenv({ path: resolve(workerRoot, ".env"),       override: false });
 
-import { getRegistry } from "../providers/registry.js";
+import {
+  experimentalProvidersAllowed,
+  getModelMetadata,
+  getRegistry,
+  premiumAllowedByDefault,
+  resolveMaxEstimatedCostUsd,
+} from "../providers/registry.js";
 import { resolveModelChain } from "../llm.js";
 
 function main() {
@@ -44,7 +50,9 @@ function main() {
       const resolved = chain.map((ref) => {
         const [provName] = ref.split(":");
         const ok = registry.getProvider(provName)?.isConfigured() ?? false;
-        return ok ? ref : `(${ref})`;
+        const meta = getModelMetadata(ref);
+        const decorated = `${ref}[${meta.tier}${meta.experimental ? ",exp" : ""}]`;
+        return ok ? decorated : `(${decorated})`;
       });
       console.log(`  ${label.padEnd(28)} → ${resolved.join(" → ")}`);
     }
@@ -67,6 +75,8 @@ function main() {
     "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY",
     "GEMINI_API_KEY", "AIMLAPI_API_KEY", "HF_TOKEN",
     "penny_ROUTING_STRATEGY", "penny_AUDIT_MODEL",
+    "penny_ALLOW_PREMIUM_MODELS", "penny_ALLOW_PREMIUM_SYNTHESIS",
+    "penny_ENABLE_EXPERIMENTAL_PROVIDERS", "penny_MAX_ESTIMATED_LLM_CALL_USD",
   ];
   for (const v of vars) {
     const val = process.env[v];
@@ -75,6 +85,11 @@ function main() {
       : "not set";
     console.log(`  ${v.padEnd(30)}: ${display}`);
   }
+
+  console.log("\n=== Guardrails ===\n");
+  console.log(`  premium allowed by default        : ${premiumAllowedByDefault()}`);
+  console.log(`  experimental providers enabled   : ${experimentalProvidersAllowed()}`);
+  console.log(`  max estimated call cost usd      : ${resolveMaxEstimatedCostUsd().toFixed(4)}`);
 
   console.log("\n=== Done ===\n");
 }

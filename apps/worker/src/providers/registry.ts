@@ -6,6 +6,99 @@ import { GeminiProvider } from "./gemini.js";
 import { HuggingFaceProvider } from "./huggingface.js";
 import { AimlapiProvider } from "./aimlapi.js";
 
+export type ModelTier = "free" | "cheap" | "standard" | "premium";
+
+export interface ModelMetadata {
+  tier: ModelTier;
+  inputCostPer1M?: number;
+  outputCostPer1M?: number;
+  experimental?: boolean;
+}
+
+export interface RoutingPolicy {
+  allowPremium?: boolean;
+  allowExperimental?: boolean;
+  maxEstimatedCostUsd?: number;
+  contextLabel?: string;
+}
+
+const DEFAULT_MAX_ESTIMATED_LLM_CALL_USD = 0.25;
+
+const MODEL_METADATA: Record<string, ModelMetadata> = {
+  "openai:mini": { tier: "cheap", inputCostPer1M: 0.15, outputCostPer1M: 0.6 },
+  "openai:balanced": { tier: "premium", inputCostPer1M: 3.0, outputCostPer1M: 12.0 },
+
+  "anthropic:haiku": { tier: "standard", inputCostPer1M: 0.8, outputCostPer1M: 4.0 },
+  "anthropic:sonnet": { tier: "premium", inputCostPer1M: 3.0, outputCostPer1M: 15.0 },
+  "anthropic:opus": { tier: "premium", inputCostPer1M: 15.0, outputCostPer1M: 75.0 },
+
+  "deepseek:chat": { tier: "cheap", inputCostPer1M: 0.27, outputCostPer1M: 1.1 },
+  "deepseek:reasoner": { tier: "standard", inputCostPer1M: 0.55, outputCostPer1M: 2.19 },
+
+  "gemini:flash": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.4 },
+  "gemini:flash-2": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.4 },
+  "gemini:2.0-flash": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.4 },
+  "gemini:flash8b": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
+  "gemini:pro": { tier: "premium", inputCostPer1M: 1.25, outputCostPer1M: 5.0 },
+
+  "aimlapi:nano": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.1, experimental: true },
+  "aimlapi:cheap": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.1, experimental: true },
+  "aimlapi:mid": { tier: "standard", inputCostPer1M: 0.65, outputCostPer1M: 0.65, experimental: true },
+  "aimlapi:expensive": { tier: "premium", inputCostPer1M: 5.0, outputCostPer1M: 5.0, experimental: true },
+
+  "huggingface:nano": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0, experimental: true },
+  "huggingface:small": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0, experimental: true },
+  "huggingface:code-nano": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0, experimental: true },
+};
+
+function parseBooleanEnv(value: string | undefined): boolean {
+  if (!value) return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "on";
+}
+
+function estimateTokens(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
+
+export function premiumAllowedByDefault(): boolean {
+  return parseBooleanEnv(process.env.penny_ALLOW_PREMIUM_MODELS);
+}
+
+export function experimentalProvidersAllowed(): boolean {
+  return parseBooleanEnv(process.env.penny_ENABLE_EXPERIMENTAL_PROVIDERS);
+}
+
+export function resolveMaxEstimatedCostUsd(): number {
+  const raw = process.env.penny_MAX_ESTIMATED_LLM_CALL_USD?.trim();
+  const parsed = raw ? Number.parseFloat(raw) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_MAX_ESTIMATED_LLM_CALL_USD;
+  return parsed;
+}
+
+export function getModelMetadata(modelRef: string): ModelMetadata {
+  return MODEL_METADATA[modelRef] ?? { tier: "standard" };
+}
+
+export function estimateModelCostUsd(
+  modelRef: string,
+  request: LLMRequest
+): number | undefined {
+  const meta = getModelMetadata(modelRef);
+  if (
+    typeof meta.inputCostPer1M !== "number" ||
+    typeof meta.outputCostPer1M !== "number"
+  ) {
+    return undefined;
+  }
+
+  const inputTokens = estimateTokens(`${request.systemPrompt}\n\n${request.userPrompt}`);
+  const outputTokens = Math.max(1, request.maxTokens ?? 4096);
+  const inputCost = (inputTokens / 1_000_000) * meta.inputCostPer1M;
+  const outputCost = (outputTokens / 1_000_000) * meta.outputCostPer1M;
+  return inputCost + outputCost;
+}
+
 /**
  * Registry for LLM providers with ordered fallback chain support.
  *
@@ -50,13 +143,23 @@ export class ProviderRegistry {
    * Skips unconfigured providers and retries down the chain on failure.
    * Throws only when every model in the chain has been exhausted.
    */
-  async call(models: string[], request: LLMRequest): Promise<LLMResponse> {
+  async call(
+    models: string[],
+    request: LLMRequest,
+    policy: RoutingPolicy = {}
+  ): Promise<LLMResponse> {
     const errors: string[] = [];
     let attempts = 0;
+    const allowPremium = policy.allowPremium ?? premiumAllowedByDefault();
+    const allowExperimental = policy.allowExperimental ?? experimentalProvidersAllowed();
+    const maxEstimatedCostUsd = policy.maxEstimatedCostUsd ?? resolveMaxEstimatedCostUsd();
+    const contextLabel = policy.contextLabel?.trim() || "default";
 
     for (const modelRef of models) {
       const { provider: providerName, modelId } = this.parseModelRef(modelRef);
       const provider = this.getProvider(providerName);
+      const metadata = getModelMetadata(modelRef);
+      const estimatedCostUsd = estimateModelCostUsd(modelRef, request);
 
       if (!provider) {
         errors.push(`${modelRef}: provider not registered`);
@@ -66,11 +169,40 @@ export class ProviderRegistry {
         // Silent skip — unconfigured providers are not an error
         continue;
       }
+      if (metadata.experimental && !allowExperimental) {
+        const reason = `${modelRef}: experimental provider disabled`;
+        this.logger(`[routing] skipping ${modelRef} for ${contextLabel} (experimental provider disabled)`);
+        errors.push(reason);
+        continue;
+      }
+      if (metadata.tier === "premium" && !allowPremium) {
+        const reason = `${modelRef}: premium model blocked (set penny_ALLOW_PREMIUM_MODELS=true and pass allowPremium: true)`;
+        this.logger(`[routing] blocking premium model ${modelRef} for ${contextLabel}`);
+        errors.push(reason);
+        continue;
+      }
+      if (
+        typeof estimatedCostUsd === "number" &&
+        estimatedCostUsd > maxEstimatedCostUsd
+      ) {
+        const reason =
+          `${modelRef}: estimated call cost $${estimatedCostUsd.toFixed(4)} exceeds limit $${maxEstimatedCostUsd.toFixed(4)}`;
+        this.logger(`[routing] skipping ${modelRef} for ${contextLabel} (${reason})`);
+        errors.push(reason);
+        continue;
+      }
 
       try {
-        this.logger(`[routing] calling ${modelRef}`);
+        this.logger(
+          `[routing] calling ${modelRef} tier=${metadata.tier} context=${contextLabel}` +
+            (typeof estimatedCostUsd === "number" ? ` est=$${estimatedCostUsd.toFixed(4)}` : "")
+        );
         attempts += 1;
         const response = await provider.call(modelId, request);
+        this.logger(
+          `[routing] success ${modelRef}` +
+            (typeof response.costUsd === "number" ? ` actual=$${response.costUsd.toFixed(4)}` : "")
+        );
         return {
           ...response,
           attemptCount: attempts,

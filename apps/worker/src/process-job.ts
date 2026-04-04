@@ -11,7 +11,7 @@ import {
   type AuditScope,
   buildIntelligenceContext,
 } from "./context.js";
-import { auditWithLlm, resolveModelChain } from "./llm.js";
+import { auditWithLlm, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
 import {
   claimJob,
   completeJob,
@@ -1525,6 +1525,7 @@ async function runClusterSynthesize(
   const { getRegistry } = await import("./providers/registry.js");
   const registry = getRegistry();
   const synthChain = resolveModelChain("cluster_synthesize");
+  const allowPremiumSynthesis = process.env.penny_ALLOW_PREMIUM_SYNTHESIS?.trim().toLowerCase() === "true";
 
   let voiceStr = "";
   if (cluster === "standard") voiceStr = "Provide a technical summary of what's broken and how to fix it.";
@@ -1542,7 +1543,10 @@ async function runClusterSynthesize(
       userPrompt: blob,
       temperature: 0.2,
       maxTokens: 1000,
-    });
+    }, resolveRoutingPolicy({
+      contextLabel: `${cluster}-cluster-synthesis`,
+      allowPremium: allowPremiumSynthesis,
+    }));
     
     let content = llmRes.content?.trim() || "{}";
     if (content.startsWith("\`\`\`json")) content = content.replace(/^\`\`\`json/, "");
@@ -1610,6 +1614,7 @@ async function runMetaSynthesize(
   const { getRegistry } = await import("./providers/registry.js");
   const registry = getRegistry();
   const synthChain = resolveModelChain("meta_synthesize");
+  const allowPremiumSynthesis = process.env.penny_ALLOW_PREMIUM_SYNTHESIS?.trim().toLowerCase() === "true";
 
   let narrativeSummary = "No narrative summary generated.";
   let crossClusterP0s: string[] = [];
@@ -1621,7 +1626,10 @@ async function runMetaSynthesize(
       userPrompt: blob,
       temperature: 0.2,
       maxTokens: 1200,
-    });
+    }, resolveRoutingPolicy({
+      contextLabel: "meta-synthesis",
+      allowPremium: allowPremiumSynthesis,
+    }));
     
     let content = llmRes.content?.trim() || "{}";
     if (content.startsWith("\`\`\`json")) content = content.replace(/^\`\`\`json/, "");
@@ -1685,6 +1693,7 @@ Narrative: ${meta.narrativeSummary}`;
   const { getRegistry } = await import("./providers/registry.js");
   const registry = getRegistry();
   const synthChain = resolveModelChain("portfolio_synthesize");
+  const allowPremiumSynthesis = process.env.penny_ALLOW_PREMIUM_SYNTHESIS?.trim().toLowerCase() === "true";
 
   let portfolioNarrative = "No narrative summary generated.";
   let portfolioTop5: string[] = [];
@@ -1695,7 +1704,10 @@ Narrative: ${meta.narrativeSummary}`;
       userPrompt: blob,
       temperature: 0.2,
       maxTokens: 1500,
-    });
+    }, resolveRoutingPolicy({
+      contextLabel: "portfolio-synthesis",
+      allowPremium: allowPremiumSynthesis,
+    }));
     
     let content = llmRes.content?.trim() || "{}";
     if (content.startsWith("\`\`\`json")) content = content.replace(/^\`\`\`json/, "");
@@ -1748,6 +1760,7 @@ async function runSynthesize(
   let summary = `${scopeLabel}: ${projects.length} project(s), ${lines.length} finding lines.`;
   const registry = getRegistry();
   const synthChain = resolveModelChain("synthesize_project");
+  const allowPremiumSynthesis = process.env.penny_ALLOW_PREMIUM_SYNTHESIS?.trim().toLowerCase() === "true";
   const anyConfigured = synthChain.some((ref) => {
     const [p] = ref.split(":");
     return registry.getProvider(p)?.isConfigured() ?? false;
@@ -1760,7 +1773,10 @@ async function runSynthesize(
         responseFormat: "text",
         temperature: 0.3,
         maxTokens: 500,
-      });
+      }, resolveRoutingPolicy({
+        contextLabel: `summary-${scopeLabel}`,
+        allowPremium: allowPremiumSynthesis,
+      }));
       summary = llmRes.content || summary;
       console.log(
         `[penny-worker] synthesize via ${llmRes.provider}:${llmRes.model} cost=$${(llmRes.costUsd ?? 0).toFixed(4)}`
