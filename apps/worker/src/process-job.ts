@@ -242,15 +242,68 @@ async function runWithConcurrency<T>(
 ): Promise<T[]> {
   const results: T[] = new Array(tasks.length);
   let next = 0;
+  let failure: unknown = null;
   async function worker(): Promise<void> {
     while (next < tasks.length) {
+      if (failure) return;
       const i = next++;
-      results[i] = await tasks[i]();
+      try {
+        results[i] = await tasks[i]();
+      } catch (error) {
+        failure = error;
+        return;
+      }
     }
   }
   const workers = Array.from({ length: Math.min(limit, tasks.length) }, worker);
   await Promise.all(workers);
+  if (failure) throw failure;
   return results;
+}
+
+const DEFAULT_PASS_CONCURRENCY = 2;
+const DEFAULT_MAX_PROJECT_LLM_COST_USD = 0.5;
+const DEFAULT_MAX_PROJECT_LLM_FALLBACK_CALLS = 24;
+
+function resolvePassConcurrency(): number {
+  const raw = process.env.penny_PASS_CONCURRENCY?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PASS_CONCURRENCY;
+  return Math.min(parsed, 10);
+}
+
+function resolveMaxProjectLlmCostUsd(): number {
+  const raw = process.env.penny_MAX_PROJECT_LLM_COST_USD?.trim();
+  const parsed = raw ? Number.parseFloat(raw) : NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_MAX_PROJECT_LLM_COST_USD;
+  return parsed;
+}
+
+function resolveMaxProjectLlmFallbackCalls(): number {
+  const raw = process.env.penny_MAX_PROJECT_LLM_FALLBACK_CALLS?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 0) return DEFAULT_MAX_PROJECT_LLM_FALLBACK_CALLS;
+  return parsed;
+}
+
+function resolveAuditAbortReason(input: {
+  projectName: string;
+  completedPasses: number;
+  totalPasses: number;
+  totalLlmCostUsd: number;
+  totalFallbackCalls: number;
+}): string | null {
+  const maxCostUsd = resolveMaxProjectLlmCostUsd();
+  if (input.totalLlmCostUsd > maxCostUsd) {
+    return `${input.projectName}: stopped audit after ${input.completedPasses}/${input.totalPasses} passes because LLM cost $${input.totalLlmCostUsd.toFixed(4)} exceeded budget $${maxCostUsd.toFixed(4)}`;
+  }
+
+  const maxFallbackCalls = resolveMaxProjectLlmFallbackCalls();
+  if (input.totalFallbackCalls > maxFallbackCalls) {
+    return `${input.projectName}: stopped audit after ${input.completedPasses}/${input.totalPasses} passes because fallback calls ${input.totalFallbackCalls} exceeded limit ${maxFallbackCalls}`;
+  }
+
+  return null;
 }
 
 const ACTIVE_FINDING_STATUSES = new Set([
@@ -1042,51 +1095,59 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         const passResults: AuditPassResult[] = [];
         let findings: Array<Record<string, unknown>> = [];
 
-        // Run domain passes in parallel (up to PASS_CONCURRENCY at a time).
-        // Each pass is a fully independent LLM call over a different file chunk,
-        // so there is no ordering dependency between them.
-        const PASS_CONCURRENCY = Number(process.env.penny_PASS_CONCURRENCY ?? 5);
+        // Run passes in bounded batches so we can stop spending after hard failures
+        // or once the project-level budget/fallback threshold is exceeded.
+        const PASS_CONCURRENCY = resolvePassConcurrency();
+        const passTaskResults: Array<{
+          llm: Awaited<ReturnType<typeof auditWithLlm>>;
+          pass: { label: string; files: string[] };
+          codeContextChars: number;
+        }> = [];
+        let auditAbortReason: string | null = null;
 
-        const passTaskResults = await runWithConcurrency(
-          passes.map((pass) => async () => {
-            const passScope: AuditScope = {
-              ...execution.scope,
-              files: pass.files,
-              scopePaths: pass.files,
-              includeReportExcerpt: false,
-              maxFiles:
-                typeof payload.max_files === "number"
-                  ? payload.max_files
-                  : Math.max(pass.files.length, 1),
-            };
-            const code = buildCodeContextForAudit(
-              execution.repoRoot,
-              scanRoots,
-              passScope
-            );
-            const llm = await auditWithLlm(
-              core,
-              auditAgent,
-              expectations,
-              code,
-              project.name,
-              visualOnly,
-              auditKindStr,
-              {
-                scopeLabel: pass.label,
-                filesInScope: pass.files,
-                knownFindingIds: knownFindingIdsForScope(existing, pass.files),
-                checklistId: execution.checklistId,
-                manifestRevision: execution.manifestRevision,
-              }
-            );
-            return { llm, pass, codeContextChars: code.length };
-          }),
-          PASS_CONCURRENCY
-        );
+        for (let start = 0; start < passes.length; start += PASS_CONCURRENCY) {
+          const batch = passes.slice(start, start + PASS_CONCURRENCY);
+          const batchResults = await runWithConcurrency(
+            batch.map((pass) => async () => {
+              const passScope: AuditScope = {
+                ...execution.scope,
+                files: pass.files,
+                scopePaths: pass.files,
+                includeReportExcerpt: false,
+                maxFiles:
+                  typeof payload.max_files === "number"
+                    ? payload.max_files
+                    : Math.max(pass.files.length, 1),
+              };
+              const code = buildCodeContextForAudit(
+                execution.repoRoot,
+                scanRoots,
+                passScope
+              );
+              const llm = await auditWithLlm(
+                core,
+                auditAgent,
+                expectations,
+                code,
+                project.name,
+                visualOnly,
+                auditKindStr,
+                {
+                  scopeLabel: pass.label,
+                  filesInScope: pass.files,
+                  knownFindingIds: knownFindingIdsForScope(existing, pass.files),
+                  checklistId: execution.checklistId,
+                  manifestRevision: execution.manifestRevision,
+                }
+              );
+              return { llm, pass, codeContextChars: code.length };
+            }),
+            PASS_CONCURRENCY
+          );
 
-        jobMetrics.pass_count += passes.length;
-        for (const { llm, pass, codeContextChars } of passTaskResults) {
+          for (const { llm, pass, codeContextChars } of batchResults) {
+            passTaskResults.push({ llm, pass, codeContextChars });
+          jobMetrics.pass_count += 1;
           jobMetrics.total_llm_cost_usd += llm.costUsd ?? 0;
           jobMetrics.total_llm_input_tokens += llm.inputTokens ?? 0;
           jobMetrics.total_llm_output_tokens += llm.outputTokens ?? 0;
@@ -1158,6 +1219,19 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
               repair_policy: inferRepairPolicy(finding as unknown as Record<string, unknown>),
             })) as Array<Record<string, unknown>>
           );
+          }
+
+          const abortReason = resolveAuditAbortReason({
+            projectName: project.name,
+            completedPasses: passTaskResults.length,
+            totalPasses: passes.length,
+            totalLlmCostUsd: jobMetrics.total_llm_cost_usd,
+            totalFallbackCalls: jobMetrics.llm_fallback_calls,
+          });
+          if (abortReason) {
+            auditAbortReason = abortReason;
+            break;
+          }
         }
 
         const { merged, added } = mergeFindings2(existing, findings, execution.manifestRevision);
@@ -1259,7 +1333,9 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         }
 
         summaries.push(
-          `${project.name}: +${added} findings, ${coverageComplete ? "coverage complete" : "coverage partial"}`
+          `${project.name}: +${added} findings, ${coverageComplete ? "coverage complete" : "coverage partial"}${
+            auditAbortReason ? " (stopped early)" : ""
+          }`
         );
         projectAuditDetails.push({
           project: project.name,
@@ -1281,7 +1357,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             llm_cache_hits: passTaskResults.filter((result) => result.llm.cacheHit).length,
             llm_fallback_calls: passTaskResults.reduce((sum, result) => sum + (result.llm.fallbackCount ?? 0), 0),
             llm_attempts: passTaskResults.reduce((sum, result) => sum + (result.llm.attemptCount ?? 0), 0),
-            pass_count: passes.length,
+            pass_count: passTaskResults.length,
             prompt_context_chars: passTaskResults.reduce((sum, result) => sum + result.codeContextChars, 0),
           },
           files_in_scope: normalizeScopePaths(
@@ -1300,6 +1376,9 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           repo_root: execution.repoRoot,
           exhaustiveness: execution.manifest.exhaustiveness,
         });
+        if (auditAbortReason) {
+          throw new Error(auditAbortReason);
+        }
       } finally {
         execution.cleanup?.();
       }

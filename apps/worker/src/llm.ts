@@ -376,30 +376,9 @@ Return JSON: { "coverage": { ... }, "findings": [ ... ] } per audit-agent output
       allowPremium: false,
     }));
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error);
     console.error("[penny-worker] LLM call failed:", error);
-    return {
-      coverage: {
-        coverage_complete: false,
-        confidence: "low",
-        checklist_id: extras?.checklistId,
-        incomplete_reason: `LLM error: ${error instanceof Error ? error.message : String(error)}`,
-      },
-      model: "error",
-      provider: "error",
-      raw_response: String(error),
-      cacheHit: false,
-      findings: [
-        {
-          finding_id: `${appName}-llm-error`,
-          title: "LLM call failed",
-          description: error instanceof Error ? error.message : String(error),
-          type: "question",
-          severity: "minor",
-          priority: "P2",
-          status: "open",
-        },
-      ],
-    };
+    throw new Error(`LLM call failed: ${msg}`);
   }
 
   const raw = llmResponse.content;
@@ -407,34 +386,9 @@ Return JSON: { "coverage": { ... }, "findings": [ ... ] } per audit-agent output
   try {
     parsed = JSON.parse(raw) as { findings?: FindingOut[]; coverage?: CoverageOut };
   } catch {
-    return {
-      coverage: {
-        coverage_complete: false,
-        confidence: "low",
-        checklist_id: extras?.checklistId,
-        incomplete_reason: "LLM returned non-JSON",
-      },
-      model: llmResponse.model,
-      provider: llmResponse.provider,
-      raw_response: raw,
-      costUsd: llmResponse.costUsd,
-      inputTokens: llmResponse.inputTokens,
-      outputTokens: llmResponse.outputTokens,
-      attemptCount: llmResponse.attemptCount,
-      fallbackCount: llmResponse.fallbackCount,
-      cacheHit: false,
-      findings: [
-        {
-          finding_id: `${appName}-parse-error`,
-          title: "LLM returned non-JSON",
-          description: raw.slice(0, 500),
-          type: "bug",
-          severity: "minor",
-          priority: "P2",
-          status: "open",
-        },
-      ],
-    };
+    throw new Error(
+      `LLM returned non-JSON from ${llmResponse.provider}:${llmResponse.model}: ${raw.slice(0, 500)}`
+    );
   }
   const findings = Array.isArray(parsed.findings) ? parsed.findings : [];
   const coverage = parsed.coverage ?? {};
