@@ -256,6 +256,42 @@ function storeAuditCacheEntry(key: string, value: AuditLlmResult): void {
   }
 }
 
+function stripMarkdownCodeFence(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  return trimmed
+    .replace(/^```[a-zA-Z0-9_-]*\s*/, "")
+    .replace(/\s*```$/, "")
+    .trim();
+}
+
+function parseStructuredJsonResponse<T>(raw: string): T {
+  const candidates: string[] = [];
+  const trimmed = raw.trim();
+  candidates.push(trimmed);
+
+  const unfenced = stripMarkdownCodeFence(trimmed);
+  if (unfenced !== trimmed) candidates.push(unfenced);
+
+  const firstBrace = unfenced.indexOf("{");
+  const lastBrace = unfenced.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace > firstBrace) {
+    const sliced = unfenced.slice(firstBrace, lastBrace + 1).trim();
+    if (!candidates.includes(sliced)) candidates.push(sliced);
+  }
+
+  let lastError: unknown = null;
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("Failed to parse JSON response");
+}
+
 /** @deprecated Use resolveModelChain() */
 export function resolveModel(): { primary: string; fallback: string | undefined } {
   const chain = resolveModelChain();
@@ -395,7 +431,7 @@ Return JSON: { "coverage": { ... }, "findings": [ ... ] } per audit-agent output
   const raw = llmResponse.content;
   let parsed: { findings?: FindingOut[]; coverage?: CoverageOut };
   try {
-    parsed = JSON.parse(raw) as { findings?: FindingOut[]; coverage?: CoverageOut };
+    parsed = parseStructuredJsonResponse<{ findings?: FindingOut[]; coverage?: CoverageOut }>(raw);
   } catch {
     throw new Error(
       `LLM returned non-JSON from ${llmResponse.provider}:${llmResponse.model}: ${raw.slice(0, 500)}`
