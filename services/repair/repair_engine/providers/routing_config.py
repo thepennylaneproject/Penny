@@ -55,27 +55,47 @@ class RoutingRules:
     max_retries: int = 2                # Max retry attempts before giving up on a provider
 
 
-# Default routes implementing the "cheapest model that can do the job" principle.
-# ~70-80% of tasks (lint, audit, basic patch) route to nano/cheap tiers.
-DEFAULT_ROUTES: dict[str, RouteEntry] = {
-    "lint_fix":          RouteEntry(primary="hf-nano",       fallback="aimlapi-cheap"),
-    "audit_scan":        RouteEntry(primary="aimlapi-cheap",  fallback="aimlapi-mid"),
-    "patch_generation":  RouteEntry(primary="aimlapi-mid",    fallback="aimlapi-expensive"),
-    "refactor":          RouteEntry(primary="aimlapi-mid",    fallback="aimlapi-expensive"),
-    "security_analysis": RouteEntry(primary="aimlapi-mid",    fallback="claude-sonnet"),
-    "complex_reasoning": RouteEntry(primary="claude-sonnet",  fallback="claude-opus"),
-}
+def default_routes_for_strategy(strategy: str) -> dict[str, RouteEntry]:
+    normalized = (strategy or "balanced").strip().lower()
+    if normalized == "local-training":
+        return {
+            "lint_fix": RouteEntry(primary="local-qwen", fallback="hf-nano"),
+            "audit_scan": RouteEntry(primary="local-qwen", fallback="hf-nano"),
+            "patch_generation": RouteEntry(primary="claude-sonnet", fallback="gpt-balanced"),
+            "refactor": RouteEntry(primary="claude-sonnet", fallback="gpt-balanced"),
+            "security_analysis": RouteEntry(primary="claude-sonnet", fallback="claude-opus"),
+            "complex_reasoning": RouteEntry(primary="claude-sonnet", fallback="claude-opus"),
+        }
+
+    # Default routes implementing the "cheapest model that can do the job" principle.
+    # ~70-80% of tasks (lint, audit, basic patch) route to nano/cheap tiers.
+    return {
+        "lint_fix": RouteEntry(primary="hf-nano", fallback="aimlapi-cheap"),
+        "audit_scan": RouteEntry(primary="aimlapi-cheap", fallback="aimlapi-mid"),
+        "patch_generation": RouteEntry(primary="aimlapi-mid", fallback="aimlapi-expensive"),
+        "refactor": RouteEntry(primary="aimlapi-mid", fallback="aimlapi-expensive"),
+        "security_analysis": RouteEntry(primary="aimlapi-mid", fallback="claude-sonnet"),
+        "complex_reasoning": RouteEntry(primary="claude-sonnet", fallback="claude-opus"),
+    }
 
 
 @dataclass
 class RoutingConfig:
-    strategy: str = field(default_factory=lambda: os.getenv("penny_ROUTING_STRATEGY", "balanced"))
-    routes: dict[str, RouteEntry] = field(default_factory=lambda: dict(DEFAULT_ROUTES))
+    strategy: str = field(default_factory=lambda: os.getenv("penny_REPAIR_ROUTING_STRATEGY", os.getenv("penny_ROUTING_STRATEGY", "balanced")))
+    routes: dict[str, RouteEntry] = field(default_factory=dict)
     rules: RoutingRules = field(default_factory=RoutingRules)
+
+    def __post_init__(self) -> None:
+        if not self.routes:
+            self.routes = default_routes_for_strategy(self.strategy)
 
     def get_route(self, task_key: str) -> RouteEntry:
         """Return the RouteEntry for a task key, falling back to a generic mid-tier route."""
-        return self.routes.get(task_key, RouteEntry(primary="aimlapi-mid"))
+        if task_key in self.routes:
+            return self.routes[task_key]
+        if self.strategy.strip().lower() == "local-training":
+            return RouteEntry(primary="local-qwen", fallback="claude-sonnet")
+        return RouteEntry(primary="aimlapi-mid")
 
     @classmethod
     def from_json(cls, path: str | Path) -> "RoutingConfig":
@@ -86,7 +106,8 @@ class RoutingConfig:
         data = json.loads(Path(path).read_text())
 
         # Merge user routes on top of defaults (user overrides win)
-        routes = dict(DEFAULT_ROUTES)
+        strategy = str(data.get("strategy", os.getenv("penny_REPAIR_ROUTING_STRATEGY", os.getenv("penny_ROUTING_STRATEGY", "balanced"))))
+        routes = default_routes_for_strategy(strategy)
         for task, entry in data.get("routes", {}).items():
             routes[task] = RouteEntry(
                 primary=entry["primary"],
@@ -101,7 +122,7 @@ class RoutingConfig:
             max_retries=rules_data.get("max_retries", 2),
         )
         return cls(
-            strategy=str(data.get("strategy", os.getenv("penny_ROUTING_STRATEGY", "balanced"))),
+            strategy=strategy,
             routes=routes,
             rules=rules,
         )

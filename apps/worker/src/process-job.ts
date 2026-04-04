@@ -15,6 +15,7 @@ import { auditWithLlm, resolveModelChain, resolveRoutingPolicy } from "./llm.js"
 import {
   claimJob,
   completeJob,
+  insertRepairJob,
   loadProject,
   loadLatestProjectManifest,
   saveProject,
@@ -751,6 +752,65 @@ function getClusterFromAuditKind(auditKind?: string): string {
   }
 }
 
+function buildRepairFindingPayload(
+  projectId: string,
+  runId: string,
+  finding: Record<string, unknown>,
+  filePath: string,
+  codeContext: string
+): RepairJobRequest["finding"] {
+  const suggestedFix =
+    finding.suggested_fix && typeof finding.suggested_fix === "object"
+      ? { ...(finding.suggested_fix as Record<string, unknown>) }
+      : {};
+  const affectedFiles = Array.isArray(suggestedFix.affected_files)
+    ? [...(suggestedFix.affected_files as unknown[]).map((value) => String(value).trim()).filter(Boolean)]
+    : [];
+  if (!affectedFiles.includes(filePath)) {
+    affectedFiles.unshift(filePath);
+  }
+  suggestedFix.affected_files = affectedFiles;
+
+  const proofHooks = Array.isArray(finding.proof_hooks)
+    ? (finding.proof_hooks as Array<Record<string, unknown>>)
+    : [];
+  const history = Array.isArray(finding.history)
+    ? (finding.history as Array<Record<string, unknown>>)
+    : [];
+  const repairPolicy = inferRepairPolicy(finding);
+  const raw = {
+    ...finding,
+    repair_policy: repairPolicy,
+    code_context: codeContext,
+    repair_request: {
+      source: "penny-worker",
+      audit_run_id: runId,
+      intended_routing_strategy:
+        process.env.penny_REPAIR_ROUTING_STRATEGY?.trim() ||
+        process.env.penny_ROUTING_STRATEGY?.trim() ||
+        "balanced",
+    },
+  };
+
+  return {
+    finding_id: String(finding.finding_id ?? "").trim(),
+    type: String(finding.type ?? "bug").trim() || "bug",
+    category: String(finding.category ?? "unknown").trim() || "unknown",
+    severity: String(finding.severity ?? "high").trim() || "high",
+    priority: String(finding.priority ?? "P2").trim() || "P2",
+    confidence: String(finding.confidence ?? "inference").trim() || "inference",
+    title: String(finding.title ?? "Finding").trim() || "Finding",
+    description: String(finding.description ?? "").trim(),
+    impact: String(finding.impact ?? "").trim(),
+    status: String(finding.status ?? "open").trim() || "open",
+    suggested_fix: suggestedFix,
+    proof_hooks: proofHooks,
+    history,
+    raw,
+    project_name: projectId,
+  };
+}
+
 /**
  * Trigger repair jobs for high-priority findings.
  * Called after audit completes to submit eligible findings for automated repair.
@@ -762,6 +822,7 @@ function getClusterFromAuditKind(auditKind?: string): string {
  * - File path available for context
  */
 async function triggerRepairsForFindings(
+  pool: pg.Pool,
   projectId: string,
   runId: string,
   findings: Array<Record<string, unknown>>,
@@ -825,10 +886,17 @@ async function triggerRepairsForFindings(
   for (const finding of eligible) {
     try {
       const filePath = String(finding.file_path ?? "").trim();
-      const title = String(finding.title ?? "Finding").trim();
-      const description = String(finding.description ?? "").trim();
       const findingId = String(finding.finding_id ?? "").trim();
-      const severity = String(finding.severity ?? "high").trim();
+      const repairPolicy = inferRepairPolicy(finding);
+      const suggestedFix =
+        finding.suggested_fix && typeof finding.suggested_fix === "object"
+          ? (finding.suggested_fix as Record<string, unknown>)
+          : {};
+      const verificationCommands = Array.isArray(suggestedFix.verification_commands)
+        ? (suggestedFix.verification_commands as unknown[])
+            .map((value) => String(value).trim())
+            .filter(Boolean)
+        : [];
 
       // Build code context (simplified - in production would load actual file content)
       let codeContext = "";
@@ -843,22 +911,26 @@ async function triggerRepairsForFindings(
         }`);
       }
 
-      const repairRequest: RepairJobRequest = {
-        run_id: runId,
-        finding_id: findingId,
-        project_id: projectId,
-        file_path: filePath,
-        finding_title: title,
-        finding_severity: severity,
-        finding_type: "bug",
-        description: description,
-        code_context: codeContext,
-        repair_config: {
-          beam_width: 4,
-          max_depth: 4,
-          timeout_seconds: 180,
-          language: "typescript",
+      await insertRepairJob(pool, {
+        projectName: projectId,
+        findingId,
+        repairPolicy,
+        targetedFiles: [filePath],
+        verificationCommands,
+        payload: {
+          source: "penny-worker",
+          audit_run_id: runId,
+          routing_strategy:
+            process.env.penny_REPAIR_ROUTING_STRATEGY?.trim() ||
+            process.env.penny_ROUTING_STRATEGY?.trim() ||
+            "balanced",
         },
+      });
+
+      const repairRequest: RepairJobRequest = {
+        project_id: projectId,
+        repo_root: repoRoot,
+        finding: buildRepairFindingPayload(projectId, runId, finding, filePath, codeContext),
       };
 
       // Submit job (non-blocking)
@@ -872,6 +944,22 @@ async function triggerRepairsForFindings(
         `[penny-worker] Submitted repair job ${jobResponse.repair_job_id} for finding ${findingId}`
       );
     } catch (error) {
+      const findingId = String(finding.finding_id ?? "").trim();
+      try {
+        await pool.query(
+          `DELETE FROM penny_repair_jobs
+            WHERE finding_id = $1
+              AND lower(trim(project_name)) = $2
+              AND status = 'queued'`,
+          [findingId, projectId.trim().toLowerCase()]
+        );
+      } catch (cleanupError) {
+        console.warn(
+          `[penny-worker] Failed to clean queued repair ledger row for ${findingId}: ${
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          }`
+        );
+      }
       console.error(
         `[penny-worker] Failed to submit repair for finding ${finding.finding_id}: ${
           error instanceof Error ? error.message : String(error)
@@ -1306,6 +1394,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         if (projectIdFromPayload && added > 0) {
           try {
             await triggerRepairsForFindings(
+              pool,
               projectIdFromPayload,
               job.id,
               merged,

@@ -73,6 +73,11 @@ class DashboardClient:
         patch_applied: bool = False,
         applied_files: list[str] | None = None,
         repair_proof: dict[str, Any] | None = None,
+        provider_used: str | None = None,
+        model_used: str | None = None,
+        routing_lane: str | None = None,
+        routing_strategy: str | None = None,
+        routing_usage: dict[str, Any] | None = None,
         error: str | None = None,
         message: str | None = None,
     ) -> dict[str, Any]:
@@ -104,6 +109,11 @@ class DashboardClient:
             "patch_applied": patch_applied,
             "applied_files": applied_files or [],
             "repair_proof": repair_proof,
+            "provider_used": provider_used,
+            "model_used": model_used,
+            "routing_lane": routing_lane,
+            "routing_strategy": routing_strategy,
+            "routing_usage": routing_usage,
             "error": error,
             "message": message,
         }

@@ -459,6 +459,10 @@ export interface RepairJob {
   patch_applied?: boolean;
   cost_usd?: number;
   provider_used?: string;
+  model_used?: string;
+  routing_lane?: string;
+  routing_strategy?: string;
+  routing_usage?: Record<string, unknown>;
   completed_at?: string;
   error?: string;
   targeted_files?: string[];

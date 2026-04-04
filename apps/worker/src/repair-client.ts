@@ -6,36 +6,39 @@
 import { randomUUID } from "node:crypto";
 
 export interface RepairJobRequest {
-  run_id: string;
-  finding_id: string;
-  project_id: string;
-  file_path: string;
-  finding_title: string;
-  finding_type?: string;
-  finding_severity?: string;
-  description?: string;
-  code_context?: string;
-  repair_config?: {
-    beam_width?: number;
-    max_depth?: number;
-    timeout_seconds?: number;
-    validation_commands?: string[];
-    language?: string;
+  finding: {
+    finding_id: string;
+    type: string;
+    category: string;
+    severity: string;
+    priority: string;
+    confidence: string;
+    title: string;
+    description: string;
+    impact: string;
+    status: string;
+    suggested_fix?: Record<string, unknown>;
+    proof_hooks?: Array<Record<string, unknown>>;
+    history?: Array<Record<string, unknown>>;
+    raw?: Record<string, unknown>;
+    project_name?: string;
   };
+  project_id?: string;
+  repo_root?: string;
 }
 
 export interface RepairJobResponse {
   repair_job_id: string;
-  status: "queued" | "in_progress" | "completed" | "failed" | "blocked";
-  created_at: string;
-  estimated_completion_ms: number;
+  finding_id: string;
+  status: "queued" | "running" | "completed" | "failed" | "blocked";
+  message: string;
 }
 
 export interface RepairJobStatus {
   repair_job_id: string;
   finding_id: string;
   project_id: string;
-  status: "queued" | "in_progress" | "completed" | "failed" | "blocked";
+  status: "queued" | "running" | "completed" | "failed" | "blocked" | "applied" | "selected";
   confidence_score?: number;
   confidence_breakdown?: {
     validation: number;
@@ -77,7 +80,7 @@ export class RepairServiceClient {
    * Returns the job ID for later polling.
    */
   async submitJob(request: RepairJobRequest): Promise<RepairJobResponse> {
-    const url = `${this.serviceUrl}/jobs`;
+    const url = `${this.serviceUrl}/repair/run`;
 
     const response = await this._fetchWithRetry(url, {
       method: "POST",
@@ -101,7 +104,7 @@ export class RepairServiceClient {
    * Get repair job status.
    */
   async getJobStatus(jobId: string): Promise<RepairJobStatus> {
-    const url = `${this.serviceUrl}/jobs/${jobId}`;
+    const url = `${this.serviceUrl}/repair/${jobId}`;
 
     const response = await this._fetchWithRetry(url, {
       method: "GET",

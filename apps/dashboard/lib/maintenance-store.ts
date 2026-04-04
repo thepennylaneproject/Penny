@@ -106,6 +106,15 @@ export async function listRepairJobsForProject(
         typeof payload.reported_status === "string"
           ? (payload.reported_status as RepairJob["reported_status"])
           : undefined,
+      provider_used:
+        typeof payload.provider_used === "string" ? payload.provider_used : undefined,
+      model_used:
+        typeof payload.model_used === "string" ? payload.model_used : undefined,
+      routing_lane:
+        typeof payload.routing_lane === "string" ? payload.routing_lane : undefined,
+      routing_strategy:
+        typeof payload.routing_strategy === "string" ? payload.routing_strategy : undefined,
+      routing_usage: asJsonObject(payload.routing_usage),
       repair_proof: parseRepairProof(payload.repair_proof) ?? undefined,
     };
   });
@@ -170,6 +179,15 @@ export async function listRepairJobsForFinding(
         typeof payload.reported_status === "string"
           ? (payload.reported_status as RepairJob["reported_status"])
           : undefined,
+      provider_used:
+        typeof payload.provider_used === "string" ? payload.provider_used : undefined,
+      model_used:
+        typeof payload.model_used === "string" ? payload.model_used : undefined,
+      routing_lane:
+        typeof payload.routing_lane === "string" ? payload.routing_lane : undefined,
+      routing_strategy:
+        typeof payload.routing_strategy === "string" ? payload.routing_strategy : undefined,
+      routing_usage: asJsonObject(payload.routing_usage),
       repair_proof: parseRepairProof(payload.repair_proof) ?? undefined,
     };
   });
@@ -222,6 +240,15 @@ export async function listRecentRepairJobs(limit = 50): Promise<RepairJob[]> {
         typeof payload.reported_status === "string"
           ? (payload.reported_status as RepairJob["reported_status"])
           : undefined,
+      provider_used:
+        typeof payload.provider_used === "string" ? payload.provider_used : undefined,
+      model_used:
+        typeof payload.model_used === "string" ? payload.model_used : undefined,
+      routing_lane:
+        typeof payload.routing_lane === "string" ? payload.routing_lane : undefined,
+      routing_strategy:
+        typeof payload.routing_strategy === "string" ? payload.routing_strategy : undefined,
+      routing_usage: asJsonObject(payload.routing_usage),
       repair_proof: parseRepairProof(payload.repair_proof) ?? undefined,
     };
   });
@@ -634,6 +661,11 @@ export async function updateRepairJobCompletion(args: {
   error?: string;
   run_id?: string;
   repair_proof?: RepairJob["repair_proof"];
+  provider_used?: string;
+  model_used?: string;
+  routing_lane?: string;
+  routing_strategy?: string;
+  routing_usage?: Record<string, unknown>;
 }): Promise<RepairJob> {
   const projectNameKey = normalizeProjectName(args.project_name);
   const rows = await pool().query(
@@ -646,9 +678,14 @@ export async function updateRepairJobCompletion(args: {
               'applied_files', COALESCE($4::jsonb, payload->'applied_files', '[]'::jsonb),
               'run_id', COALESCE($5, payload->>'run_id'),
               'repair_proof', COALESCE($6::jsonb, payload->'repair_proof', '{}'::jsonb),
-              'reported_status', COALESCE($7, payload->>'reported_status')
-            ) || (payload - 'applied_files' - 'run_id' - 'repair_proof' - 'reported_status')
-        WHERE finding_id = $8 AND lower(trim(project_name)) = $9 AND status IN ('queued', 'running')
+              'reported_status', COALESCE($7, payload->>'reported_status'),
+              'provider_used', COALESCE($8, payload->>'provider_used'),
+              'model_used', COALESCE($9, payload->>'model_used'),
+              'routing_lane', COALESCE($10, payload->>'routing_lane'),
+              'routing_strategy', COALESCE($11, payload->>'routing_strategy'),
+              'routing_usage', COALESCE($12::jsonb, payload->'routing_usage', '{}'::jsonb)
+            ) || (payload - 'applied_files' - 'run_id' - 'repair_proof' - 'reported_status' - 'provider_used' - 'model_used' - 'routing_lane' - 'routing_strategy' - 'routing_usage')
+        WHERE finding_id = $13 AND lower(trim(project_name)) = $14 AND status IN ('queued', 'running')
         RETURNING *`,
     [
       args.status,
@@ -658,6 +695,11 @@ export async function updateRepairJobCompletion(args: {
       args.run_id ?? null,
       JSON.stringify(args.repair_proof ?? {}),
       args.reported_status ?? args.status,
+      args.provider_used ?? null,
+      args.model_used ?? null,
+      args.routing_lane ?? null,
+      args.routing_strategy ?? null,
+      JSON.stringify(args.routing_usage ?? {}),
       args.finding_id,
       projectNameKey,
     ]
@@ -708,6 +750,15 @@ export async function updateRepairJobCompletion(args: {
       typeof payload.reported_status === "string"
         ? (payload.reported_status as RepairJob["reported_status"])
         : undefined,
+    provider_used:
+      typeof payload.provider_used === "string" ? payload.provider_used : undefined,
+    model_used:
+      typeof payload.model_used === "string" ? payload.model_used : undefined,
+    routing_lane:
+      typeof payload.routing_lane === "string" ? payload.routing_lane : undefined,
+    routing_strategy:
+      typeof payload.routing_strategy === "string" ? payload.routing_strategy : undefined,
+    routing_usage: asJsonObject(payload.routing_usage),
     repair_proof: parseRepairProof(payload.repair_proof) ?? undefined,
   };
 }
@@ -768,6 +819,15 @@ export async function recoverStaleRepairJobs(
         typeof payload.reported_status === "string"
           ? (payload.reported_status as RepairJob["reported_status"])
           : undefined,
+      provider_used:
+        typeof payload.provider_used === "string" ? payload.provider_used : undefined,
+      model_used:
+        typeof payload.model_used === "string" ? payload.model_used : undefined,
+      routing_lane:
+        typeof payload.routing_lane === "string" ? payload.routing_lane : undefined,
+      routing_strategy:
+        typeof payload.routing_strategy === "string" ? payload.routing_strategy : undefined,
+      routing_usage: asJsonObject(payload.routing_usage),
       repair_proof: parseRepairProof(payload.repair_proof) ?? undefined,
     };
   });

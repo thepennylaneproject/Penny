@@ -111,10 +111,15 @@ def _run_job(
         result = orchestrator.run_for_finding(finding)
 
         # Mark job as completed
+        routing_usage = result.get("routing_usage")
+        progress = None
+        if isinstance(routing_usage, dict):
+            progress = {"routing": routing_usage}
         supabase.table("repair_jobs").update({
             "status": result.get("status", "completed"),
             "action": result.get("status", "completed"),
             "best_candidate_id": result.get("selected_node_id"),
+            "progress": progress,
             "error_message": None,
             "completed_at": utc_now(),
         }).eq("repair_job_id", repair_job_id).execute()

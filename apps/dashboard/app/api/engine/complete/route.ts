@@ -18,6 +18,11 @@ import { apiErrorMessage } from "@/lib/api-error";
  *   status: "completed" | "failed" | "applied",
  *   patch_applied?: boolean,
  *   applied_files?: string[],
+ *   provider_used?: string,
+ *   model_used?: string,
+ *   routing_lane?: string,
+ *   routing_strategy?: string,
+ *   routing_usage?: object,
  *   error?: string,
  *   message?: string
  * }
@@ -41,6 +46,20 @@ export async function POST(request: Request) {
       typeof body.error === "string" ? body.error.trim() : undefined;
     const message =
       typeof body.message === "string" ? body.message.trim() : undefined;
+    const providerUsed =
+      typeof body.provider_used === "string" ? body.provider_used.trim() : undefined;
+    const modelUsed =
+      typeof body.model_used === "string" ? body.model_used.trim() : undefined;
+    const routingLane =
+      typeof body.routing_lane === "string" ? body.routing_lane.trim() : undefined;
+    const routingStrategy =
+      typeof body.routing_strategy === "string"
+        ? body.routing_strategy.trim()
+        : undefined;
+    const routingUsage =
+      body.routing_usage && typeof body.routing_usage === "object"
+        ? (body.routing_usage as Record<string, unknown>)
+        : undefined;
 
     if (!findingId || !projectName || !runId) {
       return NextResponse.json(
@@ -71,6 +90,11 @@ export async function POST(request: Request) {
       applied_files: appliedFiles,
       error,
       run_id: runId,
+      provider_used: providerUsed,
+      model_used: modelUsed,
+      routing_lane: routingLane,
+      routing_strategy: routingStrategy,
+      routing_usage: routingUsage,
     });
 
     // If patch was applied, update the finding status to fixed_pending_verify
@@ -120,6 +144,11 @@ export async function POST(request: Request) {
         status,
         patch_applied: patchApplied,
         applied_files: appliedFiles,
+        provider_used: providerUsed,
+        model_used: modelUsed,
+        routing_lane: routingLane,
+        routing_strategy: routingStrategy,
+        routing_usage: routingUsage,
         error,
         message,
       },

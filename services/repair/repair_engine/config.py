@@ -16,6 +16,17 @@ def _bool_env(name: str, default: bool = False) -> bool:
     return raw.lower() in {"1", "true", "yes", "on"}
 
 
+def _openai_compatible_base_url(*values: str) -> str:
+    for value in values:
+        candidate = value.strip()
+        if not candidate:
+            continue
+        if candidate.endswith("/v1"):
+            return candidate[:-3]
+        return candidate
+    return ""
+
+
 @dataclass
 class SearchConfig:
     root_branching_factor: int = int(os.getenv("penny_ROOT_BRANCHING_FACTOR", "5"))
@@ -76,6 +87,17 @@ class ProviderConfig:
     openai_api_key: str = field(default_factory=lambda: os.getenv("OPENAI_API_KEY", ""))
     anthropic_api_key: str = field(default_factory=lambda: os.getenv("ANTHROPIC_API_KEY", ""))
     gemini_api_key: str = field(default_factory=lambda: os.getenv("GEMINI_API_KEY", ""))
+    local_llm_base_url: str = field(
+        default_factory=lambda: _openai_compatible_base_url(
+            os.getenv("penny_LOCAL_LLM_BASE_URL", ""),
+            os.getenv("OLLAMA_BASE_URL", ""),
+            "http://127.0.0.1:11434",
+        )
+    )
+    local_llm_model: str = field(
+        default_factory=lambda: os.getenv("penny_LOCAL_LLM_MODEL", "qwen2.5-coder:14b")
+    )
+    local_llm_api_key: str = field(default_factory=lambda: os.getenv("penny_LOCAL_LLM_API_KEY", ""))
 
     # ── Model overrides (per tier) ────────────────────────────────────────────
     # aimlapi
@@ -147,6 +169,9 @@ class ProviderConfig:
             openai_api_key=self.openai_api_key,
             anthropic_api_key=self.anthropic_api_key,
             gemini_api_key=self.gemini_api_key,
+            local_llm_base_url=self.local_llm_base_url,
+            local_llm_model=self.local_llm_model,
+            local_llm_api_key=self.local_llm_api_key,
             aimlapi_model_overrides=self.aimlapi_model_overrides or None,
             openai_model_overrides=self.openai_model_overrides or None,
             anthropic_model_overrides=self.anthropic_model_overrides or None,
@@ -171,4 +196,3 @@ class EngineConfig:
     apply: ApplyConfig = field(default_factory=ApplyConfig)
     artifacts: ArtifactConfig = field(default_factory=ArtifactConfig)
     providers: ProviderConfig = field(default_factory=ProviderConfig)
-

@@ -93,6 +93,7 @@ class RepairOrchestrator:
         apply_msg: str,
         patch_applied: bool,
         repair_proof: dict[str, Any] | None,
+        routing_usage: dict[str, Any] | None,
     ) -> None:
         """Report repair completion to dashboard if configured."""
         if not self.dashboard_client:
@@ -110,6 +111,27 @@ class RepairOrchestrator:
                 patch_applied=applied,
                 applied_files=touched_files,
                 repair_proof=repair_proof,
+                provider_used=(
+                    str(routing_usage.get("primary_provider"))
+                    if routing_usage and routing_usage.get("primary_provider")
+                    else None
+                ),
+                model_used=(
+                    str(routing_usage.get("primary_model"))
+                    if routing_usage and routing_usage.get("primary_model")
+                    else None
+                ),
+                routing_lane=(
+                    str(routing_usage.get("routing_lane"))
+                    if routing_usage and routing_usage.get("routing_lane")
+                    else None
+                ),
+                routing_strategy=(
+                    str(routing_usage.get("strategy"))
+                    if routing_usage and routing_usage.get("strategy")
+                    else None
+                ),
+                routing_usage=routing_usage,
                 error=apply_msg if not applied else None,
                 message=apply_msg,
             )
@@ -124,6 +146,7 @@ class RepairOrchestrator:
         touched_files: list[str],
         verification_commands: list[str],
         run_dir: Path,
+        routing_usage: dict[str, Any] | None,
     ) -> dict[str, Any] | None:
         if selected is None or selected.eval_summary is None or not touched_files:
             return None
@@ -161,9 +184,12 @@ class RepairOrchestrator:
                 ),
                 "commands_declared": verification_commands,
             },
+            "routing": routing_usage,
         }
 
     def run_for_finding(self, finding: Finding) -> dict[str, Any]:
+        if hasattr(self.router, "reset_usage"):
+            self.router.reset_usage()
         run_id = f"repair-{finding.finding_id}-{uuid.uuid4().hex[:8]}"
         run = RepairRun(run_id=run_id, finding_id=finding.finding_id, status="generating")
         run_dir = self._run_dir(run_id)
@@ -300,18 +326,26 @@ class RepairOrchestrator:
                             touched_files,
                             verification_commands,
                             run_dir,
+                            getattr(self.router, "usage_summary", lambda *_args, **_kwargs: None)(
+                                task_type="patch_generation"
+                            ),
                         )
                     else:
                         run.status = "failed"
             else:
                 run.status = "selected"
 
+        routing_usage = getattr(self.router, "usage_summary", lambda *_args, **_kwargs: None)(
+            task_type="patch_generation"
+        )
+        if routing_usage:
+            run.metadata["routing_usage"] = routing_usage
         self._persist_run(run_dir, run, finding, fault_slice, tree, touched_files, apply_msg)
 
         # Report completion to dashboard if configured
         patch_applied = run.status == "applied" and len(touched_files) > 0
         self._report_to_dashboard(
-            finding, run_id, run.status, touched_files, apply_msg, patch_applied, repair_proof
+            finding, run_id, run.status, touched_files, apply_msg, patch_applied, repair_proof, routing_usage
         )
 
         return {
@@ -321,6 +355,7 @@ class RepairOrchestrator:
             "selected_node_id": run.selected_node_id,
             "applied_files": touched_files,
             "message": apply_msg,
+            "routing_usage": routing_usage,
         }
 
     def _persist_run(

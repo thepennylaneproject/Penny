@@ -199,6 +199,8 @@ function RepairJobDetail({ job }: { job: RepairJob }) {
       {policyRisk        && <DetailRow label="risk"      value={String(policyRisk)} />}
       {policyEligibility && <DetailRow label="eligibility" value={String(policyEligibility)} />}
       {job.provider_used && <DetailRow label="provider"  value={job.provider_used} />}
+      {job.model_used && <DetailRow label="model" value={job.model_used} />}
+      {job.routing_lane && <DetailRow label="lane" value={job.routing_lane} />}
       {(job.targeted_files?.length ?? 0) > 0 && (
         <div>
           <div style={{ color: "var(--ink-text-4)", marginBottom: "0.15rem" }}>files</div>
@@ -470,6 +472,9 @@ export function JobQueueView() {
                   : ""}
                 {job.repairJob.provider_used
                   ? ` · ${job.repairJob.provider_used}`
+                  : ""}
+                {job.repairJob.model_used
+                  ? ` · ${job.repairJob.model_used}`
                   : ""}
               </div>
             )}

@@ -39,6 +39,7 @@ Usage:
 
 from __future__ import annotations
 
+from collections import Counter
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -112,6 +113,17 @@ class GatewayResult:
     retries: int = 0         # Number of retries before a response was accepted
 
 
+@dataclass
+class GatewayCall:
+    task_type: str
+    provider_alias: str
+    model: str
+    cost_usd: float
+    confidence: float
+    escalated: bool = False
+    retries: int = 0
+
+
 # ── GatewayRouter ─────────────────────────────────────────────────────────────
 
 @dataclass
@@ -127,6 +139,7 @@ class GatewayRouter:
     model_registry: dict[str, str]
     config: RoutingConfig = field(default_factory=RoutingConfig)
     cost_tracker: CostTracker = field(default_factory=CostTracker)
+    call_history: list[GatewayCall] = field(default_factory=list)
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
@@ -135,6 +148,29 @@ class GatewayRouter:
 
     def _model(self, alias: str) -> str:
         return self.model_registry.get(alias, alias)
+
+    def _record_call(self, task_type: str, result: GatewayResult) -> None:
+        self.call_history.append(
+            GatewayCall(
+                task_type=task_type,
+                provider_alias=result.provider_alias,
+                model=result.model,
+                cost_usd=result.cost_usd,
+                confidence=result.confidence,
+                escalated=result.escalated,
+                retries=result.retries,
+            )
+        )
+
+    @staticmethod
+    def _routing_lane(alias: str) -> str:
+        if alias.startswith("local-"):
+            return "local"
+        if alias.startswith("claude-") or alias in {"gpt-balanced", "gpt-high", "gpt-reasoning", "claude-sonnet", "claude-opus", "gemini-pro"}:
+            return "premium"
+        if alias == "none" or alias == "error":
+            return "unknown"
+        return "cloud"
 
     @staticmethod
     def _estimate_tokens(text: str) -> int:
@@ -221,6 +257,7 @@ class GatewayRouter:
                 escalated=attempt_idx > 0,
                 retries=retries_used,
             )
+            self._record_call(task_type, last)
 
             if confidence >= rules.confidence_threshold:
                 return last
@@ -278,6 +315,45 @@ class GatewayRouter:
             prompts, task_type, temperature, max_tokens, expect_json, concurrency
         )]
 
+    def reset_usage(self) -> None:
+        self.cost_tracker.reset()
+        self.call_history.clear()
+
+    def usage_summary(self, task_type: str | None = None) -> dict[str, object]:
+        calls = [
+            call for call in self.call_history
+            if task_type is None or call.task_type == task_type
+        ]
+        if not calls:
+            return {
+                "strategy": self.config.strategy,
+                "routing_lane": "unknown",
+                "primary_provider": None,
+                "primary_model": None,
+                "total_cost_usd": 0.0,
+                "calls": 0,
+                "providers": [],
+                "models": [],
+                "task_type": task_type,
+            }
+
+        provider_counts = Counter(call.provider_alias for call in calls)
+        model_counts = Counter(call.model for call in calls)
+        primary_provider = provider_counts.most_common(1)[0][0]
+        primary_model = model_counts.most_common(1)[0][0]
+
+        return {
+            "strategy": self.config.strategy,
+            "routing_lane": self._routing_lane(primary_provider),
+            "primary_provider": primary_provider,
+            "primary_model": primary_model,
+            "total_cost_usd": round(sum(call.cost_usd for call in calls), 6),
+            "calls": len(calls),
+            "providers": sorted(provider_counts.keys()),
+            "models": sorted(model_counts.keys()),
+            "task_type": task_type,
+        }
+
     # ── Factory ───────────────────────────────────────────────────────────────
 
     @classmethod
@@ -288,6 +364,9 @@ class GatewayRouter:
         openai_api_key: str = "",
         anthropic_api_key: str = "",
         gemini_api_key: str = "",
+        local_llm_base_url: str = "",
+        local_llm_model: str = "",
+        local_llm_api_key: str = "",
         aimlapi_model_overrides: dict[str, str] | None = None,
         openai_model_overrides: dict[str, str] | None = None,
         anthropic_model_overrides: dict[str, str] | None = None,
@@ -316,9 +395,18 @@ class GatewayRouter:
         from .gemini_client import build_gemini_client, GEMINI_MODELS
         from .huggingface_client import build_huggingface_client, HF_MODELS
         from .openai_client import build_openai_client, OPENAI_MODELS
+        from .vllm_client import VLLMClient
 
         registry: dict[str, CompletionProvider] = {}
         model_reg: dict[str, str] = {}
+
+        if local_llm_base_url and local_llm_model:
+            registry["local-qwen"] = VLLMClient(
+                base_url=local_llm_base_url,
+                model=local_llm_model,
+                api_key=local_llm_api_key or None,
+            )
+            model_reg["local-qwen"] = local_llm_model
 
         # HuggingFace — hf_api_key="" still works for public models
         nano_model = hf_nano_model or HF_MODELS["nano"]

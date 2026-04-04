@@ -49,6 +49,8 @@ async def lifespan(app: FastAPI):
         _orchestrator = RepairOrchestrator(repo_root, config)
         worker_threads = int(os.getenv("WORKER_THREADS", "4"))
         _executor = ThreadPoolExecutor(max_workers=worker_threads)
+        app.state.orchestrator = _orchestrator
+        app.state.executor = _executor
         print(f"✓ Repair orchestrator initialized (repo_root={repo_root})")
         print(f"✓ ThreadPoolExecutor initialized (max_workers={worker_threads})")
     except Exception as e:
@@ -61,6 +63,8 @@ async def lifespan(app: FastAPI):
     if _executor:
         _executor.shutdown(wait=False)
         print("✓ ThreadPoolExecutor shutdown complete")
+    app.state.orchestrator = None
+    app.state.executor = None
 
 
 app = FastAPI(
