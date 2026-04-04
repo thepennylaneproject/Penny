@@ -119,7 +119,7 @@ export function Shell({ children, activeView, navHighlightView, onNavigate, onAu
             color: "var(--ink-text)",
           }}
         >
-          penny
+          Penny
         </span>
       </div>
       {/* ── Mobile backdrop ── */}
@@ -154,7 +154,7 @@ export function Shell({ children, activeView, navHighlightView, onNavigate, onAu
               letterSpacing: "0.01em",
             }}
           >
-            penny
+            Penny
           </span>
         </div>
 
