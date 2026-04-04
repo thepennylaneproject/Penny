@@ -51,7 +51,7 @@ export class HuggingFaceProvider extends LLMProvider {
 
   async call(modelId: string, request: LLMRequest): Promise<LLMResponse> {
     const model = this.models[modelId] ?? modelId;
-    const baseUrl = `https://api-inference.huggingface.co/models/${encodeURIComponent(model)}/v1`;
+    const baseUrl = `https://router.huggingface.co/models/${encodeURIComponent(model)}/v1`;
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",

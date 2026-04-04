@@ -25,9 +25,9 @@ export class AimlapiProvider extends LLMProvider {
 
   models: Record<string, string> = {
     nano:      "Qwen/Qwen2.5-7B-Instruct",
-    cheap:     "meta-llama/Llama-3.1-8B-Instruct",
-    mid:       "meta-llama/Llama-3.1-70B-Instruct",
-    expensive: "meta-llama/Llama-3.1-405B-Instruct",
+    cheap:     "meta-llama/Meta-Llama-3-8B-Instruct-Turbo",
+    mid:       "meta-llama/Meta-Llama-3-70B-Instruct-Turbo",
+    expensive: "meta-llama/Meta-Llama-3-405B-Instruct-Turbo",
   };
 
   private apiKey: string;
