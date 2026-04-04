@@ -5,6 +5,7 @@ import { DeepSeekProvider } from "./deepseek.js";
 import { GeminiProvider } from "./gemini.js";
 import { HuggingFaceProvider } from "./huggingface.js";
 import { AimlapiProvider } from "./aimlapi.js";
+import { OllamaProvider } from "./ollama.js";
 
 export type ModelTier = "free" | "cheap" | "standard" | "premium";
 
@@ -40,6 +41,11 @@ const MODEL_METADATA: Record<string, ModelMetadata> = {
   "gemini:2.0-flash": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.4 },
   "gemini:flash8b": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
   "gemini:pro": { tier: "premium", inputCostPer1M: 1.25, outputCostPer1M: 5.0 },
+
+  "ollama:qwen14b": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
+  "ollama:qwen7b": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
+  "ollama:qwen32b": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
+  "ollama:coder": { tier: "free", inputCostPer1M: 0, outputCostPer1M: 0 },
 
   "aimlapi:nano": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.1, experimental: true },
   "aimlapi:cheap": { tier: "cheap", inputCostPer1M: 0.1, outputCostPer1M: 0.1, experimental: true },
@@ -119,6 +125,7 @@ export class ProviderRegistry {
     this.registerProvider(new GeminiProvider());
     this.registerProvider(new HuggingFaceProvider());
     this.registerProvider(new AimlapiProvider());
+    this.registerProvider(new OllamaProvider());
   }
 
   registerProvider(provider: LLMProvider): void {
@@ -252,6 +259,12 @@ export class ProviderRegistry {
       if (modelName.includes("pro"))  return { provider: "gemini", modelId: "pro" };
       if (modelName.includes("8b"))   return { provider: "gemini", modelId: "flash8b" };
       return { provider: "gemini", modelId: "flash" };
+    }
+
+    if (modelName.includes("ollama") || modelName.includes("qwen2.5-coder")) {
+      if (modelName.includes("32b")) return { provider: "ollama", modelId: "qwen32b" };
+      if (modelName.includes("7b")) return { provider: "ollama", modelId: "qwen7b" };
+      return { provider: "ollama", modelId: "qwen14b" };
     }
 
     if (modelName.includes("deepseek")) {

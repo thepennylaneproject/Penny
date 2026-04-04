@@ -113,6 +113,7 @@ export function resolveModelChain(auditKind?: string): string[] {
   const deepseekOk  = ok("deepseek");
   const geminiOk    = ok("gemini");
   const aimlapiOk   = experimentalOk && ok("aimlapi");
+  const ollamaOk    = ok("ollama");
   const openaiOk    = ok("openai");
   const huggingfaceOk = experimentalOk;
 
@@ -127,6 +128,16 @@ export function resolveModelChain(auditKind?: string): string[] {
   const chain: string[] = [];
 
   switch (strategy) {
+    case "local-training":
+      if (ollamaOk)                      chain.push("ollama:qwen14b");
+      if (isLargeContext && geminiOk)    chain.push("gemini:flash");
+      if (deepseekOk)                    chain.push("deepseek:chat");
+      if (openaiOk)                      chain.push("openai:mini");
+      if (anthropicOk)                   chain.push("anthropic:haiku");
+      if (aimlapiOk)                     chain.push("aimlapi:cheap");
+      if (huggingfaceOk)                 chain.push("huggingface:small");
+      break;
+
     case "precision":
       // Best available; cost is secondary
       if (isSynthesis && anthropicOk)    chain.push("anthropic:opus");

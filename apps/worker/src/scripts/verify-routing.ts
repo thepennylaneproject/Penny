@@ -35,7 +35,7 @@ function main() {
   console.log("\n=== penny Routing Verification ===\n");
 
   // Show chain for each strategy × audit kind combination
-  const strategies = ["precision", "balanced", "aggressive", "economy"];
+  const strategies = ["local-training", "precision", "balanced", "aggressive", "economy"];
   const auditKinds = [
     { label: "security (high-stakes)", kind: "security" },
     { label: "logic   (high-stakes)", kind: "logic" },
@@ -65,7 +65,7 @@ function main() {
 
   // Provider status table
   console.log("\n\n=== Provider Status ===\n");
-  const allProviders = ["anthropic", "deepseek", "openai", "gemini", "aimlapi", "huggingface"];
+  const allProviders = ["ollama", "anthropic", "deepseek", "openai", "gemini", "aimlapi", "huggingface"];
   for (const name of allProviders) {
     const p = registry.getProvider(name);
     if (!p) { console.log(`  ${name.padEnd(14)}: not registered`); continue; }
@@ -79,6 +79,7 @@ function main() {
   const vars = [
     "ANTHROPIC_API_KEY", "DEEPSEEK_API_KEY", "OPENAI_API_KEY",
     "GEMINI_API_KEY", "AIMLAPI_API_KEY", "HF_TOKEN",
+    "OLLAMA_BASE_URL", "penny_ENABLE_OLLAMA",
     "penny_ROUTING_STRATEGY", "penny_AUDIT_MODEL",
     "penny_ALLOW_PREMIUM_MODELS", "penny_ALLOW_PREMIUM_SYNTHESIS",
     "penny_ENABLE_EXPERIMENTAL_PROVIDERS", "penny_MAX_ESTIMATED_LLM_CALL_USD",
