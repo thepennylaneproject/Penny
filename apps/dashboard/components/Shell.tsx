@@ -149,7 +149,6 @@ export function Shell({ children, activeView, navHighlightView, onNavigate, onAu
             style={{
               fontFamily:   "var(--font-serif)",
               fontSize:     "19px",
-              fontStyle:    "italic",
               color:        "var(--ink-text)",
               letterSpacing: "0.01em",
             }}
