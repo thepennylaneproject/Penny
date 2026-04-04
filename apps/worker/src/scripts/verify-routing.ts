@@ -8,12 +8,17 @@
  */
 
 import { config as loadDotenv } from "dotenv";
-import { resolve } from "path";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 
-// Load keys from .env.local (then .env as fallback) in the worker directory
-const workerRoot = resolve(new URL(".", import.meta.url).pathname, "../../..");
+// Load keys from monorepo root first, then worker directory for local overrides.
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const workerRoot = resolve(scriptDir, "../..");
+const repoRoot = resolve(workerRoot, "../..");
+loadDotenv({ path: resolve(repoRoot, ".env.local"), override: false });
+loadDotenv({ path: resolve(repoRoot, ".env"), override: false });
 loadDotenv({ path: resolve(workerRoot, ".env.local"), override: false });
-loadDotenv({ path: resolve(workerRoot, ".env"),       override: false });
+loadDotenv({ path: resolve(workerRoot, ".env"), override: false });
 
 import {
   experimentalProvidersAllowed,
