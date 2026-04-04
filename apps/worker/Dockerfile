@@ -15,6 +15,7 @@ RUN npm install
 # Copy source code
 COPY tsconfig.json ./
 COPY src ./src
+COPY audits ./audits
 
 # Build TypeScript
 RUN npm run build
@@ -35,6 +36,7 @@ RUN npm install --omit=dev && npm cache clean --force
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/audits ./audits
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001

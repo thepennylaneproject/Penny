@@ -50,6 +50,8 @@ function readCachedPrompt(filePath: string): string {
 function repoRoot(): string {
   const env = process.env.penny_REPO_ROOT?.trim();
   if (env && existsSync(env)) return env;
+  // In Docker the app lives at /app; detect by checking __dirname
+  if (__dirname.startsWith("/app")) return "/app";
   // src/ → worker/ → apps/ → repo root (3 levels up)
   return join(__dirname, "..", "..", "..");
 }
@@ -89,23 +91,29 @@ function getGit(): string {
  */
 function loadClusterPrompts(auditKind?: string): { core: string; auditAgent: string } {
   const root = repoRoot();
-  // core_system_prompt.md and agent files live in legacy/ after repo reorganization
+  const promptsDir = join(root, "audits", "prompts");
   const legacyDir = join(root, "legacy");
-  const corePath = join(legacyDir, "core_system_prompt.md");
-  if (!existsSync(corePath)) {
-    throw new Error(`core_system_prompt.md not found at ${corePath}`);
+
+  const corePath = join(promptsDir, "core_system_prompt.md");
+  const corePathLegacy = join(legacyDir, "core_system_prompt.md");
+  const coreResolved = existsSync(corePath) ? corePath : corePathLegacy;
+  if (!existsSync(coreResolved)) {
+    throw new Error(
+      `core_system_prompt.md not found at ${corePath}` +
+        (corePathLegacy !== corePath ? ` (or ${corePathLegacy})` : "")
+    );
   }
-  const core = readCachedPrompt(corePath);
+  const core = readCachedPrompt(coreResolved);
 
   /**
-   * Resolve a prompt file: check legacy/ first, then audits/prompts/ (for
-   * newer prompts like intelligence_extraction_prompt.md).
+   * Resolve a prompt file: prefer audits/prompts/, then legacy/ for older layouts.
    * Returns empty string if the file exists in neither location (never throws).
    */
   function prompt(filename: string): string {
+    const auditPath = join(promptsDir, filename);
+    if (existsSync(auditPath)) return readCachedPrompt(auditPath);
     const legacyPath = join(legacyDir, filename);
     if (existsSync(legacyPath)) return readCachedPrompt(legacyPath);
-    const auditPath = join(root, "audits", "prompts", filename);
     return readCachedPrompt(auditPath);
   }
 
