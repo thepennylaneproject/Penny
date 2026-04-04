@@ -66,7 +66,9 @@ export function premiumAllowedByDefault(): boolean {
 }
 
 export function experimentalProvidersAllowed(): boolean {
-  return parseBooleanEnv(process.env.penny_ENABLE_EXPERIMENTAL_PROVIDERS);
+  const raw = process.env.penny_ENABLE_EXPERIMENTAL_PROVIDERS;
+  if (typeof raw === "undefined") return true;
+  return parseBooleanEnv(raw);
 }
 
 export function resolveMaxEstimatedCostUsd(): number {
