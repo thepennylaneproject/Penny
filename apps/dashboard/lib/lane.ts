@@ -55,12 +55,8 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
-function resolveLaneBaseUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_LANE_API_BASE_URL ??
-    process.env.LANE_API_BASE_URL ??
-    ""
-  ).trim().replace(/\/+$/, "");
+function normalizeLaneBaseUrl(baseUrl: string | null | undefined): string {
+  return baseUrl?.trim().replace(/\/+$/, "") ?? "";
 }
 
 async function getLaneAccessToken(): Promise<string> {
@@ -79,10 +75,16 @@ async function getLaneAccessToken(): Promise<string> {
   return token;
 }
 
-async function laneFetch<T>(path: string, init: RequestInit): Promise<T> {
-  const baseUrl = resolveLaneBaseUrl();
+async function laneFetch<T>(
+  laneBaseUrl: string | null | undefined,
+  path: string,
+  init: RequestInit
+): Promise<T> {
+  const baseUrl = normalizeLaneBaseUrl(laneBaseUrl);
   if (!baseUrl) {
-    throw new Error("NEXT_PUBLIC_LANE_API_BASE_URL is not configured.");
+    throw new Error(
+      "Lane API base URL is unavailable for browser requests. Set NEXT_PUBLIC_LANE_API_BASE_URL on the dashboard; server-only hosts like lane.railway.internal will not work from the browser."
+    );
   }
 
   const token = await getLaneAccessToken();
@@ -118,18 +120,20 @@ async function laneFetch<T>(path: string, init: RequestInit): Promise<T> {
 }
 
 export async function runLaneAudit(
+  laneBaseUrl: string | null | undefined,
   payload: LaneAuditRequest
 ): Promise<LaneAuditResponse> {
-  return laneFetch<LaneAuditResponse>("/audit", {
+  return laneFetch<LaneAuditResponse>(laneBaseUrl, "/audit", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 }
 
 export async function generateLanePatch(
+  laneBaseUrl: string | null | undefined,
   payload: LanePatchRequest
 ): Promise<LanePatchResponse> {
-  return laneFetch<LanePatchResponse>("/generate-patch", {
+  return laneFetch<LanePatchResponse>(laneBaseUrl, "/generate-patch", {
     method: "POST",
     body: JSON.stringify(payload),
   });

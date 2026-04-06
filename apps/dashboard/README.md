@@ -67,6 +67,8 @@ npm run dev
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Postgres (Supabase). Enables `penny_projects` + job tables + durable state. |
+| `NEXT_PUBLIC_LANE_API_BASE_URL` | **Public** Lane API origin for direct browser audit / patch requests from Penny. Server-only/private hosts like `lane.railway.internal` will not work from the browser. |
+| `LANE_API_BASE_URL` | Optional server-only Lane origin for future server-to-server use. It is not exposed to the browser UI. |
 | `ORCHESTRATION_ENQUEUE_SECRET` | Bearer token for enqueue API + Netlify scheduler. |
 | `REDIS_URL` / `penny_REDIS_URL` | Push jobs to BullMQ (worker). |
 | `penny_DASHBOARD_DATA_DIR` | JSON store directory when no `DATABASE_URL`. |

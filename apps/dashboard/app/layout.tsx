@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { DM_Serif_Display, Inter, JetBrains_Mono } from "next/font/google";
 import { SentryVerifyButton } from "@/components/sentry-verify-button";
+import { RuntimeConfigProvider } from "@/components/RuntimeConfigProvider";
+import { resolveDashboardRuntimeConfig } from "@/lib/runtime-config.server";
 import "./globals.css";
 
 const inter = Inter({
@@ -30,13 +32,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const runtimeConfig = resolveDashboardRuntimeConfig();
+
   return (
     <html
       lang="en"
       className={`${inter.variable} ${jetBrainsMono.variable} ${dmSerifDisplay.variable}`}
     >
       <body className="antialiased min-h-screen">
-        {children}
+        <RuntimeConfigProvider
+          laneBaseUrl={runtimeConfig.laneBaseUrl}
+          laneServerConfigured={runtimeConfig.laneServerConfigured}
+        >
+          {children}
+        </RuntimeConfigProvider>
         <SentryVerifyButton />
       </body>
     </html>

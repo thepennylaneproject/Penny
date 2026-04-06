@@ -35,7 +35,7 @@ import {
   type ProjectManifest,
 } from "./manifest.js";
 import { getRepairClient, type RepairJobRequest } from "./repair-client.js";
-import { authenticatedCloneUrl, downloadRepoTarball, isGitHubAppConfigured } from "./github-app.js";
+import { downloadRepoTarball, isGitHubAppConfigured } from "./github-app.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFileCache = new Map<string, string>();
@@ -1614,6 +1614,7 @@ async function resolveProjectRepo(
   cleanup?: () => void;
 }> {
   const sourceType = project.sourceType ?? "portfolio_mirror";
+  const requestedRef = repoRef?.trim();
   const sourceRef =
     project.repoAccess?.localPath ??
     project.repoAccess?.cloneRef ??
@@ -1635,9 +1636,15 @@ async function resolveProjectRepo(
     }
     const target = mkdtempSync(join(tmpdir(), "penny-worker-"));
     try {
-      if (isGitHubAppConfigured()) {
-        // Use GitHub API tarball download — no git binary required
-        await downloadRepoTarball(sourceRef, target, project.github_app_installation_id);
+      if (/github\.com[/:][^/]+\/[^/.]+/i.test(sourceRef)) {
+        // Use GitHub's tarball API for GitHub-hosted repos so we avoid the
+        // git HTTPS stack entirely when fetching audit sources.
+        await downloadRepoTarball(
+          sourceRef,
+          target,
+          isGitHubAppConfigured() ? project.github_app_installation_id : undefined,
+          requestedRef
+        );
       } else {
         // Fallback: plain git clone (requires git in PATH)
         execFileSync(getGit(), ["clone", "--depth", "1", sourceRef, target], {
@@ -1645,8 +1652,8 @@ async function resolveProjectRepo(
           stdio: "pipe",
           timeout: 60_000,
         });
-        if (repoRef?.trim()) {
-          execFileSync(getGit(), ["-C", target, "checkout", repoRef.trim()], {
+        if (requestedRef) {
+          execFileSync(getGit(), ["-C", target, "checkout", requestedRef], {
             encoding: "utf8",
             stdio: "pipe",
             timeout: 60_000,

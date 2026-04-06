@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Finding, FindingStatus, RepairJob, SyncMapping } from "@/lib/types";
 import { Badge } from "./Badge";
+import { useRuntimeConfig } from "@/components/RuntimeConfigProvider";
 import { STATUS_GROUPS } from "@/lib/constants";
 import { isInQueuedSet } from "@/lib/finding-validation";
 import { UI_COPY } from "@/lib/ui-copy";
@@ -84,6 +85,7 @@ export function FindingDetail({
   onQueueRepair,
   queuedFindingIds,
 }: FindingDetailProps) {
+  const { laneBaseUrl, laneServerConfigured } = useRuntimeConfig();
   const [queueing, setQueueing] = useState(false);
   const [queueMsg, setQueueMsg] = useState<string | null>(null);
   const [actionInFlight, setActionInFlight] = useState<string | null>(null);
@@ -156,7 +158,7 @@ export function FindingDetail({
         throw new Error("Project repository URL is required for Lane patch generation.");
       }
 
-      const response = await generateLanePatch({
+      const response = await generateLanePatch(laneBaseUrl, {
         mode: "patch",
         project_id: projectName,
         repository: projectRepositoryUrl,
@@ -553,6 +555,13 @@ export function FindingDetail({
               isLoading={repairSubmitting}
               submitLabel="Generate Lane patch"
             />
+            {!laneBaseUrl ? (
+              <div style={{ fontSize: "11px", color: "var(--ink-amber)", marginTop: "0.75rem" }}>
+                {laneServerConfigured
+                  ? "A server-only Lane host is configured. Direct browser patch generation still needs NEXT_PUBLIC_LANE_API_BASE_URL."
+                  : "Lane endpoint unavailable in this environment."}
+              </div>
+            ) : null}
             {lanePatchError ? (
               <div style={{ fontSize: "11px", color: "var(--ink-red)", marginTop: "0.75rem" }}>
                 {lanePatchError}

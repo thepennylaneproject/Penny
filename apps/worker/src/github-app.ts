@@ -126,31 +126,37 @@ async function getInstallationToken(installationId: string): Promise<string> {
  * Download a repo via GitHub's tarball API and extract it to `targetDir`.
  * Uses `tar` (available everywhere — no git needed).
  *
- * Automatically looks up the GitHub App installation for the repo and
- * generates a short-lived token — no per-project configuration required.
+ * If GitHub App credentials are configured, the helper fetches a short-lived
+ * installation token; otherwise it falls back to anonymous access for public
+ * repositories.
  */
 export async function downloadRepoTarball(
   repoUrl: string,
   targetDir: string,
-  installationId?: string
+  installationId?: string,
+  ref?: string
 ): Promise<void> {
   const match = repoUrl.match(/github\.com[/:]([^/]+)\/([^/.]+)/);
   if (!match) throw new Error(`Cannot parse GitHub owner/repo from URL: ${repoUrl}`);
   const [, owner, repo] = match;
 
-  const id = installationId ?? (await getInstallationId(repoUrl));
-  const token = await getInstallationToken(id);
+  const token = installationId
+    ? await getInstallationToken(installationId)
+    : GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY
+      ? await getInstallationToken(await getInstallationId(repoUrl))
+      : undefined;
 
-  const tarballUrl = `https://api.github.com/repos/${owner}/${repo}/tarball`;
-  const res = await fetch(tarballUrl, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "X-GitHub-Api-Version": "2022-11-28",
-      "User-Agent": "penny-worker",
-    },
-    redirect: "follow",
-  });
+  const tarballUrl = ref
+    ? `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(ref)}`
+    : `https://api.github.com/repos/${owner}/${repo}/tarball`;
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "penny-worker",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(tarballUrl, { headers, redirect: "follow" });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`Tarball download failed for ${owner}/${repo} (${res.status}): ${body}`);

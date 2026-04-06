@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRuntimeConfig } from "@/components/RuntimeConfigProvider";
 import { runLaneAudit, type LaneAuditResponse } from "@/lib/lane";
 
 interface LaneAuditPanelProps {
@@ -12,6 +13,7 @@ export function LaneAuditPanel({
   projectName,
   repositoryUrl,
 }: LaneAuditPanelProps) {
+  const { laneBaseUrl, laneServerConfigured } = useRuntimeConfig();
   const [audit, setAudit] = useState<LaneAuditResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function LaneAuditPanel({
     setLoading(true);
     setError(null);
     try {
-      const response = await runLaneAudit({
+      const response = await runLaneAudit(laneBaseUrl, {
         mode: "audit",
         project_id: projectName,
         project_name: projectName,
@@ -66,12 +68,19 @@ export function LaneAuditPanel({
           <div style={{ fontSize: "12px", color: "var(--ink-text-3)", lineHeight: 1.5 }}>
             Run Lane directly from Penny and keep the findings in Penny's operator UI.
           </div>
+          {!laneBaseUrl ? (
+            <div style={{ fontSize: "10px", color: "var(--ink-amber)", lineHeight: 1.5 }}>
+              {laneServerConfigured
+                ? "A server-only Lane host is configured. Direct browser audits still need NEXT_PUBLIC_LANE_API_BASE_URL."
+                : "Lane endpoint unavailable in this environment."}
+            </div>
+          ) : null}
         </div>
         <span style={{ marginLeft: "auto" }} />
         <button
           type="button"
           onClick={runAudit}
-          disabled={loading}
+          disabled={loading || !laneBaseUrl}
           style={{ fontSize: "11px", fontFamily: "var(--font-mono)", padding: "0.45rem 0.75rem" }}
         >
           {loading ? "Running…" : "Run Lane audit"}
