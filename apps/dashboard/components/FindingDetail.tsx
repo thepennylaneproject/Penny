@@ -11,6 +11,7 @@ import { repairLedgerCaption } from "@/lib/repair-proof";
 import { useRepairJob } from "@/hooks/use-repair-job";
 import { useRepairCandidates } from "@/hooks/use-repair-candidates";
 import { useOrchestrationEvents } from "@/hooks/use-orchestration-events";
+import { useFindingStatusChangeUndo } from "@/hooks/use-finding-status-change-undo";
 import { RepairJobMonitor } from "./RepairJobMonitor";
 import { RepairConfigTuner, type RepairConfig } from "./RepairConfigTuner";
 import { CandidateComparison } from "./CandidateComparison";
@@ -105,6 +106,13 @@ export function FindingDetail({
   const { candidates } = useRepairCandidates(finding.repair_job_id ?? null);
   const { events } = useOrchestrationEvents(finding.repair_job_id ?? null);
 
+  const { changeFindingStatus } = useFindingStatusChangeUndo({
+    onChangeSuccess: () => {
+      // Refresh lifecycle after status change
+      void loadLifecycle();
+    },
+  });
+
   const loadLifecycle = useCallback(async () => {
     setLifecycleError(null);
     setLifecycleLoading(true);
@@ -145,7 +153,8 @@ export function FindingDetail({
   const handleAction = async (status: FindingStatus) => {
     setActionInFlight(status);
     try {
-      await onAction(finding.finding_id, status);
+      await changeFindingStatus(projectName, finding.finding_id, status, finding.status);
+      onAction(finding.finding_id, status);
     } finally {
       setActionInFlight(null);
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import type { Project } from "@/lib/types";
 import { apiFetch } from "@/lib/api-fetch";
+import { useProjectRemovalUndo } from "@/hooks/use-project-removal-undo";
 
 interface ProjectManagementPanelProps {
   project: Project;
@@ -74,6 +75,18 @@ export function ProjectManagementPanel({
   onDeleted,
   onUpdated,
 }: ProjectManagementPanelProps) {
+  const { removeProject } = useProjectRemovalUndo({
+    onRemoveSuccess: () => {
+      setConfirmDelete(false);
+      setDeleting(false);
+      onDeleted();
+    },
+    onRemoveError: (error) => {
+      setError(error.message);
+      setDeleting(false);
+    },
+  });
+
   const [repoUrl, setRepoUrl]     = useState(project.repositoryUrl ?? "");
   const [scanRoots, setScanRoots] = useState(
     (project.auditConfig?.scanRoots ?? ["./"]).join(", ")
@@ -199,18 +212,9 @@ export function ProjectManagementPanel({
     setDeleting(true);
     setError(null);
     try {
-      const res = await apiFetch(
-        `/api/projects/${encodeURIComponent(project.name)}`,
-        { method: "DELETE" }
-      );
-      if (!res.ok && res.status !== 204) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? `HTTP ${res.status}`);
-      }
-      onDeleted();
+      await removeProject(project);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-      setDeleting(false);
+      // Error is already handled in the hook's onRemoveError callback
     }
   }
 
@@ -415,7 +419,7 @@ export function ProjectManagementPanel({
           Danger zone
         </div>
         <p style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)", margin: 0, lineHeight: 1.5 }}>
-          Permanently removes this project and all its findings, onboarding state, and history from penny. This cannot be undone.
+          Removes this project and all its findings, onboarding state, and history from penny. You can undo this within 5 seconds.
         </p>
 
         {!confirmDelete ? (
