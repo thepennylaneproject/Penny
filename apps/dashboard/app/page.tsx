@@ -15,6 +15,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DashboardRouteShell } from "@/components/DashboardRouteShell";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { SignInPrompt, ConfigurationError, RetryableError } from "@/components/AppReadinessUI";
+import { UndoNotification } from "@/components/UndoNotification";
 import { STATUS_GROUPS } from "@/lib/constants";
 import { isInQueuedSet } from "@/lib/finding-validation";
 import { fragileShortPathSet, overlappingFragileShortPaths } from "@/lib/fragile-files";
@@ -626,6 +627,8 @@ export default function Home() {
           penny v1.1 · findings persist via api
         </div>
       )}
+
+      <UndoNotification />
     </DashboardRouteShell>
   );
 }
