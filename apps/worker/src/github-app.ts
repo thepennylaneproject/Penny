@@ -140,11 +140,18 @@ export async function downloadRepoTarball(
   if (!match) throw new Error(`Cannot parse GitHub owner/repo from URL: ${repoUrl}`);
   const [, owner, repo] = match;
 
-  const token = installationId
-    ? await getInstallationToken(installationId)
-    : GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY
-      ? await getInstallationToken(await getInstallationId(repoUrl))
-      : undefined;
+  let token: string | undefined;
+  try {
+    token = installationId
+      ? await getInstallationToken(installationId)
+      : isGitHubAppConfigured()
+        ? await getInstallationToken(await getInstallationId(repoUrl))
+        : undefined;
+  } catch (authErr) {
+    // Bad credentials or misconfigured key — fall back to anonymous access (public repos only).
+    console.error(`[github-app] Auth failed, falling back to anonymous tarball download:`, authErr instanceof Error ? authErr.message : authErr);
+    token = undefined;
+  }
 
   const tarballUrl = ref
     ? `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(ref)}`
@@ -194,7 +201,14 @@ export async function authenticatedCloneUrl(
   return url.toString();
 }
 
-/** Returns true if GitHub App credentials are configured. */
+/**
+ * Returns true only if GitHub App credentials look valid.
+ * Rejects fingerprint strings (SHA256:...) and empty keys so callers
+ * don't attempt JWT signing with an unusable credential.
+ */
 export function isGitHubAppConfigured(): boolean {
-  return Boolean(GITHUB_APP_ID && GITHUB_APP_PRIVATE_KEY);
+  if (!GITHUB_APP_ID || !GITHUB_APP_PRIVATE_KEY) return false;
+  const key = GITHUB_APP_PRIVATE_KEY.trim();
+  // Must look like a PEM block, not an SSH fingerprint or public-key hash
+  return key.startsWith("-----BEGIN");
 }

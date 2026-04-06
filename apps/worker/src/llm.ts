@@ -128,7 +128,14 @@ export function resolveModelChain(auditKind?: string): string[] {
   const chain: string[] = [];
 
   switch (strategy) {
+    case "local-only":
+      // Self-hosted: Ollama only. No paid API fallbacks. Fails fast when Ollama
+      // is unavailable so the error is clear and costs nothing.
+      if (ollamaOk) chain.push("ollama:qwen14b");
+      break;
+
     case "local-training":
+      // Local-first with cheap paid fallbacks for when Ollama is unavailable.
       if (ollamaOk)                      chain.push("ollama:qwen14b");
       if (isLargeContext && geminiOk)    chain.push("gemini:flash");
       if (deepseekOk)                    chain.push("deepseek:chat");
