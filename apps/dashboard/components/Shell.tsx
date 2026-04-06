@@ -11,7 +11,7 @@ export type NavView = "portfolio" | "engine" | "jobs";
 interface ShellProps {
   children:    React.ReactNode;
   activeView:  NavView;
-  /** Which nav item is highlighted; defaults to `activeView`. Use `"portfolio"` while a project is open so sidebar matches portfolio context. */
+  /** Which nav item is highlighted; defaults to `activeView`. */
   navHighlightView?: NavView;
   onNavigate:  (view: NavView) => void;
   /** After a successful `POST /api/sync/audit`, refresh portfolio data from the parent. */

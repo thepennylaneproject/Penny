@@ -43,6 +43,7 @@ export async function PUT(request: Request, { params }: Params) {
       repoAccess: body.repoAccess ?? existing.repoAccess,
       stack: body.stack ?? existing.stack,
       auditConfig: body.auditConfig ?? existing.auditConfig,
+      repairConfig: body.repairConfig ?? existing.repairConfig,
       profile: body.profile ?? existing.profile,
       expectations: body.expectations ?? existing.expectations,
       onboardingState: body.onboardingState ?? existing.onboardingState,

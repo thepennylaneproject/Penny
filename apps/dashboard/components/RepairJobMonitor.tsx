@@ -30,20 +30,20 @@ interface RepairJobMonitorProps {
   onRefresh?: () => void;
 }
 
-const statusColors: Record<string, string> = {
-  queued: "bg-blue-100 text-blue-800",
-  in_progress: "bg-yellow-100 text-yellow-800",
-  completed: "bg-green-100 text-green-800",
-  failed: "bg-red-100 text-red-800",
-  blocked: "bg-gray-100 text-gray-800",
+const STATUS_BADGE: Record<string, { background: string; color: string }> = {
+  queued:      { background: "var(--ink-bg-sunken)", color: "var(--ink-blue)" },
+  in_progress: { background: "var(--ink-bg-sunken)", color: "var(--ink-amber)" },
+  completed:   { background: "var(--ink-bg-sunken)", color: "var(--ink-green)" },
+  failed:      { background: "var(--ink-bg-sunken)", color: "var(--ink-red)" },
+  blocked:     { background: "var(--ink-bg-sunken)", color: "var(--ink-text-3)" },
 };
 
-const actionLabels: Record<string, { label: string; emoji: string }> = {
-  fast_lane_ready_pr: { label: "Fast Lane PR", emoji: "🚀" },
-  ready_pr: { label: "Ready PR", emoji: "✅" },
-  draft_pr: { label: "Draft PR", emoji: "📝" },
-  candidate_only: { label: "Candidate", emoji: "🔵" },
-  do_not_repair: { label: "Blocked", emoji: "🚫" },
+const ACTION_LABELS: Record<string, string> = {
+  fast_lane_ready_pr: "Fast Lane PR",
+  ready_pr:           "Ready PR",
+  draft_pr:           "Draft PR",
+  candidate_only:     "Candidate",
+  do_not_repair:      "Blocked",
 };
 
 export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
@@ -61,14 +61,9 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
       const seconds = Math.floor(ms / 1000);
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
-
-      if (hours > 0) {
-        setElapsed(`${hours}h ${minutes % 60}m`);
-      } else if (minutes > 0) {
-        setElapsed(`${minutes}m ${seconds % 60}s`);
-      } else {
-        setElapsed(`${seconds}s`);
-      }
+      if (hours > 0) setElapsed(`${hours}h ${minutes % 60}m`);
+      else if (minutes > 0) setElapsed(`${minutes}m ${seconds % 60}s`);
+      else setElapsed(`${seconds}s`);
     };
 
     updateElapsed();
@@ -77,74 +72,117 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
   }, [job]);
 
   const confidencePercent = job.confidence_score ?? 0;
-  const actionInfo = job.action ? actionLabels[job.action] : null;
+  const statusStyle = STATUS_BADGE[job.status] ?? STATUS_BADGE.blocked;
+  const actionLabel = job.action ? ACTION_LABELS[job.action] : null;
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 space-y-4">
-      {/* Header with status and action */}
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <h3 className="text-sm font-semibold text-gray-900">
+    <div
+      style={{
+        border:       "0.5px solid var(--ink-border)",
+        borderRadius: "var(--radius-lg)",
+        padding:      "1rem",
+        display:      "flex",
+        flexDirection: "column",
+        gap:          "1rem",
+        fontFamily:   "var(--font-mono)",
+      }}
+    >
+      {/* Header: finding ID + status badges */}
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "0.5rem" }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--ink-text)" }}>
             {job.finding_id}
-          </h3>
-          <p className="text-xs text-gray-600 mt-1">
-            Job: {job.repair_job_id.slice(0, 8)}...
-          </p>
+          </div>
+          <div style={{ fontSize: "11px", color: "var(--ink-text-4)", marginTop: "0.25rem" }}>
+            Job: {job.repair_job_id.slice(0, 8)}…
+          </div>
         </div>
-        <div className="flex gap-2">
+        <div style={{ display: "flex", gap: "0.35rem", alignItems: "center", flexShrink: 0 }}>
           <span
-            className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${statusColors[job.status]}`}
+            style={{
+              display:      "inline-flex",
+              alignItems:   "center",
+              borderRadius: "var(--radius-sm)",
+              padding:      "2px 8px",
+              fontSize:     "11px",
+              fontWeight:   500,
+              background:   statusStyle.background,
+              color:        statusStyle.color,
+              border:       `0.5px solid ${statusStyle.color}`,
+            }}
           >
-            {job.status === "in_progress" ? `${job.status}...` : job.status}
+            {job.status === "in_progress" ? "in progress…" : job.status}
           </span>
-          {actionInfo && (
-            <span className="inline-flex items-center rounded bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-800">
-              {actionInfo.emoji} {actionInfo.label}
+          {actionLabel ? (
+            <span
+              style={{
+                display:      "inline-flex",
+                alignItems:   "center",
+                borderRadius: "var(--radius-sm)",
+                padding:      "2px 8px",
+                fontSize:     "11px",
+                fontWeight:   500,
+                background:   "var(--ink-bg-sunken)",
+                color:        "var(--ink-blue)",
+                border:       "0.5px solid var(--ink-blue)",
+              }}
+            >
+              {actionLabel}
             </span>
-          )}
+          ) : null}
         </div>
       </div>
 
-      {/* Confidence score and breakdown */}
+      {/* Confidence score + breakdown */}
       {job.confidence_score !== undefined && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-700">
-              Confidence
-            </span>
-            <span className="text-sm font-semibold text-gray-900">
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: "11px", color: "var(--ink-text-3)" }}>Confidence</span>
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-text)" }}>
               {confidencePercent.toFixed(1)}%
             </span>
           </div>
           <ProgressBar value={confidencePercent} max={100} />
 
-          {/* Breakdown details */}
           {job.confidence_breakdown && (
-            <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-              <div className="bg-gray-50 p-2 rounded">
-                <div className="text-gray-600">Validation</div>
-                <div className="font-semibold text-gray-900">
-                  {job.confidence_breakdown.validation.toFixed(0)}%
+            <div
+              style={{
+                display:             "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap:                 "0.5rem",
+                marginTop:           "0.25rem",
+              }}
+            >
+              {(
+                [
+                  ["Validation", job.confidence_breakdown.validation],
+                  ["Locality",   job.confidence_breakdown.locality],
+                  ["Risk",       job.confidence_breakdown.risk],
+                  ["Uncertainty", -job.confidence_breakdown.uncertainty_penalty],
+                ] as [string, number][]
+              ).map(([label, value]) => (
+                <div
+                  key={label}
+                  style={{
+                    background:   "var(--ink-bg-sunken)",
+                    padding:      "0.5rem",
+                    borderRadius: "var(--radius-sm)",
+                    border:       "0.5px solid var(--ink-border-faint)",
+                  }}
+                >
+                  <div style={{ fontSize: "10px", color: "var(--ink-text-4)" }}>{label}</div>
+                  <div
+                    style={{
+                      fontSize:   "13px",
+                      fontWeight: 600,
+                      color:      value < 0 ? "var(--ink-red)" : "var(--ink-text)",
+                      marginTop:  "0.15rem",
+                    }}
+                  >
+                    {value < 0 ? "" : ""}{value.toFixed(1)}%
+                  </div>
                 </div>
-              </div>
-              <div className="bg-gray-50 p-2 rounded">
-                <div className="text-gray-600">Locality</div>
-                <div className="font-semibold text-gray-900">
-                  {job.confidence_breakdown.locality.toFixed(0)}%
-                </div>
-              </div>
-              <div className="bg-gray-50 p-2 rounded">
-                <div className="text-gray-600">Risk</div>
-                <div className="font-semibold text-gray-900">
-                  {job.confidence_breakdown.risk.toFixed(0)}%
-                </div>
-              </div>
-              <div className="bg-gray-50 p-2 rounded">
-                <div className="text-gray-600">Uncertainty</div>
-                <div className="font-semibold text-gray-900">
-                  -{job.confidence_breakdown.uncertainty_penalty.toFixed(0)}%
-                </div>
-              </div>
+              ))}
             </div>
           )}
         </div>
@@ -152,9 +190,9 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
 
       {/* Candidates evaluated */}
       {job.total_candidates_evaluated !== undefined && (
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">Candidates Evaluated</span>
-          <span className="font-semibold text-gray-900">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "11px", color: "var(--ink-text-3)" }}>Candidates evaluated</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-text)" }}>
             {job.total_candidates_evaluated}
           </span>
         </div>
@@ -162,9 +200,9 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
 
       {/* Best score */}
       {job.best_score !== undefined && (
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">Best Patch Score</span>
-          <span className="font-semibold text-gray-900">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "11px", color: "var(--ink-text-3)" }}>Best patch score</span>
+          <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--ink-text)" }}>
             {job.best_score.toFixed(1)}%
           </span>
         </div>
@@ -172,12 +210,24 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
 
       {/* PR link */}
       {job.pr_url && (
-        <div className="bg-blue-50 border border-blue-200 rounded p-2">
+        <div
+          style={{
+            background:   "var(--ink-bg-sunken)",
+            border:       "0.5px solid var(--ink-border)",
+            borderRadius: "var(--radius-sm)",
+            padding:      "0.5rem 0.75rem",
+          }}
+        >
           <a
             href={job.pr_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-700 hover:text-blue-900 font-medium"
+            style={{
+              fontSize:       "11px",
+              color:          "var(--ink-blue)",
+              fontWeight:     500,
+              textDecoration: "none",
+            }}
           >
             PR #{job.pr_number} → {job.pr_url.split("/").pop()}
           </a>
@@ -186,26 +236,53 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
 
       {/* Error message */}
       {job.error_message && (
-        <div className="bg-red-50 border border-red-200 rounded p-2">
-          <p className="text-xs text-red-700">{job.error_message}</p>
+        <div
+          style={{
+            background:   "var(--ink-bg-sunken)",
+            border:       "0.5px solid var(--ink-red)",
+            borderRadius: "var(--radius-sm)",
+            padding:      "0.5rem 0.75rem",
+          }}
+        >
+          <p style={{ fontSize: "11px", color: "var(--ink-red)", margin: 0 }}>
+            {job.error_message}
+          </p>
         </div>
       )}
 
-      {/* Timing */}
-      <div className="pt-2 border-t border-gray-200">
-        <div className="flex items-center justify-between text-xs text-gray-600">
-          <span>Elapsed</span>
-          <span className="font-mono">{elapsed}</span>
-        </div>
+      {/* Elapsed time */}
+      <div
+        style={{
+          paddingTop: "0.5rem",
+          borderTop:  "0.5px solid var(--ink-border-faint)",
+          display:    "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span style={{ fontSize: "11px", color: "var(--ink-text-4)" }}>Elapsed</span>
+        <span style={{ fontSize: "11px", color: "var(--ink-text-3)" }}>{elapsed}</span>
       </div>
 
       {/* Refresh button */}
       {onRefresh && (
         <button
+          type="button"
           onClick={onRefresh}
-          className="w-full py-2 text-xs font-medium text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded transition-colors"
+          style={{
+            width:        "100%",
+            padding:      "0.5rem",
+            fontSize:     "11px",
+            fontFamily:   "var(--font-mono)",
+            fontWeight:   500,
+            color:        "var(--ink-blue)",
+            background:   "var(--ink-bg-sunken)",
+            border:       "0.5px solid var(--ink-border-faint)",
+            borderRadius: "var(--radius-sm)",
+            cursor:       "pointer",
+          }}
         >
-          Refresh Status
+          Refresh status
         </button>
       )}
     </div>

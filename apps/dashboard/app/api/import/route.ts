@@ -38,6 +38,23 @@ export async function POST(request: Request) {
     const mode: "merge" | "replace" =
       body.mode === "replace" ? "replace" : "merge";
 
+    // Replace mode permanently deletes all existing findings — require explicit confirmation.
+    if (mode === "replace" && body.confirm_replace !== true) {
+      const repo = getRepository();
+      const existing = await repo.getByName(projectName);
+      const existingCount = existing?.findings?.length ?? 0;
+      return NextResponse.json(
+        {
+          error: "replace_confirmation_required",
+          message:
+            "Replace mode permanently removes all existing findings and cannot be undone. " +
+            "Pass confirm_replace: true to proceed.",
+          existing_findings_count: existingCount,
+        },
+        { status: 409 }
+      );
+    }
+
     const repo = getRepository();
     const existing = await repo.getByName(projectName);
     const totalBefore = existing?.findings?.length ?? 0;
@@ -88,6 +105,7 @@ export async function POST(request: Request) {
       sourceType: existing?.sourceType ?? "import",
       sourceRef: existing?.sourceRef,
       auditConfig: existing?.auditConfig,
+      repairConfig: existing?.repairConfig,
       profile: existing?.profile,
       expectations: existing?.expectations,
       onboardingState: existing?.onboardingState,

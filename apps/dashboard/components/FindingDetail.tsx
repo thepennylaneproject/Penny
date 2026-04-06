@@ -16,6 +16,7 @@ import { RepairConfigTuner, type RepairConfig } from "./RepairConfigTuner";
 import { CandidateComparison } from "./CandidateComparison";
 import { PRManager } from "./PRManager";
 import { RepairHistory } from "./RepairHistory";
+import { FindingStatusFlow } from "./FindingStatusFlow";
 interface FindingLifecyclePayload {
   linear: {
     integration_configured: boolean;
@@ -602,82 +603,19 @@ export function FindingDetail({
 
       {/* Status workflow hint */}
       {finding.status && (
-        <div
-          style={{
-            fontSize: "12px",
-            color: "var(--ink-text-2)",
-            lineHeight: 1.5,
-            marginBottom: "1rem",
-            padding: "0.75rem 0.85rem",
-            background: "var(--ink-bg-sunken)",
-            borderRadius: "var(--radius-md)",
-            border: "0.5px solid var(--ink-border-faint)",
+        <FindingStatusFlow
+          currentStatus={finding.status}
+          onStatusChange={async (newStatus) => {
+            await handleAction(newStatus);
           }}
-        >
-          <strong style={{ color: "var(--ink-text)" }}>Status:</strong>{" "}
-          {WORKFLOW_HINTS[finding.status] ?? "Unknown status"}
-        </div>
+          isLoading={actionInFlight !== null}
+        />
       )}
 
-      {/* Actions */}
-      <div
-        style={{
-          display:      "flex",
-          gap:          "0.5rem",
-          alignItems:   "center",
-          flexWrap:     "wrap",
-          borderTop:    "0.5px solid var(--ink-border-faint)",
-          paddingTop:   "1rem",
-          marginTop:    "0.25rem",
-        }}
-      >
-        {STATUS_GROUPS.active.includes(finding.status) && (
-          <>
-            <button
-              type="button"
-              disabled={actionInFlight !== null}
-              onClick={() => handleAction("in_progress")}
-            >
-              {actionInFlight === "in_progress" ? "…" : "Start fix"}
-            </button>
-            <button
-              type="button"
-              disabled={actionInFlight !== null}
-              onClick={() => handleAction("deferred")}
-            >
-              {actionInFlight === "deferred" ? "…" : "Defer"}
-            </button>
-          </>
-        )}
-        {finding.status === "in_progress" && (
-          <button
-            type="button"
-            disabled={actionInFlight !== null}
-            onClick={() => handleAction("fixed_pending_verify")}
-          >
-            {actionInFlight === "fixed_pending_verify" ? "…" : "Mark fixed (needs verify)"}
-          </button>
-        )}
-        {finding.status === "fixed_pending_verify" && (
-          <button
-            type="button"
-            disabled={actionInFlight !== null}
-            onClick={() => handleAction("fixed_verified")}
-          >
-            {actionInFlight === "fixed_verified" ? "…" : "Verify fix"}
-          </button>
-        )}
-
-        <div
-          style={{
-            marginLeft: "auto",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: "0.35rem",
-          }}
-        >
-          {onQueueRepair && !isQueued && (
+      {/* Repair queue action */}
+      {onQueueRepair && (
+        <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "0.75rem", justifyContent: "flex-end" }}>
+          {!isQueued && (
             <span
               style={{
                 fontSize: "10px",
@@ -692,55 +630,55 @@ export function FindingDetail({
             </span>
           )}
           <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-          {onQueueRepair && !isQueued && (
-            <button
-              type="button"
-              disabled={queueing}
-              onClick={async () => {
-                setQueueing(true);
-                setQueueMsg(null);
-                try {
-                  await onQueueRepair(finding.finding_id, projectName);
-                  setQueueMsg(`✓ ${UI_COPY.ledgerRecorded}`);
-                  void loadLifecycle();
-                } catch (e) {
-                  const msg =
-                    e instanceof Error ? e.message : "Could not queue repair.";
-                  setQueueMsg(`✗ ${msg}`);
-                } finally {
-                  setQueueing(false);
-                }
-              }}
-              style={{
-                borderColor: stripe,
-                color:       stripe,
-                fontFamily:  "var(--font-mono)",
-                fontSize:    "11px",
-              }}
-              title={UI_COPY.addToLedger}
-            >
-              {queueing ? UI_COPY.ledgerAdding : UI_COPY.addToLedger}
-            </button>
-          )}
-          {isQueued && (
-            <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ink-amber)" }}>
-              {UI_COPY.onLedger}
-            </span>
-          )}
-          {queueMsg && !isQueued && (
-            <span
-              style={{
-                fontSize: "11px",
-                fontFamily: "var(--font-mono)",
-                color: queueMsg.includes("✓") ? "var(--ink-green)" : "var(--ink-red)",
-              }}
-            >
-              {queueMsg}
-            </span>
-          )}
+            {!isQueued && (
+              <button
+                type="button"
+                disabled={queueing}
+                onClick={async () => {
+                  setQueueing(true);
+                  setQueueMsg(null);
+                  try {
+                    await onQueueRepair(finding.finding_id, projectName);
+                    setQueueMsg(`✓ ${UI_COPY.ledgerRecorded}`);
+                    void loadLifecycle();
+                  } catch (e) {
+                    const msg =
+                      e instanceof Error ? e.message : "Could not queue repair.";
+                    setQueueMsg(`✗ ${msg}`);
+                  } finally {
+                    setQueueing(false);
+                  }
+                }}
+                style={{
+                  borderColor: stripe,
+                  color: stripe,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "11px",
+                }}
+                title={UI_COPY.addToLedger}
+              >
+                {queueing ? UI_COPY.ledgerAdding : UI_COPY.addToLedger}
+              </button>
+            )}
+            {isQueued && (
+              <span style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ink-amber)" }}>
+                {UI_COPY.onLedger}
+              </span>
+            )}
+            {queueMsg && !isQueued && (
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "var(--font-mono)",
+                  color: queueMsg.includes("✓") ? "var(--ink-green)" : "var(--ink-red)",
+                }}
+              >
+                {queueMsg}
+              </span>
+            )}
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

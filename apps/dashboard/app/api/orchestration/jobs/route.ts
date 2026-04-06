@@ -11,7 +11,11 @@ import {
 } from "@/lib/orchestration-jobs";
 import { recordDurableEventBestEffort } from "@/lib/durable-state";
 import { apiErrorMessage } from "@/lib/api-error";
-import { bullmqConnectionFromEnv, requirepennyAuditQueue } from "@/lib/redis-bullmq";
+import {
+  bullmqConnectionFromEnv,
+  redisEnqueueFailure,
+  requirepennyAuditQueue,
+} from "@/lib/redis-bullmq";
 import { getOrSetRuntimeCache, invalidateRuntimeCache } from "@/lib/runtime-cache";
 
 const JOB_TYPES: pennyJobType[] = [
@@ -140,17 +144,21 @@ export async function POST(request: Request) {
       } catch (redisErr) {
         // BullMQ enqueue failed — mark the DB row failed immediately so the
         // operator sees it rather than leaving it stuck in "queued" forever.
-        const msg =
-          redisErr instanceof Error ? redisErr.message : String(redisErr);
-        console.error("[orchestration/jobs] Redis enqueue failed:", msg);
+        const failure = redisEnqueueFailure(redisErr);
+        console.error("[orchestration/jobs] Redis enqueue failed:", failure.detail);
         try {
-          await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${msg}`);
+          await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${failure.detail}`);
         } catch (dbErr) {
           console.error("[orchestration/jobs] Could not mark job failed:", dbErr);
         }
         return NextResponse.json(
-          { error: `Redis enqueue failed: ${msg}` },
-          { status: 502 }
+          {
+            error: failure.error,
+            message: failure.message,
+            hint: failure.hint,
+            detail: failure.detail,
+          },
+          { status: failure.status }
         );
       }
     }

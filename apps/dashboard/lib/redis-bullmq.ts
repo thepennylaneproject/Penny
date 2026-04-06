@@ -57,3 +57,36 @@ export function requirepennyAuditQueue(): Queue {
   }
   return queue;
 }
+
+export function isRedisQuotaExceeded(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /max requests limit exceeded/i.test(message);
+}
+
+export function redisEnqueueFailure(error: unknown): {
+  error: string;
+  message: string;
+  hint?: string;
+  status: number;
+  detail: string;
+} {
+  const detail = error instanceof Error ? error.message : String(error);
+  if (isRedisQuotaExceeded(error)) {
+    return {
+      error: "redis_quota_exceeded",
+      message: "Queue capacity is temporarily exhausted.",
+      hint:
+        "Upstash has hit its request cap. Increase the Redis plan or wait for the quota window to reset, then retry.",
+      status: 503,
+      detail,
+    };
+  }
+
+  return {
+    error: "redis_enqueue_failed",
+    message: "Queue dispatch failed.",
+    hint: "Check Redis availability and try again.",
+    status: 502,
+    detail,
+  };
+}

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { bullmqConnectionFromEnv, requirepennyAuditQueue } from "@/lib/redis-bullmq";
+import {
+  bullmqConnectionFromEnv,
+  redisEnqueueFailure,
+  requirepennyAuditQueue,
+} from "@/lib/redis-bullmq";
 import { recordDurableEventBestEffort } from "@/lib/durable-state";
 import { readRepairQueue, writeRepairQueue } from "@/lib/audit-reader";
 import {
@@ -78,7 +82,53 @@ export async function POST(request: Request) {
     if (jobsStoreConfigured()) {
       const repo = getRepository();
       const project = await repo.getByName(projectName);
-      const finding = project?.findings.find((item) => item.finding_id === findingId);
+
+      // Guard: project must exist when queueing a repair.
+      if (!project) {
+        return NextResponse.json(
+          { error: `Project "${projectName}" not found` },
+          { status: 404 }
+        );
+      }
+
+      const finding = project.findings.find((item) => item.finding_id === findingId);
+
+      // Guard: finding must exist (unless queued from a backlog/task reference).
+      if (!finding && !backlogId && !maintenanceTaskId) {
+        return NextResponse.json(
+          { error: `Finding "${findingId}" not found in project "${projectName}"` },
+          { status: 404 }
+        );
+      }
+
+      // Guard: prevent duplicate active repair jobs for the same finding.
+      {
+        const { createPostgresPool } = await import("@/lib/postgres");
+        const pool = createPostgresPool();
+        const existingJobs = await pool.query(
+          `SELECT id FROM penny_audit_jobs
+            WHERE job_type = 'repair_finding'
+              AND lower(trim(project_name)) = lower(trim($1))
+              AND payload->>'finding_id' = $2
+              AND status IN ('queued', 'running')
+            LIMIT 1`,
+          [projectName, findingId]
+        );
+        if (existingJobs.length > 0) {
+          return NextResponse.json(
+            {
+              error: "duplicate_repair_job",
+              message: `A repair job for finding "${findingId}" is already queued or running.`,
+              existing_job_id: existingJobs[0].id,
+              added: false,
+            },
+            { status: 409 }
+          );
+        }
+      }
+
+      const githubAppConfigured = Boolean(process.env.GITHUB_APP_ID);
+
       const payload = {
         finding_id: findingId,
         finding_title: finding?.title,
@@ -117,13 +167,18 @@ export async function POST(request: Request) {
             { jobId: row.id, removeOnComplete: true, removeOnFail: false }
           );
         } catch (redisErr) {
-          const msg = redisErr instanceof Error ? redisErr.message : String(redisErr);
+          const failure = redisEnqueueFailure(redisErr);
           try {
-            await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${msg}`);
+            await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${failure.detail}`);
           } catch {}
           return NextResponse.json(
-            { error: `Redis enqueue failed: ${msg}` },
-            { status: 502 }
+            {
+              error: failure.error,
+              message: failure.message,
+              hint: failure.hint,
+              detail: failure.detail,
+            },
+            { status: failure.status }
           );
         }
       }
@@ -138,7 +193,28 @@ export async function POST(request: Request) {
 
       invalidateRuntimeCache(...STATUS_CACHE_KEYS);
 
-      return NextResponse.json({ job: row, added: true });
+      const warnings: string[] = [];
+      if (!githubAppConfigured) {
+        warnings.push(
+          "GitHub App is not configured (GITHUB_APP_ID missing). Repair patches will be generated " +
+          "but cannot be automatically opened as pull requests. Set GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY to enable PR creation."
+        );
+      }
+
+      return NextResponse.json({ job: row, added: true, warnings: warnings.length > 0 ? warnings : undefined });
+    }
+
+    // File-store fallback: not safe in production (Netlify functions are stateless).
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        {
+          error: "repair_queue_unavailable",
+          message:
+            "The repair queue requires a database connection (DATABASE_URL). " +
+            "The file-based fallback is not available in production deployments.",
+        },
+        { status: 503 }
+      );
     }
 
     const queue = readRepairQueue();

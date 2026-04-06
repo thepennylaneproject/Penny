@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import type { Project } from "@/lib/types";
+import { apiFetch } from "@/lib/api-fetch";
 
 interface ProjectManagementPanelProps {
   project: Project;
@@ -117,7 +118,7 @@ export function ProjectManagementPanel({
             .filter(Boolean),
         },
       };
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/projects/${encodeURIComponent(project.name)}`,
         { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
       );
@@ -151,7 +152,7 @@ export function ProjectManagementPanel({
         profile: undefined,
         expectations: undefined,
       };
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/projects/${encodeURIComponent(project.name)}`,
         { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }
       );
@@ -174,7 +175,7 @@ export function ProjectManagementPanel({
     setError(null);
     setStatus(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/projects/${encodeURIComponent(project.name)}/onboarding/cluster`,
         { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cluster }) }
       );
@@ -198,7 +199,7 @@ export function ProjectManagementPanel({
     setDeleting(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await apiFetch(
         `/api/projects/${encodeURIComponent(project.name)}`,
         { method: "DELETE" }
       );

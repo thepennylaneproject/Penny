@@ -15,6 +15,7 @@ interface ImportModalProps {
     repository_url?: string;
     default_branch?: string;
   }) => Promise<void>;
+  fixedMode?: OnboardMode;
   onClose:  () => void;
 }
 
@@ -29,8 +30,13 @@ const modeBtn = (active: boolean): CSSProperties => ({
   cursor:       "pointer",
 });
 
-export function ImportModal({ onImport, onOnboardRepository, onClose }: ImportModalProps) {
-  const [mode, setMode] = useState<OnboardMode>("repository");
+export function ImportModal({
+  onImport,
+  onOnboardRepository,
+  fixedMode,
+  onClose,
+}: ImportModalProps) {
+  const [mode, setMode] = useState<OnboardMode>(fixedMode ?? "repository");
   const [name,      setName]      = useState("");
   const [repoUrl,   setRepoUrl]   = useState("");
   const [defaultBranch, setDefaultBranch] = useState("");
@@ -47,6 +53,10 @@ export function ImportModal({ onImport, onOnboardRepository, onClose }: ImportMo
     repoUrl.trim().length > 0 ||
     defaultBranch.trim().length > 0 ||
     jsonText.trim().length > 0;
+
+  const tabsEnabled = fixedMode === undefined;
+  const isRepositoryMode = mode === "repository";
+  const modalTitle = isRepositoryMode ? "New project from repository" : "Import findings";
 
   const handleClose = () => {
     if (importSummary) {
@@ -202,7 +212,7 @@ export function ImportModal({ onImport, onOnboardRepository, onClose }: ImportMo
         }}
       >
         <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--ink-text)" }}>
-          Onboard project
+          {modalTitle}
         </span>
         <button
           type="button"
@@ -283,36 +293,38 @@ export function ImportModal({ onImport, onOnboardRepository, onClose }: ImportMo
         </div>
       ) : (
         <>
-      <div
-        role="tablist"
-        aria-label="Onboarding mode"
-        style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}
-      >
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "repository"}
-          onClick={() => {
-            setMode("repository");
-            setError("");
-          }}
-          style={modeBtn(mode === "repository")}
+      {tabsEnabled && (
+        <div
+          role="tablist"
+          aria-label="Onboarding mode"
+          style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}
         >
-          From repository
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mode === "json"}
-          onClick={() => {
-            setMode("json");
-            setError("");
-          }}
-          style={modeBtn(mode === "json")}
-        >
-          Import findings JSON
-        </button>
-      </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "repository"}
+            onClick={() => {
+              setMode("repository");
+              setError("");
+            }}
+            style={modeBtn(mode === "repository")}
+          >
+            From repository
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "json"}
+            onClick={() => {
+              setMode("json");
+              setError("");
+            }}
+            style={modeBtn(mode === "json")}
+          >
+            Import findings JSON
+          </button>
+        </div>
+      )}
 
       {mode === "repository" && (
         <div style={{ marginBottom: "1.5rem" }}>

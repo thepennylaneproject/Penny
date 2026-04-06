@@ -16,7 +16,7 @@ export async function GET(
     const { name } = await params;
     const projectId = await resolveProjectIdByNameOrId(supabase, name);
     if (!projectId) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return NextResponse.json([]);
     }
 
     // First get all repair jobs for this project

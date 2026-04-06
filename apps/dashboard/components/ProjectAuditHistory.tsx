@@ -38,7 +38,7 @@ function formatAuditLabel(
   jobType: string,
   payload?: Record<string, unknown>
 ): string {
-  if (jobType === "onboard_project" || jobType === "onboard_repository") return "Onboard project audit";
+  if (jobType === "onboard_project" || jobType === "onboard_repository") return "Project setup audit";
   if (jobType === "re_audit_project") return "Full re-audit";
   if (jobType === "synthesize_project") return "Synthesizer";
   if (jobType === "weekly_audit") return "Weekly portfolio audit";
@@ -186,6 +186,21 @@ export function ProjectAuditHistory({ projectName, projectStatus }: ProjectAudit
     return headers;
   };
 
+  const formatApiError = async (res: Response): Promise<string> => {
+    const err = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      hint?: string;
+    };
+    const message =
+      typeof err.message === "string"
+        ? err.message
+        : typeof err.error === "string"
+          ? err.error
+          : `Failed (${res.status})`;
+    return typeof err.hint === "string" ? `${message} ${err.hint}` : message;
+  };
+
   const enqueueAudit = async (
     key: string,
     payload: { job_type: string; project_name: string; payload?: Record<string, unknown> }
@@ -199,8 +214,7 @@ export function ProjectAuditHistory({ projectName, projectStatus }: ProjectAudit
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? `Failed (${res.status})`);
+        throw new Error(await formatApiError(res));
       }
       await load();
     } catch (error) {
@@ -430,6 +444,22 @@ export function ProjectAuditHistory({ projectName, projectStatus }: ProjectAudit
             autoComplete="off"
             style={{ marginTop: "0.5rem", paddingTop: "0.5rem", borderTop: "0.5px solid var(--ink-border-faint)" }}
           >
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              tabIndex={-1}
+              aria-hidden="true"
+              value="project-audit-history"
+              readOnly
+              style={{
+                position: "absolute",
+                opacity: 0,
+                pointerEvents: "none",
+                width: 1,
+                height: 1,
+              }}
+            />
             <input
               type="password"
               name="audit_enqueue_secret_override"

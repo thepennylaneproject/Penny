@@ -1,4 +1,4 @@
-import { createSupabaseBrowserClient } from "@/lib/supabase";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 export interface LaneAuditFinding {
   id: string;
@@ -60,7 +60,7 @@ function normalizeLaneBaseUrl(baseUrl: string | null | undefined): string {
 }
 
 async function getLaneAccessToken(): Promise<string> {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = getSupabaseBrowserClient();
   if (!supabase) {
     throw new Error("Supabase client is not configured for Lane requests.");
   }
@@ -83,7 +83,7 @@ async function laneFetch<T>(
   const baseUrl = normalizeLaneBaseUrl(laneBaseUrl);
   if (!baseUrl) {
     throw new Error(
-      "Lane API base URL is unavailable for browser requests. Set NEXT_PUBLIC_LANE_API_BASE_URL on the dashboard; server-only hosts like lane.railway.internal will not work from the browser."
+      "Lane API is unavailable in this environment. Configure LANE_API_BASE_URL or NEXT_PUBLIC_LANE_API_BASE_URL on the dashboard."
     );
   }
 

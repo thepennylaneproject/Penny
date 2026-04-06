@@ -23,13 +23,18 @@ export function OnboardingReviewPanel({
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const isDirty =
-    profileText !== initialProfileText || expectationsText !== initialExpectationsText;
+  const profileDirty = profileText !== initialProfileText;
+  const expectationsDirty = expectationsText !== initialExpectationsText;
+  const isDirty = profileDirty || expectationsDirty;
 
   // Check if both approvals exist
   const profileApproved = project.profile?.active != null;
   const expectationsApproved = project.expectations?.active != null;
-  const canActivate = profileApproved && expectationsApproved && saving === null;
+  const canActivate =
+    profileApproved &&
+    expectationsApproved &&
+    saving === null &&
+    !isDirty;
 
   useEffect(() => {
     setProfileText(initialProfileText);
@@ -156,21 +161,47 @@ export function OnboardingReviewPanel({
       <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
         <button
           type="button"
-          onClick={() => save({ profileContent: profileText, expectationsContent: expectationsText }, "save")}
-          disabled={saving !== null}
+          onClick={() =>
+            save(
+              {
+                ...(profileDirty ? { profileContent: profileText } : {}),
+                ...(expectationsDirty ? { expectationsContent: expectationsText } : {}),
+              },
+              "save"
+            )
+          }
+          disabled={saving !== null || !isDirty}
         >
           {saving === "save" ? "saving…" : "Save drafts"}
         </button>
         <button
           type="button"
-          onClick={() => save({ approveProfile: true }, "approve-profile")}
+          onClick={() =>
+            save(
+              {
+                ...(profileDirty ? { profileContent: profileText } : {}),
+                ...(expectationsDirty ? { expectationsContent: expectationsText } : {}),
+                approveProfile: true,
+              },
+              "approve-profile"
+            )
+          }
           disabled={saving !== null}
         >
           {saving === "approve-profile" ? "…" : "Approve profile"}
         </button>
         <button
           type="button"
-          onClick={() => save({ approveExpectations: true }, "approve-expectations")}
+          onClick={() =>
+            save(
+              {
+                ...(profileDirty ? { profileContent: profileText } : {}),
+                ...(expectationsDirty ? { expectationsContent: expectationsText } : {}),
+                approveExpectations: true,
+              },
+              "approve-expectations"
+            )
+          }
           disabled={saving !== null}
         >
           {saving === "approve-expectations" ? "…" : "Approve expectations"}
@@ -179,7 +210,15 @@ export function OnboardingReviewPanel({
           type="button"
           onClick={() => save({ activate: true }, "activate")}
           disabled={!canActivate}
-          title={!profileApproved ? "Approve profile first" : !expectationsApproved ? "Approve expectations first" : ""}
+          title={
+            !profileApproved
+              ? "Approve profile first"
+              : !expectationsApproved
+                ? "Approve expectations first"
+                : isDirty
+                  ? "Save drafts before activating"
+                  : ""
+          }
         >
           {saving === "activate" ? "…" : "Activate project"}
         </button>

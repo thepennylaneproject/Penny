@@ -119,6 +119,15 @@ export async function proxy(request: NextRequest) {
         { status: 503 }
       );
     }
+    // penny_ALLOW_OPEN_API is set — all APIs are unauthenticated.
+    // This is only safe for local development. Log a loud warning so
+    // it is visible in Railway/Netlify function logs if accidentally set in production.
+    if (process.env.NODE_ENV === "production") {
+      console.warn(
+        "[penny] SECURITY WARNING: penny_ALLOW_OPEN_API is set in a production environment. " +
+        "All /api/* routes are unauthenticated. Set DASHBOARD_API_SECRET or SUPABASE_JWT_SECRET to secure the dashboard."
+      );
+    }
     return NextResponse.next();
   }
 

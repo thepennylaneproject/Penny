@@ -5,7 +5,7 @@
 export const UI_COPY = {
   navPortfolio: "Portfolio",
   /** Sidebar + engine view nav label */
-  navRepairLedger: "Repair engine",
+  navRepairLedger: "Repairs",
   /** Count badge next to nav item */
   navLedgerCountTitle: "Findings queued for auto-repair",
   /** Engine footer / queue section */
@@ -77,9 +77,9 @@ export const UI_COPY = {
   confirmRemove: "Remove",
   confirmDiscard: "Discard",
   /** Project operations sections */
-  opsSectionSetup: "Setup & review",
-  opsSectionBulk: "Bulk operations & backlog",
-  opsSectionLinear: "Linear",
+  opsSectionSetup: "Repository setup",
+  opsSectionBulk: "Backlog & batch actions",
+  opsSectionLinear: "Issue sync",
   opsSectionHistory: "Audit history",
   /** Finding save / refresh */
   findingSavedLine: "Saved.",

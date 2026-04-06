@@ -39,7 +39,16 @@ export function useRepairCosts(
       const response = await apiFetch(
         `/api/projects/${projectId}/repair-costs`
       );
-      setCosts(Array.isArray(response) ? response : []);
+      if (response.status === 404) {
+        setCosts([]);
+        return;
+      }
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as { error?: string };
+        throw new Error(payload.error ?? `Failed to load repair costs (${response.status}).`);
+      }
+      const payload = (await response.json().catch(() => [])) as unknown;
+      setCosts(Array.isArray(payload) ? payload : []);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       setError(errorMsg);

@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       sourceRef: body.sourceRef,
       stack: body.stack,
       auditConfig: body.auditConfig,
+      repairConfig: body.repairConfig,
       profile: body.profile,
       expectations: body.expectations,
       onboardingState: body.onboardingState,

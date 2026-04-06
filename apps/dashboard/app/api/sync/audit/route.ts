@@ -6,6 +6,7 @@ import type { Project, Finding } from "@/lib/types";
 import { apiErrorMessage } from "@/lib/api-error";
 import { normalizeProjectName } from "@/lib/project-identity";
 import { validateFinding } from "@/lib/finding-validation";
+import { isDegradedAuditPlaceholderFinding } from "@/lib/degraded-audit-finding";
 
 /**
  * GET  /api/sync/audit — preview what's available to import.
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
         : "Imported";
 
     const findings = readOpenFindings();
+    let findingsDroppedAsDegraded = 0;
 
     // Also pull findings from audit run files (findings[] inside each run)
     const runFiles = readAuditRunFiles();
@@ -64,6 +66,10 @@ export async function POST(request: Request) {
     const validFindings: Finding[] = [];
     const invalidFindings: Array<{ finding_id: unknown; auditor: unknown; errors: string[] }> = [];
     for (const f of findings) {
+      if (isDegradedAuditPlaceholderFinding(f)) {
+        findingsDroppedAsDegraded++;
+        continue;
+      }
       const errors = validateFinding(f);
       if (errors.length === 0) {
         validFindings.push(f as Finding);
@@ -82,6 +88,7 @@ export async function POST(request: Request) {
         projects_updated: 0,
         findings_imported: 0,
         findings_rejected: 0,
+        findings_dropped_as_degraded: 0,
         message: "No findings found in audit output. Run an audit first.",
       });
     }
@@ -91,8 +98,12 @@ export async function POST(request: Request) {
         projects_updated: 0,
         findings_imported: 0,
         findings_rejected: invalidFindings.length,
+        findings_dropped_as_degraded: findingsDroppedAsDegraded,
         invalid_findings: invalidFindings,
-        message: `All ${invalidFindings.length} findings were rejected due to schema violations. Check auditor output.`,
+        message:
+          findingsDroppedAsDegraded > 0
+            ? `Dropped ${findingsDroppedAsDegraded} degraded audit placeholder finding(s); no actionable findings remained.${invalidFindings.length > 0 ? ` ${invalidFindings.length} additional finding(s) were rejected due to schema violations.` : ""}`
+            : `All ${invalidFindings.length} findings were rejected due to schema violations. Check auditor output.`,
       });
     }
 
@@ -177,17 +188,19 @@ export async function POST(request: Request) {
       payload: {
         projects_updated: projectsUpdated,
         findings_imported: findingsImported,
+        findings_dropped_as_degraded: findingsDroppedAsDegraded,
       },
     });
     return NextResponse.json({
       projects_updated: projectsUpdated,
       findings_imported: findingsImported,
       findings_rejected: invalidFindings.length,
+      findings_dropped_as_degraded: findingsDroppedAsDegraded,
       ...(invalidFindings.length > 0 && { invalid_findings: invalidFindings }),
       message:
         findingsImported > 0
-          ? `Imported ${findingsImported} findings across ${projectsUpdated} project(s).${invalidFindings.length > 0 ? ` ${invalidFindings.length} rejected (schema violations).` : ""}`
-          : `All findings already present — nothing new to import.${invalidFindings.length > 0 ? ` ${invalidFindings.length} rejected (schema violations).` : ""}`,
+          ? `Imported ${findingsImported} findings across ${projectsUpdated} project(s).${findingsDroppedAsDegraded > 0 ? ` ${findingsDroppedAsDegraded} degraded placeholder finding(s) were dropped.` : ""}${invalidFindings.length > 0 ? ` ${invalidFindings.length} rejected (schema violations).` : ""}`
+          : `All findings already present — nothing new to import.${findingsDroppedAsDegraded > 0 ? ` ${findingsDroppedAsDegraded} degraded placeholder finding(s) were dropped.` : ""}${invalidFindings.length > 0 ? ` ${invalidFindings.length} rejected (schema violations).` : ""}`,
     });
   } catch (error) {
     console.error("POST /api/sync/audit", error);

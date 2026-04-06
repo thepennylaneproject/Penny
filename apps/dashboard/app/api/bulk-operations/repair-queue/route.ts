@@ -4,7 +4,11 @@ import { apiErrorMessage, isValidProjectName, parseJsonBody } from "@/lib/api-er
 import { recordDurableEventBestEffort } from "@/lib/durable-state";
 import { insertAuditJob, updateAuditJobStatus } from "@/lib/orchestration-jobs";
 import { normalizeProjectName } from "@/lib/project-identity";
-import { bullmqConnectionFromEnv, requirepennyAuditQueue } from "@/lib/redis-bullmq";
+import {
+  bullmqConnectionFromEnv,
+  redisEnqueueFailure,
+  requirepennyAuditQueue,
+} from "@/lib/redis-bullmq";
 import { invalidateRuntimeCache } from "@/lib/runtime-cache";
 
 const STATUS_CACHE_KEYS = [
@@ -140,11 +144,11 @@ export async function POST(request: Request) {
               { jobId: row.id, removeOnComplete: true, removeOnFail: false }
             );
           } catch (redisErr) {
-            const msg = redisErr instanceof Error ? redisErr.message : String(redisErr);
-            console.error(`[bulk-repair] Redis enqueue failed for ${row.id}:`, msg);
-            await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${msg}`);
+            const failure = redisEnqueueFailure(redisErr);
+            console.error(`[bulk-repair] Redis enqueue failed for ${row.id}:`, failure.detail);
+            await updateAuditJobStatus(row.id, "failed", `Redis enqueue error: ${failure.detail}`);
             // Count as failure if Redis fails.
-            throw new Error(`Redis enqueue failed: ${msg}`);
+            throw new Error(`${failure.message}${failure.hint ? ` ${failure.hint}` : ""}`);
           }
         }
         queuedCount++;

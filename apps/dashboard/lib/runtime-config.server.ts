@@ -14,9 +14,10 @@ export function resolveDashboardRuntimeConfig(
 ): DashboardRuntimeConfig {
   const publicLaneBaseUrl = normalizeUrl(env.NEXT_PUBLIC_LANE_API_BASE_URL ?? null);
   const serverLaneBaseUrl = normalizeUrl(env.LANE_API_BASE_URL ?? null);
+  const laneConfigured = Boolean(publicLaneBaseUrl || serverLaneBaseUrl);
 
   return {
-    laneBaseUrl: publicLaneBaseUrl,
+    laneBaseUrl: laneConfigured ? "/api/lane" : null,
     laneServerConfigured: Boolean(serverLaneBaseUrl),
   };
 }

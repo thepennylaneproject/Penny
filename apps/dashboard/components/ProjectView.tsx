@@ -110,6 +110,7 @@ export function ProjectView({
   const [selectedFindingIds, setSelectedFindingIds] = useState<Set<string>>(new Set());
   const [batchQueuing, setBatchQueuing] = useState(false);
   const [batchQueueResult, setBatchQueueResult] = useState<string | null>(null);
+  const [repairConfigSaving, setRepairConfigSaving] = useState(false);
   const batchResultTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -227,7 +228,7 @@ export function ProjectView({
 
   const tabItems: { id: ProjectTab; label: string }[] = [
     { id: "findings", label: "Findings" },
-    { id: "operations", label: "Project & operations" },
+    { id: "operations", label: "Project workflow" },
   ];
 
   return (
@@ -510,7 +511,7 @@ export function ProjectView({
                 cursor: "pointer",
               }}
             >
-              Repair Operations
+              Repair cost summary
             </summary>
             <div style={{ marginTop: "1rem" }}>
               {opsHydrated.repair ? (
@@ -548,15 +549,35 @@ export function ProjectView({
                 cursor: "pointer",
               }}
             >
-              Repair Configuration
+              Repair defaults
             </summary>
             <div style={{ marginTop: "1rem" }}>
               {opsHydrated.repairConfig ? (
                 <ProjectRepairConfig
                   projectName={project.name}
-                  settings={{}}
+                  settings={project.repairConfig}
+                  isLoading={repairConfigSaving}
                   onSave={async (settings) => {
-                    // Handle save to backend
+                    setRepairConfigSaving(true);
+                    try {
+                      const res = await apiFetch(
+                        `/api/projects/${encodeURIComponent(project.name)}`,
+                        {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ repairConfig: settings }),
+                        }
+                      );
+                      if (!res.ok) {
+                        const body = (await res.json().catch(() => ({}))) as { error?: string };
+                        throw new Error(body.error ?? `Could not save repair settings (${res.status}).`);
+                      }
+                      const updated = (await res.json()) as Project;
+                      setFindings(updated.findings ?? []);
+                      await refetchProject();
+                    } finally {
+                      setRepairConfigSaving(false);
+                    }
                   }}
                 />
               ) : (

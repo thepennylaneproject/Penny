@@ -1,20 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
-export interface ProjectRepairSettings {
-  repair_enabled?: boolean;
-  repair_auto_draft?: boolean;
-  confidence_fast_lane_threshold?: number;
-  confidence_vulnerability_minimum?: number;
-  max_concurrent_repairs?: number;
-  default_timeout_seconds?: number;
-}
+import { useEffect, useState } from "react";
+import type { ProjectRepairSettings } from "@/lib/types";
 
 interface ProjectRepairConfigProps {
   projectName: string;
   settings?: ProjectRepairSettings;
-  onSave?: (settings: ProjectRepairSettings) => void;
+  onSave?: (settings: ProjectRepairSettings) => Promise<void> | void;
   isLoading?: boolean;
 }
 
@@ -40,23 +32,44 @@ export function ProjectRepairConfig({
   const [defaultTimeout, setDefaultTimeout] = useState(
     settings.default_timeout_seconds ?? 180
   );
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<string | null>(null);
 
-  const handleSave = () => {
-    onSave?.({
-      repair_enabled: repairEnabled,
-      repair_auto_draft: autoDraft,
-      confidence_fast_lane_threshold: fastLaneThreshold,
-      confidence_vulnerability_minimum: vulnThreshold,
-      max_concurrent_repairs: maxConcurrent,
-      default_timeout_seconds: defaultTimeout,
-    });
+  useEffect(() => {
+    setRepairEnabled(settings.repair_enabled ?? true);
+    setAutoDraft(settings.repair_auto_draft ?? true);
+    setFastLaneThreshold(settings.confidence_fast_lane_threshold ?? 0.98);
+    setVulnThreshold(settings.confidence_vulnerability_minimum ?? 0.97);
+    setMaxConcurrent(settings.max_concurrent_repairs ?? 4);
+    setDefaultTimeout(settings.default_timeout_seconds ?? 180);
+    setSaveError(null);
+    setSaveStatus(null);
+  }, [settings]);
+
+  const handleSave = async () => {
+    if (!onSave) return;
+    setSaveError(null);
+    setSaveStatus(null);
+    try {
+      await onSave({
+        repair_enabled: repairEnabled,
+        repair_auto_draft: autoDraft,
+        confidence_fast_lane_threshold: fastLaneThreshold,
+        confidence_vulnerability_minimum: vulnThreshold,
+        max_concurrent_repairs: maxConcurrent,
+        default_timeout_seconds: defaultTimeout,
+      });
+      setSaveStatus("Saved.");
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : String(error));
+    }
   };
 
   return (
     <div className="border border-gray-200 rounded-lg p-4 space-y-4">
       <div>
         <h3 className="text-sm font-semibold text-gray-900">
-          Repair Configuration
+          Repair defaults
         </h3>
         <p className="text-xs text-gray-600 mt-1">{projectName}</p>
       </div>
@@ -71,7 +84,7 @@ export function ProjectRepairConfig({
             className="w-4 h-4 rounded border-gray-300"
           />
           <span className="text-sm font-medium text-gray-700">
-            Enable Auto-Repair
+            Enable automatic repairs
           </span>
         </label>
         <p className="text-xs text-gray-600 ml-7">
@@ -91,7 +104,7 @@ export function ProjectRepairConfig({
                 className="w-4 h-4 rounded border-gray-300"
               />
               <span className="text-sm font-medium text-gray-700">
-                Auto-Draft PRs
+                Draft pull requests automatically
               </span>
             </label>
             <p className="text-xs text-gray-600 ml-7">
@@ -178,15 +191,21 @@ export function ProjectRepairConfig({
           <div className="bg-blue-50 border border-blue-200 rounded p-3 space-y-1">
             <p className="text-xs font-medium text-blue-900">Governance Lock</p>
             <p className="text-xs text-blue-700">
-              Thresholds and limits are hardcoded per the founder decisions.
-              Contact your admin to change these values.
+              These thresholds are stored per project and take effect for future repair runs.
             </p>
           </div>
+
+          {saveError && (
+            <p className="text-xs text-red-700">{saveError}</p>
+          )}
+          {saveStatus && (
+            <p className="text-xs text-green-700">{saveStatus}</p>
+          )}
 
           {/* Save button */}
           {onSave && (
             <button
-              onClick={handleSave}
+              onClick={() => void handleSave()}
               disabled={isLoading}
               className="w-full py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 rounded transition-colors"
             >

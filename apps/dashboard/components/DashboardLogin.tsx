@@ -56,6 +56,7 @@ export function DashboardLogin({
     >
       <form
         onSubmit={submit}
+        autoComplete="on"
         style={{
           width:          "100%",
           maxWidth:       "400px",
@@ -65,6 +66,22 @@ export function DashboardLogin({
           borderRadius:   "var(--radius-lg)",
         }}
       >
+        <input
+          type="text"
+          name="username"
+          autoComplete="username"
+          tabIndex={-1}
+          aria-hidden="true"
+          value={email}
+          onChange={() => {}}
+          style={{
+            position: "absolute",
+            opacity: 0,
+            pointerEvents: "none",
+            width: 1,
+            height: 1,
+          }}
+        />
         <div
           style={{
             fontSize:       "9px",

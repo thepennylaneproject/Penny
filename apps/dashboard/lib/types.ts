@@ -277,6 +277,15 @@ export interface ProjectAuditConfig {
   preferredScopeType?: ScopeType;
 }
 
+export interface ProjectRepairSettings {
+  repair_enabled?: boolean;
+  repair_auto_draft?: boolean;
+  confidence_fast_lane_threshold?: number;
+  confidence_vulnerability_minimum?: number;
+  max_concurrent_repairs?: number;
+  default_timeout_seconds?: number;
+}
+
 export interface ProjectProfileSummary {
   status?: string;
   languages?: string[];
@@ -414,6 +423,7 @@ export interface Project {
     css?: string;
   };
   auditConfig?: ProjectAuditConfig;
+  repairConfig?: ProjectRepairSettings;
   profile?: ProjectArtifact;
   expectations?: ProjectArtifact;
   onboardingState?: OnboardingState;

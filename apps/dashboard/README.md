@@ -51,7 +51,7 @@ Use this before sharing the dashboard URL beyond trusted operators.
    - Prefer **one** production host (canonical: Netlify per root README) so env and scheduled functions stay consistent.
 7. **Smoke test after deploy**
    - Open `/api/health` → `{ ok: true }`.
-   - Log in, load portfolio, open a project with `?project=<name>` in the URL (refresh should keep the same project).
+   - Log in, load portfolio, open a project at `/projects/<name>`, and verify refresh keeps you on the same project route.
    - Optional: run a non-destructive orchestration action with the enqueue secret pasted in the panel.
 
 ## Run locally

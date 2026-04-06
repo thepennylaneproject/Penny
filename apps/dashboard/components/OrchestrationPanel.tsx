@@ -220,6 +220,21 @@ export function OrchestrationPanel() {
     return headers;
   }, [enqueueSecret]);
 
+  const formatApiError = useCallback(async (res: Response): Promise<string> => {
+    const err = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      message?: string;
+      hint?: string;
+    };
+    const message =
+      typeof err.message === "string"
+        ? err.message
+        : typeof err.error === "string"
+          ? err.error
+          : `Failed (${res.status})`;
+    return typeof err.hint === "string" ? `${message} ${err.hint}` : message;
+  }, []);
+
   const dispatchAction = useCallback(
     async (action: OrchestrationActionKind, projectName?: string) => {
       setDispatchError(null);
@@ -232,8 +247,7 @@ export function OrchestrationPanel() {
           body: JSON.stringify(body),
         });
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error ?? `Failed (${res.status})`);
+          throw new Error(await formatApiError(res));
         }
         await load(undefined, { bypassCache: true });
       } catch (e) {
@@ -243,7 +257,7 @@ export function OrchestrationPanel() {
         setDispatching(null);
       }
     },
-    [load, authHeaders]
+    [load, authHeaders, formatApiError]
   );
 
   const clearQueue = useCallback(async () => {
@@ -257,8 +271,7 @@ export function OrchestrationPanel() {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? `Failed (${res.status})`);
+        throw new Error(await formatApiError(res));
       }
       await load(undefined, { bypassCache: true });
     } catch (error) {
@@ -267,7 +280,7 @@ export function OrchestrationPanel() {
     } finally {
       setDispatching(null);
     }
-  }, [load, authHeaders]);
+  }, [load, authHeaders, formatApiError]);
 
   const enqueueWeekly = useCallback(async () => {
     setDispatchError(null);
@@ -279,8 +292,7 @@ export function OrchestrationPanel() {
         body: JSON.stringify({ job_type: "weekly_audit" }),
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error ?? `Failed (${res.status})`);
+        throw new Error(await formatApiError(res));
       }
       await load(undefined, { bypassCache: true });
     } catch (e) {
@@ -289,7 +301,7 @@ export function OrchestrationPanel() {
     } finally {
       setDispatching(null);
     }
-  }, [load, authHeaders]);
+  }, [load, authHeaders, formatApiError]);
 
   if (loading) {
     return (
@@ -368,6 +380,22 @@ export function OrchestrationPanel() {
         autoComplete="off"
         style={{ marginBottom: "0.75rem" }}
       >
+        <input
+          type="text"
+          name="username"
+          autoComplete="username"
+          tabIndex={-1}
+          aria-hidden="true"
+          value="orchestration"
+          readOnly
+          style={{
+            position: "absolute",
+            opacity: 0,
+            pointerEvents: "none",
+            width: 1,
+            height: 1,
+          }}
+        />
         <label style={{ fontSize: "9px", color: "var(--ink-text-4)", display: "block", marginBottom: "0.25rem" }}>
           ORCHESTRATION_ENQUEUE_SECRET (stored in session only)
         </label>

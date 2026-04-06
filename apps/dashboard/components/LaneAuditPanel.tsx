@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRuntimeConfig } from "@/components/RuntimeConfigProvider";
 import { runLaneAudit, type LaneAuditResponse } from "@/lib/lane";
+import { isDegradedAuditPlaceholderFinding } from "@/lib/degraded-audit-finding";
 
 interface LaneAuditPanelProps {
   projectName: string;
@@ -71,7 +72,7 @@ export function LaneAuditPanel({
           {!laneBaseUrl ? (
             <div style={{ fontSize: "10px", color: "var(--ink-amber)", lineHeight: 1.5 }}>
               {laneServerConfigured
-                ? "A server-only Lane host is configured. Direct browser audits still need NEXT_PUBLIC_LANE_API_BASE_URL."
+                ? "Lane is configured server-side, but the dashboard proxy is unavailable."
                 : "Lane endpoint unavailable in this environment."}
             </div>
           ) : null}
@@ -105,35 +106,46 @@ export function LaneAuditPanel({
               Lane completed without returning findings.
             </div>
           ) : (
-            audit.findings.map((finding) => (
-              <div
-                key={finding.id}
-                style={{
-                  border: "0.5px solid var(--ink-border-faint)",
-                  borderRadius: "var(--radius-md)",
-                  padding: "0.65rem 0.75rem",
-                  background: "var(--ink-bg-raised)",
-                }}
-              >
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
-                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                    {finding.id}
-                  </span>
-                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                    {finding.severity}
-                  </span>
-                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                    {finding.type}
-                  </span>
+            audit.findings.map((finding) => {
+              const degraded = isDegradedAuditPlaceholderFinding(finding);
+              return (
+                <div
+                  key={finding.id}
+                  style={{
+                    border: degraded
+                      ? "0.5px solid var(--ink-amber-border)"
+                      : "0.5px solid var(--ink-border-faint)",
+                    borderRadius: "var(--radius-md)",
+                    padding: "0.65rem 0.75rem",
+                    background: degraded ? "var(--ink-amber-bg)" : "var(--ink-bg-raised)",
+                  }}
+                >
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
+                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                      {finding.id}
+                    </span>
+                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: degraded ? "var(--ink-amber)" : "var(--ink-text-4)" }}>
+                      {degraded ? "audit degraded" : finding.severity}
+                    </span>
+                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                      {degraded ? "operator review" : finding.type}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: "12px", color: "var(--ink-text-2)", marginBottom: degraded ? "0.45rem" : "0.35rem" }}>
+                    {finding.message}
+                  </div>
+                  {degraded ? (
+                    <div style={{ fontSize: "10px", lineHeight: 1.5, color: "var(--ink-text-3)" }}>
+                      Treat this as a Lane runtime limitation, not a confirmed code defect. Run a scoped review or retry the audit when Lane capacity is healthy.
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                      {finding.file}
+                    </div>
+                  )}
                 </div>
-                <div style={{ fontSize: "12px", color: "var(--ink-text-2)", marginBottom: "0.35rem" }}>
-                  {finding.message}
-                </div>
-                <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                  {finding.file}
-                </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       ) : null}

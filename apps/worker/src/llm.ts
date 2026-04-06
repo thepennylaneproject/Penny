@@ -518,6 +518,7 @@ function normalizePriority(s: string): string {
 // ─── Lane audit adapter ───────────────────────────────────────────────────────
 
 import { laneAudit, type LaneAuditFinding } from "./lane-client.js";
+import { isLaneDegradedAuditFinding } from "./lane-degraded-audit.js";
 
 /**
  * Derive a Penny priority string from a Lane severity label.
@@ -590,17 +591,29 @@ export async function auditWithLane(
     },
   });
 
-  const findings = (response.findings ?? []).map(mapLaneFinding);
+  const degradedFindings = (response.findings ?? []).filter(isLaneDegradedAuditFinding);
+  const findings = (response.findings ?? [])
+    .filter((finding) => !isLaneDegradedAuditFinding(finding))
+    .map(mapLaneFinding);
   const latency = Date.now() - start;
+  const degradedReason = degradedFindings[0]?.message;
 
   return {
     findings,
     coverage: {
-      coverage_complete: response.status === "completed",
-      confidence: findings.length === 0 ? "high" : "medium",
+      coverage_complete: response.status === "completed" && degradedFindings.length === 0,
+      confidence:
+        degradedFindings.length > 0
+          ? "low"
+          : findings.length === 0
+            ? "high"
+            : "medium",
       files_reviewed: extras?.filesInScope ?? [],
       modules_reviewed: extras?.filesInScope ?? [],
-      incomplete_reason: response.status === "failed" ? response.summary : undefined,
+      incomplete_reason:
+        response.status === "failed"
+          ? response.summary
+          : degradedReason,
     },
     model: "lane",
     provider: "lane",
