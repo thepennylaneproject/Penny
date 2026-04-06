@@ -11,7 +11,8 @@ import {
   type AuditScope,
   buildIntelligenceContext,
 } from "./context.js";
-import { auditWithLlm, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
+import { auditWithLlm, auditWithLane, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
+import { isLaneConfigured } from "./lane-client.js";
 import {
   claimJob,
   completeJob,
@@ -1091,7 +1092,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             execution.repoRoot,
             ["./"]
           );
-          const llm = await auditWithLlm(
+          const llm = await (isLaneConfigured() ? auditWithLane : auditWithLlm)(
             core,
             auditAgent,
             expectations,
@@ -1105,6 +1106,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
               knownFindingIds: knownFindingIds(existing),
               checklistId: execution.checklistId,
               manifestRevision: execution.manifestRevision,
+              repositoryUrl: project.repositoryUrl,
             }
           );
           jobMetrics.total_llm_cost_usd += llm.costUsd ?? 0;
@@ -1212,7 +1214,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
                 scanRoots,
                 passScope
               );
-              const llm = await auditWithLlm(
+              const llm = await (isLaneConfigured() ? auditWithLane : auditWithLlm)(
                 core,
                 auditAgent,
                 expectations,
@@ -1226,6 +1228,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
                   knownFindingIds: knownFindingIdsForScope(existing, pass.files),
                   checklistId: execution.checklistId,
                   manifestRevision: execution.manifestRevision,
+                  repositoryUrl: project.repositoryUrl,
                 }
               );
               return { llm, pass, codeContextChars: code.length };

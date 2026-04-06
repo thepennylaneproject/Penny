@@ -319,6 +319,7 @@ export async function auditWithLlm(
     knownFindingIds?: string[];
     checklistId?: string;
     manifestRevision?: string;
+    repositoryUrl?: string;
   }
 ): Promise<AuditLlmResult> {
   const registry = getRegistry();
@@ -512,4 +513,103 @@ function normalizePriority(s: string): string {
   const v = (s || "").toUpperCase();
   if (["P0", "P1", "P2", "P3"].includes(v)) return v;
   return "P2";
+}
+
+// ─── Lane audit adapter ───────────────────────────────────────────────────────
+
+import { laneAudit, type LaneAuditFinding } from "./lane-client.js";
+
+/**
+ * Derive a Penny priority string from a Lane severity label.
+ * Lane uses: low | medium | high | critical
+ */
+function laneSeverityToPriority(severity: string): string {
+  switch ((severity || "").toLowerCase()) {
+    case "critical": return "P0";
+    case "high":     return "P1";
+    case "medium":   return "P2";
+    default:         return "P3";
+  }
+}
+
+/** Map a single Lane finding to Penny's FindingOut shape. */
+function mapLaneFinding(f: LaneAuditFinding): FindingOut {
+  const title = f.message.slice(0, 120);
+  return {
+    finding_id: f.id,
+    title,
+    description: f.message,
+    type: f.type || "bug",
+    severity: normalizeSeverity(f.severity),
+    priority: laneSeverityToPriority(f.severity),
+    status: "open",
+    category: f.type || undefined,
+    proof_hooks: f.file ? [{ file: f.file, summary: f.message }] : [],
+  };
+}
+
+/**
+ * Drop-in replacement for `auditWithLlm()` that delegates to the Lane agent.
+ *
+ * Lane handles its own RAG retrieval and model routing internally; Penny just
+ * supplies the project/repo context and the files in scope for this pass.
+ */
+export async function auditWithLane(
+  _corePrompt: string,
+  _auditAgentPrompt: string,
+  _expectations: string,
+  _codeContext: string,
+  appName: string,
+  _visualOnly: boolean,
+  auditKind?: string,
+  extras?: {
+    scopeLabel?: string;
+    filesInScope?: string[];
+    knownFindingIds?: string[];
+    checklistId?: string;
+    manifestRevision?: string;
+    repositoryUrl?: string;
+  }
+): Promise<AuditLlmResult> {
+  const start = Date.now();
+  const repositoryUrl = extras?.repositoryUrl ?? "";
+
+  const response = await laneAudit({
+    project_id: appName,
+    project_name: appName,
+    repository: repositoryUrl,
+    scope_paths: extras?.filesInScope ?? [],
+    prompt: [
+      auditKind ? `Audit kind: ${auditKind}` : null,
+      extras?.scopeLabel ? `Scope: ${extras.scopeLabel}` : null,
+      extras?.checklistId ? `Checklist: ${extras.checklistId}` : null,
+    ].filter(Boolean).join(" | ") || undefined,
+    metadata: {
+      manifest_revision: extras?.manifestRevision,
+      known_finding_ids: extras?.knownFindingIds,
+    },
+  });
+
+  const findings = (response.findings ?? []).map(mapLaneFinding);
+  const latency = Date.now() - start;
+
+  return {
+    findings,
+    coverage: {
+      coverage_complete: response.status === "completed",
+      confidence: findings.length === 0 ? "high" : "medium",
+      files_reviewed: extras?.filesInScope ?? [],
+      modules_reviewed: extras?.filesInScope ?? [],
+      incomplete_reason: response.status === "failed" ? response.summary : undefined,
+    },
+    model: "lane",
+    provider: "lane",
+    raw_response: JSON.stringify(response),
+    costUsd: 0,
+    inputTokens: 0,
+    outputTokens: 0,
+    attemptCount: 1,
+    fallbackCount: 0,
+    latency_ms: latency,
+  };
 }
