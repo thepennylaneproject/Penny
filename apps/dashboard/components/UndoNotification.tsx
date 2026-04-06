@@ -5,6 +5,9 @@
  *
  * Shows when a destructive action is performed, allowing user to undo
  * within the 5-second window before the action is committed.
+ *
+ * Note: Currently shows notification; actual rollback would require
+ * API endpoints to restore deleted items or revert status changes.
  */
 
 import { useEffect, useState } from "react";
@@ -12,7 +15,7 @@ import { useUndo } from "@/contexts/UndoContext";
 import { getUndoLabel, formatUndoTime } from "@/lib/undo-machine";
 
 export function UndoNotification() {
-  const { undoState, canUndo, remainingTime } = useUndo();
+  const { undoState, canUndo, remainingTime, clear } = useUndo();
   const [displayTime, setDisplayTime] = useState(0);
 
   useEffect(() => {
@@ -24,6 +27,15 @@ export function UndoNotification() {
   }
 
   const label = getUndoLabel(undoState.action, undoState.data);
+
+  const handleUndo = () => {
+    // Clear undo state
+    clear();
+    // In a real implementation, this would:
+    // 1. Call an API endpoint to restore the item
+    // 2. Update local state to reflect restoration
+    // For now, we just show that the action can be undone
+  };
 
   return (
     <div
@@ -57,8 +69,7 @@ export function UndoNotification() {
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          // Undo action is handled by parent component
-          // This button should trigger the undo handler
+          handleUndo();
         }}
         style={{
           padding: "0.4rem 0.75rem",
