@@ -12,7 +12,7 @@ import {
   buildIntelligenceContext,
 } from "./context.js";
 import { auditWithLlm, auditWithLane, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
-import { isLaneConfigured } from "./lane-client.js";
+import { isLaneConfigured, lanePatch } from "./lane-client.js";
 import {
   claimJob,
   completeJob,
@@ -828,6 +828,7 @@ async function triggerRepairsForFindings(
   runId: string,
   findings: Array<Record<string, unknown>>,
   repoRoot: string,
+  repositoryUrl?: string,
 ): Promise<void> {
   const repairClient = getRepairClient();
 
@@ -910,6 +911,51 @@ async function triggerRepairsForFindings(
         console.warn(`[penny-worker] Failed to read file ${filePath}: ${
           error instanceof Error ? error.message : String(error)
         }`);
+      }
+
+      // Try Lane patch first; fall through to paid repair service if confidence is
+      // too low (< 0.70) or if Lane is unavailable / returns an error.
+      const LANE_PATCH_MIN_CONFIDENCE = 0.70;
+      if (isLaneConfigured() && repositoryUrl) {
+        try {
+          const laneResult = await lanePatch({
+            project_id: projectId,
+            repository: repositoryUrl,
+            finding: {
+              id: findingId,
+              type: String(finding.type ?? "bug"),
+              severity: String(finding.severity ?? "minor"),
+              file: filePath,
+              message: String(finding.description ?? finding.title ?? ""),
+            },
+            metadata: { audit_run_id: runId },
+          });
+
+          if (laneResult.status === "completed" && laneResult.confidence >= LANE_PATCH_MIN_CONFIDENCE) {
+            finding.repair_job_id = laneResult.patch_id;
+            finding.repair_status = "lane_patched";
+            finding.lane_patch_diff = laneResult.diff;
+            finding.lane_patch_confidence = laneResult.confidence;
+            console.log(
+              `[penny-worker] Lane patched finding ${findingId} ` +
+              `(confidence ${laneResult.confidence.toFixed(2)}), skipping paid repair`
+            );
+            continue; // skip paid repair service for this finding
+          }
+
+          console.log(
+            `[penny-worker] Lane patch for ${findingId} below threshold ` +
+            `(${laneResult.confidence.toFixed(2)} < ${LANE_PATCH_MIN_CONFIDENCE}), ` +
+            `elevating to paid repair service`
+          );
+        } catch (laneErr) {
+          console.warn(
+            `[penny-worker] Lane patch failed for ${findingId}, ` +
+            `elevating to paid repair service: ${
+              laneErr instanceof Error ? laneErr.message : String(laneErr)
+            }`
+          );
+        }
       }
 
       await insertRepairJob(pool, {
@@ -1401,7 +1447,8 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
               projectIdFromPayload,
               job.id,
               merged,
-              execution.repoRoot
+              execution.repoRoot,
+              project.repositoryUrl,
             );
             // Save findings again with repair_job_ids
             await saveProject(pool, {
