@@ -71,7 +71,7 @@ class RepairOrchestrator:
 
             generator = PatchGenerator(
                 model=self.settings.REPAIR_MODEL_OVERRIDE or None,
-                api_key=self.settings.GITHUB_COPILOT_TOKEN or self.settings.ANTHROPIC_API_KEY or None,
+                api_key=self.settings.GITHUB_TOKEN or self.settings.ANTHROPIC_API_KEY or None,
             )
             self.evaluator = PatchEvaluator(timeout_seconds=job.get("timeout_seconds", 60))
 

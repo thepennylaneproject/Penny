@@ -1,6 +1,6 @@
 """Patch generation for repairs — powered by the GitHub Copilot API.
 
-Falls back to Anthropic if GITHUB_COPILOT_TOKEN is not set and
+Falls back to Anthropic if GITHUB_TOKEN lacks models:read or is absent and
 ANTHROPIC_API_KEY is available (legacy support).
 """
 
@@ -74,10 +74,10 @@ class PatchCandidate:
 class PatchGenerator:
     """Generates patch candidates via GitHub Copilot API (OpenAI-compatible).
 
-    Falls back to Anthropic when GITHUB_COPILOT_TOKEN is absent.
+    Falls back to Anthropic when GITHUB_TOKEN is absent or lacks models:read.
     """
 
-    COPILOT_BASE_URL = "https://api.githubcopilot.com"
+    MODELS_BASE_URL = "https://models.inference.ai.azure.com"
 
     def __init__(self, model: Optional[str] = None, api_key: Optional[str] = None):
         self._model_override = model
@@ -85,12 +85,12 @@ class PatchGenerator:
         self._backend = self._detect_backend()
 
     def _detect_backend(self) -> str:
-        if (self._api_key_override or os.getenv("GITHUB_COPILOT_TOKEN", "")):
+        if (self._api_key_override or os.getenv("GITHUB_TOKEN", "")):
             return "copilot"
         if os.getenv("ANTHROPIC_API_KEY", ""):
             return "anthropic"
         raise RuntimeError(
-            "PatchGenerator: set GITHUB_COPILOT_TOKEN (preferred) or ANTHROPIC_API_KEY"
+            "PatchGenerator: ensure GITHUB_TOKEN has models:read permission (preferred) or set ANTHROPIC_API_KEY"
         )
 
     def _resolve_model(self, request: PatchRequest) -> str:
@@ -102,8 +102,8 @@ class PatchGenerator:
 
     async def _call_copilot(self, model: str, prompt: str) -> tuple[str, dict]:
         from openai import OpenAI
-        token = self._api_key_override or os.getenv("GITHUB_COPILOT_TOKEN", "")
-        client = OpenAI(api_key=token, base_url=self.COPILOT_BASE_URL)
+        token = self._api_key_override or os.getenv("GITHUB_TOKEN", "")
+        client = OpenAI(api_key=token, base_url=self.MODELS_BASE_URL)
         response = client.chat.completions.create(
             model=model,
             max_tokens=4096,

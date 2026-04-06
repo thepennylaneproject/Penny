@@ -21,15 +21,16 @@ class Settings(BaseSettings):
     GITHUB_ORG: str | None = os.getenv("GITHUB_ORG")
     GITHUB_REPO: str | None = os.getenv("GITHUB_REPO")
 
-    # LLM — GitHub Copilot API (primary)
-    # Personal access token (classic) or fine-grained PAT with Copilot access.
-    GITHUB_COPILOT_TOKEN: str | None = os.getenv("GITHUB_COPILOT_TOKEN")
+    # LLM — GitHub Models API (primary, OpenAI-compatible)
+    # Uses the same GITHUB_TOKEN as the GitHub App installation token.
+    # The token needs the `models:read` permission added to the App's permissions.
+    # Base URL: https://models.inference.ai.azure.com
+    GITHUB_MODELS_BASE_URL: str = "https://models.inference.ai.azure.com"
 
     # Optional: pin a specific model regardless of severity routing.
-    # When set, every patch call uses this model (useful for debugging).
     REPAIR_MODEL_OVERRIDE: str | None = os.getenv("REPAIR_MODEL_OVERRIDE")
 
-    # LLM — Anthropic (legacy / fallback if GITHUB_COPILOT_TOKEN is absent)
+    # LLM — Anthropic (legacy / fallback if GITHUB_TOKEN is absent)
     ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
     CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-latest")
 
@@ -60,10 +61,10 @@ class Settings(BaseSettings):
             raise ValueError("SUPABASE_URL not configured")
         if not self.SUPABASE_SERVICE_ROLE_KEY:
             raise ValueError("SUPABASE_SERVICE_ROLE_KEY not configured")
-        if not self.GITHUB_COPILOT_TOKEN and not self.ANTHROPIC_API_KEY:
+        if not self.GITHUB_TOKEN and not self.ANTHROPIC_API_KEY:
             raise ValueError(
-                "No LLM backend configured: set GITHUB_COPILOT_TOKEN (preferred) "
-                "or ANTHROPIC_API_KEY (legacy fallback)"
+                "No LLM backend configured: ensure GITHUB_TOKEN has models:read permission "
+                "(preferred) or set ANTHROPIC_API_KEY (legacy fallback)"
             )
 
 
