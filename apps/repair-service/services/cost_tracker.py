@@ -42,6 +42,42 @@ class CostTracker:
             input_price_per_1k=0.005,
             output_price_per_1k=0.015,
         ),
+        # GitHub Copilot API models (OpenAI-compatible)
+        "gpt-4o-mini": ModelCost(
+            model="gpt-4o-mini",
+            input_price_per_1k=0.00015,
+            output_price_per_1k=0.0006,
+        ),
+        "claude-3.5-haiku": ModelCost(
+            model="claude-3.5-haiku",
+            input_price_per_1k=0.0008,
+            output_price_per_1k=0.004,
+        ),
+        "claude-3-5-haiku-20241022": ModelCost(
+            model="claude-3-5-haiku-20241022",
+            input_price_per_1k=0.0008,
+            output_price_per_1k=0.004,
+        ),
+        "gpt-4.1": ModelCost(
+            model="gpt-4.1",
+            input_price_per_1k=0.002,
+            output_price_per_1k=0.008,
+        ),
+        "o4-mini": ModelCost(
+            model="o4-mini",
+            input_price_per_1k=0.0011,
+            output_price_per_1k=0.0044,
+        ),
+        "claude-3.5-sonnet": ModelCost(
+            model="claude-3.5-sonnet",
+            input_price_per_1k=0.003,
+            output_price_per_1k=0.015,
+        ),
+        "claude-3-5-sonnet-20241022": ModelCost(
+            model="claude-3-5-sonnet-20241022",
+            input_price_per_1k=0.003,
+            output_price_per_1k=0.015,
+        ),
     }
 
     def __init__(self):

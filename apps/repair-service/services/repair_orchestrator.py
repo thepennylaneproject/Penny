@@ -70,18 +70,20 @@ class RepairOrchestrator:
             self.beam_search = BeamSearchOrchestrator(beam_config)
 
             generator = PatchGenerator(
-                model=self.settings.CLAUDE_MODEL,
-                api_key=self.settings.ANTHROPIC_API_KEY,
+                model=self.settings.REPAIR_MODEL_OVERRIDE or None,
+                api_key=self.settings.GITHUB_COPILOT_TOKEN or self.settings.ANTHROPIC_API_KEY or None,
             )
             self.evaluator = PatchEvaluator(timeout_seconds=job.get("timeout_seconds", 60))
 
-            # Build patch request
+            # Build patch request — include severity/category for model selection
             patch_request = PatchRequest(
                 file_path=job.get("file_path", "unknown"),
                 code_context=code_context,
                 finding_title=job.get("finding_id", "unknown"),
-                finding_description="",
+                finding_description=job.get("finding_description", ""),
                 language=job.get("language", "typescript"),
+                severity=str(job.get("severity", "")),
+                category=str(job.get("category", "")),
                 is_root_generation=True,
             )
 

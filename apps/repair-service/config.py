@@ -21,7 +21,15 @@ class Settings(BaseSettings):
     GITHUB_ORG: str | None = os.getenv("GITHUB_ORG")
     GITHUB_REPO: str | None = os.getenv("GITHUB_REPO")
 
-    # LLM
+    # LLM — GitHub Copilot API (primary)
+    # Personal access token (classic) or fine-grained PAT with Copilot access.
+    GITHUB_COPILOT_TOKEN: str | None = os.getenv("GITHUB_COPILOT_TOKEN")
+
+    # Optional: pin a specific model regardless of severity routing.
+    # When set, every patch call uses this model (useful for debugging).
+    REPAIR_MODEL_OVERRIDE: str | None = os.getenv("REPAIR_MODEL_OVERRIDE")
+
+    # LLM — Anthropic (legacy / fallback if GITHUB_COPILOT_TOKEN is absent)
     ANTHROPIC_API_KEY: str | None = os.getenv("ANTHROPIC_API_KEY")
     CLAUDE_MODEL: str = os.getenv("CLAUDE_MODEL", "claude-3-5-sonnet-latest")
 
@@ -52,8 +60,11 @@ class Settings(BaseSettings):
             raise ValueError("SUPABASE_URL not configured")
         if not self.SUPABASE_SERVICE_ROLE_KEY:
             raise ValueError("SUPABASE_SERVICE_ROLE_KEY not configured")
-        if not self.ANTHROPIC_API_KEY:
-            raise ValueError("ANTHROPIC_API_KEY not configured")
+        if not self.GITHUB_COPILOT_TOKEN and not self.ANTHROPIC_API_KEY:
+            raise ValueError(
+                "No LLM backend configured: set GITHUB_COPILOT_TOKEN (preferred) "
+                "or ANTHROPIC_API_KEY (legacy fallback)"
+            )
 
 
 def get_settings() -> Settings:
