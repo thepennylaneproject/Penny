@@ -11,6 +11,7 @@ import { FindingRow } from "./FindingRow";
 import { FindingDetail } from "./FindingDetail";
 import { LinearSync } from "./LinearSync";
 import { ProjectAuditHistory } from "./ProjectAuditHistory";
+import { LaneAuditPanel } from "./LaneAuditPanel";
 import { OnboardingReviewPanel } from "./OnboardingReviewPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { BulkActionsPanel } from "./BulkActionsPanel";
@@ -310,6 +311,7 @@ export function ProjectView({
 
       {tab === "operations" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+          <LaneAuditPanel projectName={project.name} repositoryUrl={project.repositoryUrl} />
 
           {/* ── Project management ──────────────────────────────── */}
           <details
@@ -868,6 +870,7 @@ export function ProjectView({
                 <FindingDetail
                   finding={selectedFinding}
                   projectName={project.name}
+                  projectRepositoryUrl={project.repositoryUrl}
                   onClose={() => setSelected(null)}
                   onAction={handleAction}
                   onQueueRepair={onQueueRepair}

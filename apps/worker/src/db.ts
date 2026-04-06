@@ -86,8 +86,9 @@ export function createPool(): pg.Pool {
 
   if (!url) {
     throw new Error(
-      "Database connection required. Provide DATABASE_URL or SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY. " +
-        "See railway env vars configuration."
+      "Database connection required. Set DATABASE_URL (or penny_DATABASE_URL), or set SUPABASE_URL + " +
+        "SUPABASE_SERVICE_ROLE_KEY. penny-worker loads .env/.env.local from the repo root, apps/dashboard, " +
+        "then apps/worker."
     );
   }
 

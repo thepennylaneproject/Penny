@@ -5,6 +5,7 @@ import { STATUS_GROUPS } from "@/lib/constants";
 import { isInQueuedSet } from "@/lib/finding-validation";
 import { UI_COPY } from "@/lib/ui-copy";
 import { apiFetch } from "@/lib/api-fetch";
+import { generateLanePatch, type LanePatchResponse } from "@/lib/lane";
 import { repairLedgerCaption } from "@/lib/repair-proof";
 import { useRepairJob } from "@/hooks/use-repair-job";
 import { useRepairCandidates } from "@/hooks/use-repair-candidates";
@@ -49,6 +50,7 @@ const SEVERITY_BORDER: Record<string, string> = {
 interface FindingDetailProps {
   finding:           Finding;
   projectName:       string;
+  projectRepositoryUrl?: string;
   onClose:           () => void;
   onAction:          (findingId: string, newStatus: FindingStatus) => void;
   onQueueRepair?:    (findingId: string, projectName: string) => Promise<void>;
@@ -76,6 +78,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export function FindingDetail({
   finding,
   projectName,
+  projectRepositoryUrl,
   onClose,
   onAction,
   onQueueRepair,
@@ -88,6 +91,8 @@ export function FindingDetail({
   const [lifecycleLoading, setLifecycleLoading] = useState(true);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const [repairSubmitting, setRepairSubmitting] = useState(false);
+  const [lanePatch, setLanePatch] = useState<LanePatchResponse | null>(null);
+  const [lanePatchError, setLanePatchError] = useState<string | null>(null);
   const isQueued = isInQueuedSet(queuedFindingIds, projectName, finding.finding_id);
   const fix      = typeof finding.suggested_fix === "object" ? finding.suggested_fix : {};
   const stripe   = SEVERITY_BORDER[finding.severity ?? ""] ?? "var(--ink-border)";
@@ -145,25 +150,34 @@ export function FindingDetail({
 
   const handleSubmitRepair = async (config: RepairConfig) => {
     setRepairSubmitting(true);
+    setLanePatchError(null);
     try {
-      const response = await apiFetch("/api/repair-jobs", {
-        method: "POST",
-        body: JSON.stringify({
-          finding_id: finding.finding_id,
-          project_id: projectName,
-          config,
-        }),
-      });
-      if (response.ok) {
-        const data = await response.json();
-        // Refresh lifecycle to show new repair job
-        await loadLifecycle();
-      } else {
-        const error = await response.json();
-        console.error("Failed to submit repair job:", error);
+      if (!projectRepositoryUrl) {
+        throw new Error("Project repository URL is required for Lane patch generation.");
       }
+
+      const response = await generateLanePatch({
+        mode: "patch",
+        project_id: projectName,
+        repository: projectRepositoryUrl,
+        finding: {
+          id: finding.finding_id,
+          type: finding.type,
+          severity: finding.severity,
+          file: finding.proof_hooks?.[0]?.file ?? "",
+          message: finding.title,
+        },
+        prompt:
+          typeof fix.approach === "string" && fix.approach.trim()
+            ? fix.approach
+            : config.validation_commands?.join("; "),
+      });
+      setLanePatch(response);
     } catch (err) {
-      console.error("Error submitting repair job:", err);
+      setLanePatch(null);
+      setLanePatchError(
+        err instanceof Error ? err.message : "Error generating Lane patch."
+      );
     } finally {
       setRepairSubmitting(false);
     }
@@ -533,13 +547,49 @@ export function FindingDetail({
       {!finding.repair_job_id && (
         <div style={{ marginBottom: "1.25rem" }}>
           <SectionLabel>Configure Auto-Repair</SectionLabel>
-          <RepairConfigTuner
-            findingId={finding.finding_id}
-            onSubmit={handleSubmitRepair}
-            isLoading={repairSubmitting}
-          />
-        </div>
-      )}
+            <RepairConfigTuner
+              findingId={finding.finding_id}
+              onSubmit={handleSubmitRepair}
+              isLoading={repairSubmitting}
+              submitLabel="Generate Lane patch"
+            />
+            {lanePatchError ? (
+              <div style={{ fontSize: "11px", color: "var(--ink-red)", marginTop: "0.75rem" }}>
+                {lanePatchError}
+              </div>
+            ) : null}
+            {lanePatch ? (
+              <div
+                style={{
+                  marginTop: "0.85rem",
+                  padding: "0.8rem",
+                  borderRadius: "var(--radius-md)",
+                  border: "0.5px solid var(--ink-border-faint)",
+                  background: "var(--ink-bg-sunken)",
+                }}
+              >
+                <SectionLabel>Lane patch</SectionLabel>
+                <div style={{ fontSize: "11px", color: "var(--ink-text-3)", marginBottom: "0.5rem" }}>
+                  <strong style={{ color: "var(--ink-text-2)" }}>{lanePatch.file}</strong>
+                  {" "}
+                  · confidence {lanePatch.confidence.toFixed(2)}
+                </div>
+                <pre
+                  style={{
+                    margin: 0,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-word",
+                    fontSize: "11px",
+                    fontFamily: "var(--font-mono)",
+                    color: "var(--ink-text-2)",
+                  }}
+                >
+                  {lanePatch.diff}
+                </pre>
+              </div>
+            ) : null}
+          </div>
+        )}
 
       {/* Status workflow hint */}
       {finding.status && (

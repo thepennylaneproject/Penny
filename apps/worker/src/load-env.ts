@@ -4,22 +4,23 @@
  * misses root `/.env.local` and `/dashboard/.env.local`.
  */
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const workerRoot = join(__dirname, "..");
-const repoRoot = join(workerRoot, "..");
+const workerRoot = resolve(__dirname, "..");
+const repoRoot = resolve(workerRoot, "../..");
+const dashboardRoot = resolve(repoRoot, "apps/dashboard");
 
 /** Later paths override earlier (worker-local wins). */
 const ENV_FILES = [
-  join(repoRoot, ".env"),
-  join(repoRoot, ".env.local"),
-  join(repoRoot, "dashboard", ".env"),
-  join(repoRoot, "dashboard", ".env.local"),
-  join(workerRoot, ".env"),
-  join(workerRoot, ".env.local"),
+  resolve(repoRoot, ".env"),
+  resolve(repoRoot, ".env.local"),
+  resolve(dashboardRoot, ".env"),
+  resolve(dashboardRoot, ".env.local"),
+  resolve(workerRoot, ".env"),
+  resolve(workerRoot, ".env.local"),
 ];
 
 for (const path of ENV_FILES) {

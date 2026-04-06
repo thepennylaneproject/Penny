@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { resolveProjectIdByNameOrId } from "@/lib/repair-jobs";
 
 export async function POST(request: NextRequest) {
   const supabase = createSupabaseServerClient();
@@ -17,12 +18,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const projectId = await resolveProjectIdByNameOrId(supabase, String(project_id));
+    if (!projectId) {
+      return NextResponse.json(
+        { error: "project not found" },
+        { status: 404 }
+      );
+    }
+
+    const { data: finding, error: findingError } = await supabase
+      .from("findings")
+      .select("id, project_id")
+      .eq("id", finding_id)
+      .eq("project_id", projectId)
+      .maybeSingle();
+
+    if (findingError) {
+      console.error(`[repair-jobs POST] Error validating finding:`, findingError);
+      return NextResponse.json({ error: findingError.message }, { status: 400 });
+    }
+
+    if (!finding) {
+      return NextResponse.json(
+        { error: "finding not found for project" },
+        { status: 404 }
+      );
+    }
+
+    const { data: existingJob, error: existingJobError } = await supabase
+      .from("repair_jobs")
+      .select("id, repair_job_id")
+      .eq("finding_id", finding_id)
+      .eq("project_id", projectId)
+      .in("status", ["queued", "generating", "evaluating"])
+      .maybeSingle();
+
+    if (existingJobError) {
+      console.error(`[repair-jobs POST] Error checking active jobs:`, existingJobError);
+      return NextResponse.json({ error: existingJobError.message }, { status: 400 });
+    }
+
+    if (existingJob) {
+      return NextResponse.json(
+        { error: "repair job already in progress", repair_job_id: existingJob.repair_job_id },
+        { status: 409 }
+      );
+    }
+
     // Create a new repair job in the repair_jobs table
     const { data, error } = await supabase
       .from("repair_jobs")
       .insert({
         finding_id,
-        project_id,
+        project_id: projectId,
         status: "queued",
         confidence_score: null,
         confidence_breakdown: null,

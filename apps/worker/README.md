@@ -4,11 +4,11 @@ Processes `penny_audit_jobs` from BullMQ queue **penny-audit** (or polls the DB 
 
 ## Env
 
-On startup the worker loads, in order (later files override): repo `.env` / `.env.local`, `dashboard/.env` / `dashboard/.env.local`, then `worker/.env` / `worker/.env.local`. So you can keep a single `dashboard/.env.local` and run `npm run dev` from `worker/` without copying `DATABASE_URL`.
+On startup the worker loads, in order (later files override): repo-root `.env` / `.env.local`, `apps/dashboard/.env` / `apps/dashboard/.env.local`, then `apps/worker/.env` / `apps/worker/.env.local`. So you can keep a single repo-root `.env.local` (or `apps/dashboard/.env.local`) and run `npm run dev` from `apps/worker/` without copying `DATABASE_URL`.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | Same Postgres as dashboard (Supabase). Alias: `penny_DATABASE_URL`. |
+| `DATABASE_URL` | Yes | Same Postgres as dashboard (Supabase). Alias: `penny_DATABASE_URL`. You can also use `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` and let the worker derive the Postgres URL. |
 | `OPENAI_API_KEY` | For real audits | Without it, jobs complete with a config finding only. |
 | `REDIS_URL` / `penny_REDIS_URL` | No | If set, uses BullMQ; else polls DB. **Production:** set this to avoid steady DB QPS from polling. |
 | `penny_REPO_ROOT` | No | Path to penny repo root (expects `core_system_prompt`, `expectations/`, `the_penny_lane_project/`). Default: parent of `worker/`. |
@@ -27,7 +27,7 @@ Deploy this process on any long-lived host (Railway, Fly, VPS, etc.) with repo c
 
 ## Stuck in `queued`?
 
-If the dashboard shows Redis on but jobs never leave `queued`, the worker is not running or is pointed at a different Redis/DB than the dashboard. Start the worker locally: `cd worker && npm install && npm run dev`.
+If the dashboard shows Redis on but jobs never leave `queued`, the worker is not running or is pointed at a different Redis/DB than the dashboard. Start the worker locally: `cd apps/worker && npm install && npm run dev`.
 
 To drop pending work: use the dashboard **Clear queue (Redis + DB)** or `POST /api/orchestration/queue/clear` with the same Bearer secret as enqueue.
 

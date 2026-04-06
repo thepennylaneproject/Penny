@@ -1,4 +1,5 @@
 import { penny_ENQUEUE_SECRET_STORAGE_KEY } from "@/lib/auth-constants";
+import { getSupabaseBrowserClient } from "@/lib/supabase";
 
 function mergeEnqueueSecretFromStorage(headers: Headers): void {
   if (typeof window === "undefined") return;
@@ -14,6 +15,25 @@ function mergeEnqueueSecretFromStorage(headers: Headers): void {
   }
 }
 
+async function mergeSupabaseToken(headers: Headers): Promise<void> {
+  if (typeof window === "undefined" || headers.has("Authorization")) return;
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) return;
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      console.warn("Failed to read Supabase session for API auth:", error.message);
+      return;
+    }
+    const token = data.session?.access_token?.trim();
+    if (token) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
+  } catch (error) {
+    console.warn("Failed to attach Supabase session token:", error);
+  }
+}
+
 /**
  * Default browser fetch for `/api/*`: session cookie only.
  * Use for project CRUD, findings, import, login, engine queue from an authenticated session.
@@ -23,11 +43,13 @@ export function apiFetch(
   init?: RequestInit
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
-  return fetch(input, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  return mergeSupabaseToken(headers).then(() =>
+    fetch(input, {
+      ...init,
+      headers,
+      credentials: "include",
+    })
+  );
 }
 
 /**
@@ -41,9 +63,11 @@ export function apiFetchWithEnqueueSecret(
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
   mergeEnqueueSecretFromStorage(headers);
-  return fetch(input, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  return mergeSupabaseToken(headers).then(() =>
+    fetch(input, {
+      ...init,
+      headers,
+      credentials: "include",
+    })
+  );
 }

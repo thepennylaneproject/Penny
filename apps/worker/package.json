@@ -12,7 +12,8 @@
     "admin:queue": "tsx src/scripts/admin.ts queue",
     "admin:repair": "tsx src/scripts/admin.ts repair",
     "admin:list-jobs": "tsx src/scripts/admin.ts list-jobs",
-    "admin:list-repairs": "tsx src/scripts/admin.ts list-repairs"
+    "admin:list-repairs": "tsx src/scripts/admin.ts list-repairs",
+    "admin:validate-run": "tsx src/scripts/admin.ts validate-run"
   },
   "dependencies": {
     "@sentry/node": "^8.30.0",

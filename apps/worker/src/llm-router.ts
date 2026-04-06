@@ -4,9 +4,15 @@
  */
 
 import { getRegistry } from './providers/registry.js';
-import { AuditLlmResult } from './llm.js';
 import { insertModelUsage } from './supabase-client.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+
+export interface AuditMetricUsage {
+  model: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  latency_ms?: number;
+}
 
 /**
  * Pricing map for all supported models (per 1M tokens)
@@ -51,21 +57,23 @@ export async function logAuditMetrics(
   client: SupabaseClient | null,
   runId: string,
   auditKind: string,
-  result: AuditLlmResult
+  result: AuditMetricUsage
 ): Promise<boolean> {
-  if (!client || !result.inputTokens || !result.outputTokens) {
+  const inputTokens = result.inputTokens ?? 0;
+  const outputTokens = result.outputTokens ?? 0;
+  if (!client || (inputTokens <= 0 && outputTokens <= 0)) {
     return false;
   }
 
-  const costUsd = calculateCost(result.model, result.inputTokens, result.outputTokens);
+  const costUsd = calculateCost(result.model, inputTokens, outputTokens);
 
   return insertModelUsage(
     client,
     runId,
     auditKind,
     result.model,
-    result.inputTokens,
-    result.outputTokens,
+    inputTokens,
+    outputTokens,
     costUsd,
     result.latency_ms || 0
   );
@@ -91,7 +99,9 @@ export function resolveLLMTier(
   }
 
   // Environment override
-  const envTier = process.env.PENNY_ROUTING_STRATEGY?.trim().toLowerCase();
+  const envTier =
+    process.env.penny_ROUTING_STRATEGY?.trim().toLowerCase() ||
+    process.env.PENNY_ROUTING_STRATEGY?.trim().toLowerCase();
   if (envTier && ['aggressive', 'balanced', 'precision'].includes(envTier)) {
     return envTier as 'aggressive' | 'balanced' | 'precision';
   }

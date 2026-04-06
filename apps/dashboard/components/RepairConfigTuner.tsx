@@ -16,6 +16,7 @@ interface RepairConfigTunerProps {
   onConfigChange?: (config: RepairConfig) => void;
   onSubmit?: (config: RepairConfig) => void;
   isLoading?: boolean;
+  submitLabel?: string;
 }
 
 export function RepairConfigTuner({
@@ -24,6 +25,7 @@ export function RepairConfigTuner({
   onConfigChange,
   onSubmit,
   isLoading = false,
+  submitLabel = "Submit Repair Job",
 }: RepairConfigTunerProps) {
   const [beamWidth, setBeamWidth] = useState(initialConfig.beam_width ?? 4);
   const [maxDepth, setMaxDepth] = useState(initialConfig.max_depth ?? 4);
@@ -196,7 +198,7 @@ export function RepairConfigTuner({
           disabled={isLoading}
           className="w-full py-2 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 rounded transition-colors"
         >
-          {isLoading ? "Submitting..." : "Submit Repair Job"}
+          {isLoading ? "Submitting..." : submitLabel}
         </button>
       )}
     </div>

@@ -119,7 +119,7 @@ docker build -t penny-repair .
 See `.env.example` for all required variables. Each service needs a specific subset:
 
 - **Dashboard**: Supabase, GitHub App, Repair Service, Sentry
-- **Worker**: Supabase, Redis, LLM providers, Repair Service, GitHub App
+- **Worker**: Supabase, Redis, LLM providers, Repair Service, GitHub App. The worker reads `.env` / `.env.local` from the repo root first, then `apps/dashboard`, then `apps/worker`.
 - **Repair Service**: Supabase, LLM providers, Qdrant, engine tuning vars
 
 ## Features

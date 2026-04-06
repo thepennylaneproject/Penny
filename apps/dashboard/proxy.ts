@@ -6,6 +6,68 @@ import {
   isOpenApiAllowedWithoutSecret,
 } from "@/lib/dashboard-secret";
 
+function decodeBase64Url(value: string): string | null {
+  try {
+    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+async function verifySupabaseJwt(
+  token: string,
+  secret: string,
+  audience: string
+): Promise<boolean> {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const [headerPart, payloadPart, signaturePart] = parts;
+  const payloadRaw = decodeBase64Url(payloadPart);
+  if (!payloadRaw) return false;
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(payloadRaw) as Record<string, unknown>;
+  } catch {
+    return false;
+  }
+
+  const exp = Number(payload.exp);
+  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) return false;
+  if (typeof payload.sub !== "string" || payload.sub.length === 0) return false;
+  if (audience) {
+    const aud = payload.aud;
+    const audienceOk =
+      typeof aud === "string"
+        ? aud === audience
+        : Array.isArray(aud)
+          ? aud.includes(audience)
+          : false;
+    if (!audienceOk) return false;
+  }
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(`${headerPart}.${payloadPart}`)
+  );
+  const expected = btoa(String.fromCharCode(...new Uint8Array(signature)))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return expected === signaturePart;
+}
+
 async function verifySessionCookie(
   token: string,
   secret: string
@@ -47,7 +109,10 @@ export async function proxy(request: NextRequest) {
   const raw =
     process.env.DASHBOARD_API_SECRET?.trim() ||
     process.env.ORCHESTRATION_ENQUEUE_SECRET?.trim();
-  if (!raw) {
+  const supabaseJwtSecret = process.env.SUPABASE_JWT_SECRET?.trim() || "";
+  const supabaseAudience = process.env.SUPABASE_JWT_AUDIENCE?.trim() || "authenticated";
+
+  if (!raw && !supabaseJwtSecret) {
     if (!isOpenApiAllowedWithoutSecret()) {
       return NextResponse.json(
         { error: "misconfigured", message: DASHBOARD_MISCONFIGURED_MESSAGE },
@@ -63,16 +128,22 @@ export async function proxy(request: NextRequest) {
 
   const norm = (s: string) => s.trim().replace(/\r?\n/g, "").trim();
   const auth = request.headers.get("authorization");
-  if (auth?.startsWith("Bearer ") && norm(auth.slice(7)) === norm(raw)) {
-    return NextResponse.next();
+  if (auth?.startsWith("Bearer ")) {
+    const token = auth.slice(7).trim();
+    if (raw && norm(token) === norm(raw)) {
+      return NextResponse.next();
+    }
+    if (supabaseJwtSecret && (await verifySupabaseJwt(token, supabaseJwtSecret, supabaseAudience))) {
+      return NextResponse.next();
+    }
   }
   const headerVal = request.headers.get("x-penny-api-secret");
-  if (headerVal != null && norm(headerVal) === norm(raw)) {
+  if (raw && headerVal != null && norm(headerVal) === norm(raw)) {
     return NextResponse.next();
   }
 
   const cookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  if (cookie && (await verifySessionCookie(cookie, raw))) {
+  if (raw && cookie && (await verifySessionCookie(cookie, raw))) {
     return NextResponse.next();
   }
 

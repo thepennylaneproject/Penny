@@ -356,6 +356,9 @@ class RepairOrchestrator:
             "applied_files": touched_files,
             "message": apply_msg,
             "routing_usage": routing_usage,
+            "usage_records": getattr(self.router, "usage_records", lambda *_args, **_kwargs: [])(
+                task_type="patch_generation"
+            ),
         }
 
     def _persist_run(

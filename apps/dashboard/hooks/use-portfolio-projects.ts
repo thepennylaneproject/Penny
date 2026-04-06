@@ -38,7 +38,7 @@ export function usePortfolioProjects() {
       }
       if (res.status === 401) {
         setLoginHint(
-          "If you were already signed in, your session may have expired. Enter your access key again."
+          "If you were already signed in, your Supabase session may have expired. Sign in again."
         );
         setNeedsAuth(true);
         setProjects([]);

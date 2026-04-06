@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { resolveProjectIdByNameOrId } from "@/lib/repair-jobs";
 
 type Params = { params: Promise<{ name: string }> };
 
@@ -12,7 +13,12 @@ export async function GET(
     return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
   }
   try {
-    const { name: projectId } = await params;
+    const { name } = await params;
+    const projectId = await resolveProjectIdByNameOrId(supabase, name);
+    if (!projectId) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+    }
+
     // First get all repair jobs for this project
     const { data: jobs, error: jobsError } = await supabase
       .from("repair_jobs")
@@ -35,7 +41,7 @@ export async function GET(
 
     // Then fetch all costs for those jobs
     const { data: costs, error: costsError } = await supabase
-      .from("model_usage")
+      .from("repair_costs")
       .select(
         `
         id,

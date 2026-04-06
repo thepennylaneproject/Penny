@@ -1,6 +1,6 @@
 # Phase 2 — Quick Reference
 
-## Status: ✅ Observability & Cost Tracking Integrated
+## Status: ⚙️ Build-ready, validation pending
 
 ### What's Working Now
 1. **Structured Logging** — Datadog-compatible JSON output from every audit
@@ -24,17 +24,13 @@ npm start      # Ready to process audit jobs
 | `PHASE_2_SUMMARY.md` | Detailed implementation notes |
 | `PHASE_2_PROMPT_MIGRATION.md` | How to add the 17 agent prompt files |
 
-### Next: Prompt Files
-The worker can load all 17 audit agents **if** the prompt files exist. They don't exist yet.
+### Prompt Status
+The active core, visual, intelligence, and synthesizer prompt files are already present in `audits/prompts/`.
 
-**Required files:** 17 prompt files (from v2.0 `audits/prompts/`)
-- 6 core agents: logic, security, performance, ux, data, deploy
-- 6 visual agents: color, typography, components, layout, polish, tokens
-- 2 investor agents: investor-readiness, code-debt
-- 1 intelligence: intelligence_extraction_prompt
-- Plus synthesizers and base audit template
-
-**Action:** See `PHASE_2_PROMPT_MIGRATION.md` for detailed steps
+Current nuance:
+- `code_debt` still falls back to the base audit prompt because `code-debt.md` is not present
+- the worker now resolves `audit_suite_configs` / `default_llm_tier` before running project audits
+- synthesis jobs now emit `model_usage` rows just like primary audit passes
 
 ### Cost Tracking Example
 When an audit completes:
@@ -86,8 +82,8 @@ If an audit fails:
 - Job marked as failed in database
 
 ### Phase 3 Prep
-- Repair service API endpoint design is separate
-- Worker ready to call repair service (pending client implementation)
+- Repair service is already wired through `apps/worker/src/repair-client.ts`
+- Worker submits eligible findings to the repair service after audit completion
 - Supabase repair_jobs table ready to receive repair tasks
 
 ---
@@ -98,6 +94,7 @@ If an audit fails:
 ```env
 SUPABASE_URL=https://...
 SUPABASE_SERVICE_ROLE_KEY=...
+penny_ROUTING_STRATEGY=balanced
 PENNY_SENTRY_DSN=https://... (optional; observability disabled if not set)
 REDIS_URL=... (for BullMQ; fallback to polling if not set)
 ```
@@ -115,31 +112,27 @@ REDIS_URL=... (for BullMQ; fallback to polling if not set)
 ---
 
 ## Testing Audit Kinds
-Once prompt files are in place:
+Use the dashboard/API to enqueue jobs, then validate them from the worker side:
 
 ```bash
-# Full audit (default)
-curl -X POST http://worker:3000/audit \
-  -H "Content-Type: application/json" \
-  -d '{"project": "my-project"}'
+# 1. Queue an audit
+pnpm --filter penny-worker exec tsx src/scripts/admin.ts queue --project MyApp --type re_audit_project
 
-# Specific agent
-curl -X POST http://worker:3000/audit \
-  -H "Content-Type: application/json" \
-  -d '{"project": "my-project", "audit_kind": "logic"}'
+# 2. List recent jobs to capture the job UUID
+pnpm --filter penny-worker exec tsx src/scripts/admin.ts list-jobs
 
-# Visual-only
-curl -X POST http://worker:3000/audit \
-  -H "Content-Type: application/json" \
-  -d '{"project": "my-project", "audit_kind": "visual"}'
-
-# Intelligence report
-curl -X POST http://worker:3000/audit \
-  -H "Content-Type: application/json" \
-  -d '{"project": "my-project", "audit_kind": "intelligence"}'
+# 3. Validate the finished lifecycle
+pnpm --filter penny-worker exec tsx src/scripts/admin.ts validate-run --job-id <uuid>
 ```
 
-Watch worker logs for observability JSON output and check Supabase for model_usage rows.
+The validator checks:
+- `penny_audit_jobs` status and payload
+- matching `penny_audit_runs` completion row
+- `audit_metrics` / `project_audit_details` in the run payload
+- `model_usage` rows by job id and by completed run id
+- repair handoff rows in `penny_repair_jobs`
+
+Watch worker logs for observability JSON output and use `validate-run` to confirm DB evidence.
 
 ---
 
@@ -161,7 +154,7 @@ Watch worker logs for observability JSON output and check Supabase for model_usa
 → Check Sentry DSN is set. Logs still go to stdout regardless.
 
 **Model usage table empty?**
-→ Verify SUPABASE_SERVICE_ROLE_KEY is set and Supabase is reachable.
+→ Verify `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` are set and Supabase is reachable. If `validate-run` still reports zero `model_usage` rows, inspect the current `audit_runs` vs `penny_audit_runs` linkage before treating Phase 2 as complete.
 
 **Loop detection false positives?**
 → Threshold is 4 runs in 5 minutes. Adjust in `observability.ts` if needed (currently hardcoded).
@@ -170,8 +163,7 @@ Watch worker logs for observability JSON output and check Supabase for model_usa
 
 ## Next Steps (Priority Order)
 
-1. **[HIGH] Copy prompt files** → 15 agents become live
-2. **[HIGH] Verify prompts load** → No-op warnings in worker logs
-3. **[MEDIUM] Test audit jobs** → Cost tracking appears in model_usage
-4. **[MEDIUM] Set up audit suite config** → Per-project agent selection
-5. **[LOW] Phase 3 design** → Repair service + dashboard UI
+1. **[HIGH] Run a real lifecycle validation** → queue, completion payload, repair handoff
+2. **[HIGH] Verify `model_usage` persistence on a live run** → confirm audit/synthesis cost evidence
+3. **[MEDIUM] Add `code-debt.md`** → dedicated strategic prompt instead of base fallback
+4. **[LOW] Phase 3 hardening** → repair service lifecycle + safeguards

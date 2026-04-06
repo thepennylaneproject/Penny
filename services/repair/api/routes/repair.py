@@ -12,7 +12,7 @@ from supabase import Client
 
 from repair_engine.models.types import Finding
 from repair_engine.orchestrator import RepairOrchestrator
-from api.supabase_client import get_supabase
+from api.supabase_client import get_supabase, insert_repair_costs
 
 router = APIRouter(tags=["repair"])
 
@@ -112,9 +112,12 @@ def _run_job(
 
         # Mark job as completed
         routing_usage = result.get("routing_usage")
+        usage_records = result.get("usage_records")
         progress = None
         if isinstance(routing_usage, dict):
             progress = {"routing": routing_usage}
+        if isinstance(usage_records, list):
+            insert_repair_costs(supabase, repair_job_id, usage_records)
         supabase.table("repair_jobs").update({
             "status": result.get("status", "completed"),
             "action": result.get("status", "completed"),

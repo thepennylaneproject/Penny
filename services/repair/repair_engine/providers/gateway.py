@@ -109,6 +109,8 @@ class GatewayResult:
     model: str
     confidence: float
     cost_usd: float
+    input_tokens: int = 0
+    output_tokens: int = 0
     escalated: bool = False  # True if a higher-cost provider was used
     retries: int = 0         # Number of retries before a response was accepted
 
@@ -118,6 +120,8 @@ class GatewayCall:
     task_type: str
     provider_alias: str
     model: str
+    input_tokens: int
+    output_tokens: int
     cost_usd: float
     confidence: float
     escalated: bool = False
@@ -155,6 +159,8 @@ class GatewayRouter:
                 task_type=task_type,
                 provider_alias=result.provider_alias,
                 model=result.model,
+                input_tokens=result.input_tokens,
+                output_tokens=result.output_tokens,
                 cost_usd=result.cost_usd,
                 confidence=result.confidence,
                 escalated=result.escalated,
@@ -254,6 +260,8 @@ class GatewayRouter:
                 model=model,
                 confidence=confidence,
                 cost_usd=actual_cost,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
                 escalated=attempt_idx > 0,
                 retries=retries_used,
             )
@@ -353,6 +361,26 @@ class GatewayRouter:
             "models": sorted(model_counts.keys()),
             "task_type": task_type,
         }
+
+    def usage_records(self, task_type: str | None = None) -> list[dict[str, object]]:
+        records: list[dict[str, object]] = []
+        for call in self.call_history:
+            if task_type is not None and call.task_type != task_type:
+                continue
+            records.append(
+                {
+                    "task_type": call.task_type,
+                    "provider_alias": call.provider_alias,
+                    "model": call.model,
+                    "input_tokens": call.input_tokens,
+                    "output_tokens": call.output_tokens,
+                    "cost_usd": round(call.cost_usd, 8),
+                    "confidence": call.confidence,
+                    "escalated": call.escalated,
+                    "retries": call.retries,
+                }
+            )
+        return records
 
     # ── Factory ───────────────────────────────────────────────────────────────
 

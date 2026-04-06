@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase";
+import { resolveRepairJobByPublicId } from "@/lib/repair-jobs";
 
 type Params = { params: Promise<{ jobId: string }> };
 
@@ -13,6 +14,14 @@ export async function GET(
   }
   try {
     const { jobId } = await params;
+    const resolved = await resolveRepairJobByPublicId(supabase, jobId);
+    if (!resolved) {
+      return NextResponse.json(
+        { error: "Repair job not found" },
+        { status: 404 }
+      );
+    }
+
     const { data, error } = await supabase
       .from("orchestration_events")
       .select(
@@ -26,7 +35,7 @@ export async function GET(
         created_at
       `
       )
-      .eq("repair_job_id", jobId)
+      .eq("repair_job_id", resolved.id)
       .order("created_at", { ascending: false });
 
     if (error) {

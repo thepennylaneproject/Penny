@@ -6,6 +6,22 @@
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+export type LlmTier = 'aggressive' | 'balanced' | 'precision';
+
+export interface ProjectConfigRow {
+  id: string;
+  name: string;
+  repository_url?: string;
+  default_llm_tier?: LlmTier;
+}
+
+export interface AuditSuiteConfigRow {
+  suite_id: string;
+  enabled: boolean;
+  llm_tier?: LlmTier;
+  agent_overrides?: Record<string, boolean>;
+}
+
 interface SupabaseConfig {
   url: string;
   serviceRoleKey: string;
@@ -229,7 +245,7 @@ export async function insertFindings(
 export async function getProject(
   client: SupabaseClient | null,
   projectId: string
-): Promise<{ id: string; name: string; repository_url?: string; default_llm_tier?: string } | null> {
+): Promise<ProjectConfigRow | null> {
   if (!client) return null;
 
   const { data, error } = await client
@@ -243,7 +259,68 @@ export async function getProject(
     return null;
   }
 
-  return data || null;
+  return (data as ProjectConfigRow | null) || null;
+}
+
+/**
+ * Resolve a project row by canonical name or repository URL.
+ */
+export async function resolveProjectConfig(
+  client: SupabaseClient | null,
+  input: { projectName?: string | null; repositoryUrl?: string | null }
+): Promise<ProjectConfigRow | null> {
+  if (!client) return null;
+
+  const projectName = input.projectName?.trim();
+  const repositoryUrl = input.repositoryUrl?.trim();
+
+  if (projectName) {
+    const { data, error } = await client
+      .from('projects')
+      .select('id, name, repository_url, default_llm_tier')
+      .eq('name', projectName)
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error resolving project by name:', error);
+    } else if (data) {
+      return data as ProjectConfigRow;
+    }
+  }
+
+  if (repositoryUrl) {
+    const { data, error } = await client
+      .from('projects')
+      .select('id, name, repository_url, default_llm_tier')
+      .eq('repository_url', repositoryUrl)
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error resolving project by repository URL:', error);
+    } else if (data) {
+      return data as ProjectConfigRow;
+    }
+  }
+
+  if (projectName) {
+    const { data, error } = await client
+      .from('projects')
+      .select('id, name, repository_url, default_llm_tier')
+      .ilike('name', projectName)
+      .limit(1)
+      .maybeSingle();
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Error resolving project by case-insensitive name:', error);
+      return null;
+    }
+
+    return (data as ProjectConfigRow | null) || null;
+  }
+
+  return null;
 }
 
 /**
@@ -252,7 +329,7 @@ export async function getProject(
 export async function getAuditSuiteConfigs(
   client: SupabaseClient | null,
   projectId: string
-): Promise<Array<{ suite_id: string; enabled: boolean; llm_tier?: string; agent_overrides?: Record<string, boolean> }> | null> {
+): Promise<AuditSuiteConfigRow[] | null> {
   if (!client) return null;
 
   const { data, error } = await client
@@ -265,7 +342,7 @@ export async function getAuditSuiteConfigs(
     return null;
   }
 
-  return data || null;
+  return (data as AuditSuiteConfigRow[] | null) || null;
 }
 
 /**

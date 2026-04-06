@@ -1,6 +1,6 @@
-# Phase 2: Worker Audit Engine Upgrade — COMPLETE ✅
+# Phase 2: Worker Audit Engine Upgrade — IN PROGRESS ⚙️
 
-**Status:** Observability, cost tracking, and all 17 audit agent prompts integrated and ready for deployment
+**Status:** Observability, cost tracking, suite-aware routing, and repair handoff are integrated. Remaining work is operator validation plus optional prompt expansion for currently fallback-backed strategic audits.
 
 ## What Was Completed
 
@@ -18,17 +18,21 @@
     - OpenAI: GPT-4o-mini ($0.15/$0.6), GPT-4o ($5/$15)
     - Gemini: Flash ($0.075/$0.3), Pro ($1.25/$5)
   - `calculateCost()`: Computes cost from token counts
-  - `logAuditMetrics()`: Writes model_usage to Supabase (prepared for future integration)
+  - `logAuditMetrics()`: Writes model_usage to Supabase
   - `resolveLLMTier()`: Maps audit kind → LLM tier (aggressive/balanced/precision)
   - `TIER_PRICING`: UI cost estimation hints
 
 ### 3. Worker Integration
 - **File:** `apps/worker/src/process-job.ts` (updated)
   - Added imports for observability, cost tracking, and Supabase modules
+  - Resolves per-project `default_llm_tier` and `audit_suite_configs` before audit execution
+  - Skips audit kinds blocked by disabled suites or per-agent overrides
+  - Applies the resolved routing strategy while each project audit runs
   - Added `logExecution()` calls after intelligence extraction pass with observability metrics
   - Added `logAuditMetrics()` calls after intelligence extraction to write model_usage to Supabase
   - Added `logExecution()` calls after each domain pass
   - Added `logAuditMetrics()` calls after each domain pass to persist cost data
+  - Added observability + usage logging for cluster/meta/project/portfolio synthesis jobs
   - Added error observability logging in prep failure catch block
   - Added error observability logging in main audit execution catch block
   - Structured metrics: run_id, project_id, agent_name, model, latency_ms, cost_usd, input/output tokens, status
@@ -129,43 +133,40 @@ Also sends to Sentry with exception details.
 
 ## Completed Phase 2 Tasks
 
-### ✅ Prompt File Migration (DONE)
-- ✅ Copied all 17 agent prompt files from v2.0 to `audits/prompts/`
-- ✅ Verified `loadClusterPrompts()` can load all agent variations
+### ✅ Prompt File Migration (MOSTLY DONE)
+- ✅ Core, visual, intelligence, and synthesizer prompt files are present in `audits/prompts/`
+- ✅ Verified `loadClusterPrompts()` can load the active routed prompt variations
 - ✅ Created core_system_prompt.md (from AGENT-PREAMBLE.md)
 - ✅ Created audit-agent.md and domain_audits.md base templates
 - ✅ Worker builds successfully with all prompts in place
-- **6 core + 6 visual + 2 investor + 1 intelligence + 2 synthesizers = 17 agents ready**
+- Remaining optional gap: `code-debt.md` is still absent, so `code_debt` currently falls back to the base audit prompt.
 
 ### ✅ Model Usage Persistence (DONE)
 - ✅ Call `logAuditMetrics()` after each LLM audit
 - ✅ Write model_usage rows to Supabase with cost tracking
 - ✅ Latency and token metrics included in writes
+- ✅ Synthesis jobs now emit the same usage rows as primary audit passes
 
 ## Remaining Phase 2 Tasks
 
 ### Next Steps for Complete Agent Support
-1. **Audit Suite Configuration Integration** (Required for agent selectivity)
-   - Update worker to read `audit_suite_configs` from Supabase
-   - Implement per-project agent selection (toggle which of 17 agents to run)
-   - Respect LLM tier per-suite configuration
-   - **Action**: Pass audit_suite_configs from DB to processJob, use to filter agent runs
-
-2. **Test Audit Run** (Validation)
+1. **Operator Validation Run**
    - Run a full audit job with observability enabled
    - Verify logs appear in stdout (Datadog)
    - Check Sentry receives error/warning events
    - Confirm model_usage table populated in Supabase
+   - Use `pnpm --filter penny-worker exec tsx src/scripts/admin.ts validate-run --job-id <uuid>` to verify the DB evidence after the run completes
 
-4. **Visual + Strategic Agents** (Prompt file dependent)
+2. **Lifecycle Validation**
+   - Exercise queue → claim → execution → completion on a representative project
+   - Validate skip behavior when a suite or agent override is disabled
+   - Validate repair handoff still occurs for eligible findings
+   - Investigate any `validate-run` warning where `model_usage` rows are missing for both the job id and the completed run id
+
+3. **Visual + Strategic Agents** (Prompt file dependent)
    - ⏳ Verify visual cluster prompt loading (visual-*.md files)
-   - ⏳ Verify strategic agents (investor, blind spot, etc.)
+   - ⏳ Add a dedicated `code-debt.md` prompt if a project-specific strategic prompt becomes available
    - ⏳ Test synthesizer passes (cluster_synthesize, meta_synthesize)
-
-5. **Repair Service Integration** (Phase 3)
-   - Create `apps/worker/src/repair-client.ts` for HTTP calls
-   - Pass repair-worthy findings to repair service
-   - Handle async repair callbacks
 
 ---
 
@@ -174,10 +175,11 @@ Also sends to Sentry with exception details.
 | File | Changes |
 |------|---------|
 | `apps/worker/src/observability.ts` | NEW: Sentry + Datadog logging + loop detection |
-| `apps/worker/src/llm-router.ts` | NEW: Pricing map + cost calculation + tier resolution |
-| `apps/worker/src/process-job.ts` | Added observability logging after LLM calls + error handlers |
+| `apps/worker/src/llm-router.ts` | NEW: Pricing map + cost calculation + tier resolution; now honors lowercase + uppercase routing env vars |
+| `apps/worker/src/process-job.ts` | Added suite-aware routing, skip logic, and synthesis usage logging |
+| `apps/worker/src/scripts/admin.ts` | Added `validate-run` lifecycle verifier for job/run/model_usage/repair evidence |
 | `apps/worker/src/llm.ts` | Added `latency_ms?` to `AuditLlmResult` interface |
-| `apps/worker/package.json` | Verified @sentry/node dependency |
+| `apps/worker/package.json` | Verified dependencies and added `admin:validate-run` |
 
 ---
 
@@ -195,7 +197,7 @@ Also sends to Sentry with exception details.
 - [ ] Full audit run completes with observability logs visible
 - [ ] Datadog ingestion works (requires deployed worker)
 - [ ] Sentry error grouping works (requires deployed worker)
-- [ ] Cost metrics appear in model_usage table (live test)
+- [ ] Cost metrics appear in model_usage table for both audit and synthesis jobs (live test)
 
 ---
 
@@ -236,4 +238,5 @@ Also sends to Sentry with exception details.
 - **Sentry Auto-Init**: Observability.ts initializes Sentry if `PENNY_SENTRY_DSN` is set
 - **Fallback Tracking**: Fallback status is determined by `fallbackCount > 0`, not by model name
 - **Loop Detection Preventive**: Triggers warning when agent runs 4+ times in 5 minutes (default threshold, not configurable yet)
-- **No Breaking Changes**: All changes are additive; existing process-job.ts logic unchanged
+- **Suite-aware routing**: worker now resolves `default_llm_tier` + `audit_suite_configs` before running a project audit
+- **No Breaking Changes**: all changes are additive and preserve existing job types / queue contracts

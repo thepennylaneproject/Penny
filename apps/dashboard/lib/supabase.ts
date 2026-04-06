@@ -11,8 +11,6 @@ interface SupabaseConfig {
   url: string;
   serviceRoleKey: string;
   anonKey: string;
-  configured: boolean;
-  missing: string[];
 }
 
 /**
@@ -23,17 +21,10 @@ export function readSupabaseConfig(): SupabaseConfig {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-  const missing: string[] = [];
-  if (!url) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-  if (!serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-  if (!anonKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-
   return {
     url,
     serviceRoleKey,
     anonKey,
-    configured: missing.length === 0,
-    missing,
   };
 }
 
@@ -44,8 +35,12 @@ export function readSupabaseConfig(): SupabaseConfig {
 export function createSupabaseServerClient(): SupabaseClient | null {
   const config = readSupabaseConfig();
 
-  if (!config.configured) {
-    console.warn('Supabase not configured. Available tables:', config.missing.join(', '));
+  const missing: string[] = [];
+  if (!config.url) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
+  if (!config.serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
+
+  if (missing.length > 0) {
+    console.warn('Supabase server client not configured. Missing:', missing.join(', '));
     return null;
   }
 
@@ -63,8 +58,12 @@ export function createSupabaseServerClient(): SupabaseClient | null {
 export function createSupabaseBrowserClient(): SupabaseClient | null {
   const config = readSupabaseConfig();
 
-  if (!config.configured) {
-    console.warn('Supabase not configured. Available tables:', config.missing.join(', '));
+  const missing: string[] = [];
+  if (!config.url) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
+  if (!config.anonKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+
+  if (missing.length > 0) {
+    console.warn('Supabase browser client not configured. Missing:', missing.join(', '));
     return null;
   }
 
@@ -75,12 +74,20 @@ export function createSupabaseBrowserClient(): SupabaseClient | null {
  * Singleton server client instance
  */
 let serverClientInstance: SupabaseClient | null = null;
+let browserClientInstance: SupabaseClient | null = null;
 
 export function getSupabaseServerClient(): SupabaseClient | null {
   if (!serverClientInstance) {
     serverClientInstance = createSupabaseServerClient();
   }
   return serverClientInstance;
+}
+
+export function getSupabaseBrowserClient(): SupabaseClient | null {
+  if (!browserClientInstance) {
+    browserClientInstance = createSupabaseBrowserClient();
+  }
+  return browserClientInstance;
 }
 
 /**
