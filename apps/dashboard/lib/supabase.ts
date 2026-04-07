@@ -96,13 +96,16 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
 
 /**
  * Query projects table
+ * Excludes large JSONB/text columns (stack_info, expectations_content) for list views.
  */
 export async function getProjects(client: SupabaseClient | null) {
   if (!client) return null;
 
   const { data, error } = await client
     .from('projects')
-    .select('*');
+    .select(
+      'id, name, repository_url, branch, last_audit_at, created_at, updated_at, github_repo_url, github_app_installation_id, default_llm_tier'
+    );
 
   if (error) {
     console.error('Error fetching projects:', error);
@@ -114,13 +117,16 @@ export async function getProjects(client: SupabaseClient | null) {
 
 /**
  * Query audit_runs for a project
+ * Excludes trigger_payload (large JSONB) for list views.
  */
 export async function getAuditRuns(client: SupabaseClient | null, projectId: string) {
   if (!client) return null;
 
   const { data, error } = await client
     .from('audit_runs')
-    .select('*')
+    .select(
+      'id, project_id, kind, status, trigger_type, summary_stats, started_at, completed_at, total_cost_usd, created_at'
+    )
     .eq('project_id', projectId)
     .order('created_at', { ascending: false });
 
@@ -134,15 +140,27 @@ export async function getAuditRuns(client: SupabaseClient | null, projectId: str
 
 /**
  * Query findings for a project
+ * Excludes large JSONB columns (proof_hooks, suggested_fix, history, metadata) for list views.
+ * Supports optional pagination via limit/offset (default limit: 100).
  */
-export async function getFindings(client: SupabaseClient | null, projectId: string) {
+export async function getFindings(
+  client: SupabaseClient | null,
+  projectId: string,
+  options?: { limit?: number; offset?: number }
+) {
   if (!client) return null;
+
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
 
   const { data, error } = await client
     .from('findings')
-    .select('*')
+    .select(
+      'id, project_id, run_id, agent_name, severity, priority, type, status, confidence, title, description, file_path, line_range, created_at, updated_at'
+    )
     .eq('project_id', projectId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     console.error('Error fetching findings:', error);
@@ -154,20 +172,29 @@ export async function getFindings(client: SupabaseClient | null, projectId: stri
 
 /**
  * Query findings by status
+ * Excludes large JSONB columns (proof_hooks, suggested_fix, history, metadata) for list views.
+ * Supports optional pagination via limit/offset (default limit: 100).
  */
 export async function getFindingsByStatus(
   client: SupabaseClient | null,
   projectId: string,
-  status: string
+  status: string,
+  options?: { limit?: number; offset?: number }
 ) {
   if (!client) return null;
 
+  const limit = options?.limit ?? 100;
+  const offset = options?.offset ?? 0;
+
   const { data, error } = await client
     .from('findings')
-    .select('*')
+    .select(
+      'id, project_id, run_id, agent_name, severity, priority, type, status, confidence, title, description, file_path, line_range, created_at, updated_at'
+    )
     .eq('project_id', projectId)
     .eq('status', status)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
 
   if (error) {
     console.error('Error fetching findings by status:', error);
@@ -242,7 +269,9 @@ export async function getModelUsage(client: SupabaseClient | null, runId: string
 
   const { data, error } = await client
     .from('model_usage')
-    .select('*')
+    .select(
+      'id, run_id, agent_name, model_name, input_tokens, output_tokens, cost_usd, latency_ms, timestamp'
+    )
     .eq('run_id', runId);
 
   if (error) {
@@ -264,7 +293,9 @@ export async function getAuditSuiteConfigs(
 
   const { data, error } = await client
     .from('audit_suite_configs')
-    .select('*')
+    .select(
+      'id, project_id, suite_id, enabled, llm_tier, agent_overrides, created_at, updated_at'
+    )
     .eq('project_id', projectId);
 
   if (error) {
@@ -307,13 +338,16 @@ export async function updateAuditSuiteConfig(
 
 /**
  * Query webhooks for a project
+ * Excludes secret_token to avoid leaking HMAC secrets to callers.
  */
 export async function getWebhooks(client: SupabaseClient | null, projectId: string) {
   if (!client) return null;
 
   const { data, error } = await client
     .from('webhooks')
-    .select('*')
+    .select(
+      'id, project_id, github_repo_url, events, active, created_at, updated_at'
+    )
     .eq('project_id', projectId);
 
   if (error) {
@@ -332,7 +366,9 @@ export async function getSchedules(client: SupabaseClient | null, projectId: str
 
   const { data, error } = await client
     .from('schedules')
-    .select('*')
+    .select(
+      'id, project_id, cron_expression, audit_kind, llm_tier, enabled, last_run_at, next_run_at, created_at, updated_at'
+    )
     .eq('project_id', projectId);
 
   if (error) {
