@@ -11,7 +11,7 @@ import { FindingRow } from "./FindingRow";
 import { FindingDetail } from "./FindingDetail";
 import { LinearSync } from "./LinearSync";
 import { ProjectAuditHistory } from "./ProjectAuditHistory";
-import { LaneAuditPanel } from "./LaneAuditPanel";
+import { LanePanel } from "./LanePanel";
 import { OnboardingReviewPanel } from "./OnboardingReviewPanel";
 import { MaintenancePanel } from "./MaintenancePanel";
 import { BulkActionsPanel } from "./BulkActionsPanel";
@@ -45,6 +45,7 @@ interface ProjectViewProps {
   refetchProject:    () => Promise<RefetchProjectResult>;
   onQueueRepair?:    (findingId: string, projectName: string) => Promise<void>;
   queuedFindingIds?: Set<string>;
+  initialFindingId?: string;
 }
 
 const tabButtonStyle = (active: boolean): CSSProperties => ({
@@ -66,6 +67,7 @@ export function ProjectView({
   refetchProject,
   onQueueRepair,
   queuedFindingIds,
+  initialFindingId,
 }: ProjectViewProps) {
   const showOnboarding =
     (project.status ?? "active") === "draft" ||
@@ -116,6 +118,22 @@ export function ProjectView({
   useEffect(() => {
     setFindings(project.findings ?? []);
   }, [project.name, project.findings]);
+
+  // Auto-select a finding when navigated here via deep-link (e.g. NextActionCard "Open").
+  // Only runs once when findings first load; user can close the drawer normally after.
+  const didAutoSelect = useRef(false);
+  useEffect(() => {
+    if (!initialFindingId || didAutoSelect.current || findings.length === 0) return;
+    const target = findings.find((f) => f.finding_id === initialFindingId);
+    if (target) {
+      didAutoSelect.current = true;
+      setSelected(target);
+      // Switch to findings tab in case it isn't already active
+      setTab("findings");
+      // Switch filter to "all" if the finding wouldn't be visible under the current filter
+      setFilter("all");
+    }
+  }, [initialFindingId, findings]);
 
   // Fetch repair costs for this project
   const { costs: repairCosts, totalCost } = useRepairCosts(project.name, {
@@ -312,7 +330,7 @@ export function ProjectView({
 
       {tab === "operations" && (
         <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          <LaneAuditPanel projectName={project.name} repositoryUrl={project.repositoryUrl} />
+          <LanePanel projectName={project.name} repositoryUrl={project.repositoryUrl} />
 
           {/* ── Project management ──────────────────────────────── */}
           <details
@@ -865,12 +883,27 @@ export function ProjectView({
                     }
                     title={
                       total === 0
-                        ? "No findings. Run an audit to discover issues."
+                        ? "No findings. Run Lane to discover issues."
                         : filter === "active" && resolved === total
                         ? "All findings resolved. Ready to deploy."
                         : filter === "active"
                         ? "No active findings"
                         : "No findings match this filter"
+                    }
+                    action={
+                      total === 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setTab("operations")}
+                          style={{
+                            fontSize:   "11px",
+                            fontFamily: "var(--font-mono)",
+                            padding:    "5px 14px",
+                          }}
+                        >
+                          Go to project workflow →
+                        </button>
+                      ) : undefined
                     }
                   />
                 )}

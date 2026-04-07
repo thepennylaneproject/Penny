@@ -37,7 +37,9 @@ export function getUndoLabel(action: UndoableAction, data: UndoState["data"]): s
     case "remove_project":
       return `Removed project "${data.projectName}"`;
     case "change_finding_status":
-      return `Changed finding status to "${data.newStatus}"`;
+      return data.previousStatus
+        ? `Marked as "${data.newStatus}" — tap Undo to restore "${data.previousStatus}"`
+        : `Marked as "${data.newStatus}"`;
     case "delete_finding":
       return `Deleted finding`;
     default:

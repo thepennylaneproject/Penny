@@ -1,0 +1,264 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "data",
+  "run_id": "data-20260407-052750",
+  "agent": {
+    "name": "schema-auditor",
+    "role": "Maps Postgres schema, RLS, and app types to surface integrity gaps and drift for the Penny monorepo.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "supabase/migrations/20260402163739_lyra_schema.sql",
+      "supabase/migrations/20260402163740_rls_policies.sql",
+      "supabase/migrations/20260402164018_v3_additions.sql",
+      "supabase/migrations/20260402231116_repair_service.sql",
+      "supabase/migrations/20260403102352_penny_projects.sql",
+      "supabase/migrations/20260403104948_penny_repair_tables.sql",
+      "supabase/migrations/20260403105735_penny_manifests_linear.sql",
+      "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
+      "supabase/migrations/20260405163000_phase1_database_backbone_hardening.sql",
+      "apps/dashboard/lib/types.ts",
+      "apps/dashboard/lib/orchestration-jobs.ts",
+      "apps/dashboard/lib/store-supabase.ts",
+      "apps/dashboard/lib/supabase.ts",
+      "apps/worker/src/db.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": 15,
+    "files_skipped": [
+      "packages/** (no database packages found)",
+      "services/** (Python repair API not deep-scanned for SQL)",
+      "types/database.ts (not present — no generated Supabase types)"
+    ],
+    "coverage_complete": false,
+    "incomplete_reason": "Skipped full scan of services/** SQL usage and all API routes; focused on supabase/migrations and primary DB touchpoints under apps/dashboard and apps/worker."
+  },
+  "findings": [
+    {
+      "id": "f-9ef3f9e1",
+      "category": "rls",
+      "severity": "major",
+      "priority": "P1",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "title": "Dashboard penny_* tables have no RLS in migrations",
+      "description": "Migrations create penny_projects, penny_audit_jobs, penny_audit_runs, penny_repair_jobs, penny_maintenance_*, penny_project_manifests, penny_linear_sync, etc., without ENABLE ROW LEVEL SECURITY or policies. The auth-scoped LYRA tables (projects, findings, …) use owner_id and policies; the dashboard document store does not mirror that model. If these tables are exposed via PostgREST with default grants, tenant isolation relies entirely on application code and connection string secrecy, not database enforcement.",
+      "file_path": "supabase/migrations/20260403102352_penny_projects.sql",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "penny_projects DDL has no RLS",
+          "value": "CREATE TABLE IF NOT EXISTS penny_projects ( ... ) — no subsequent ALTER ENABLE ROW LEVEL SECURITY in repo migrations reviewed.",
+          "file": "supabase/migrations/20260403102352_penny_projects.sql",
+          "start_line": 9
+        },
+        {
+          "hook_type": "data_shape",
+          "summary": "Contrast with LYRA tables",
+          "value": "projects table uses owner_id + policies in 20260402163740_rls_policies.sql; penny_* family has no matching pattern."
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Enable RLS on each penny_* table and define policies tied to auth.uid() (or a project membership table), or REVOKE default API role access and restrict to service_role / server-only roles.",
+        "steps": [
+          "Confirm PostgREST exposure and current GRANTs in the live Supabase project.",
+          "Add migrations: ENABLE ROW LEVEL SECURITY + policies, or REVOKE FROM anon/authenticated as appropriate."
+        ]
+      },
+      "estimated_effort": "medium"
+    },
+    {
+      "id": "f-2c1c5aa4",
+      "category": "schema_drift",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "title": "penny_finding_status enum includes value not present in TS FindingStatus",
+      "description": "PostgreSQL enum penny_finding_status includes 'assigned' (20260402163739_lyra_schema.sql). apps/dashboard/lib/types.ts FindingStatus union does not include 'assigned', so rows or API payloads using that value will not type-check in client code and may break narrowing or switches.",
+      "file_path": "apps/dashboard/lib/types.ts",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "DB enum values",
+          "value": "'open', 'accepted', 'assigned', 'in_progress', ...",
+          "file": "supabase/migrations/20260402163739_lyra_schema.sql",
+          "start_line": 8
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "TS union omits assigned",
+          "value": "FindingStatus = \"open\" | \"accepted\" | \"in_progress\" | ...",
+          "file": "apps/dashboard/lib/types.ts",
+          "start_line": 63
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Add 'assigned' to FindingStatus or migrate DB to drop/rename the enum value to align with the canonical contract in audits/agent expectations.",
+        "steps": [
+          "Regenerate or hand-sync shared types from Supabase schema.",
+          "Run a one-time UPDATE if the value is unused."
+        ]
+      },
+      "estimated_effort": "small"
+    },
+    {
+      "id": "f-9e051198",
+      "category": "rls",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "title": "model_usage has RLS enabled but no policy definitions in migrations",
+      "description": "20260402163740_rls_policies.sql enables ROW LEVEL SECURITY on model_usage but does not add any CREATE POLICY. Rows are therefore denied for roles subject to RLS without a bypass. Server code using SUPABASE_SERVICE_ROLE_KEY bypasses RLS (see apps/dashboard/lib/supabase.ts), so ingestion may work, but authenticated or anon clients cannot read model_usage without additional policies—by design or oversight.",
+      "file_path": "supabase/migrations/20260402163740_rls_policies.sql",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "RLS on without policy",
+          "value": "ALTER TABLE model_usage ENABLE ROW LEVEL SECURITY; — file ends without model_usage policies.",
+          "file": "supabase/migrations/20260402163740_rls_policies.sql",
+          "start_line": 13
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Helper expects service client",
+          "value": "getModelUsage(client) uses .from('model_usage')",
+          "file": "apps/dashboard/lib/supabase.ts",
+          "start_line": 240
+        }
+      ],
+      "suggested_fix": {
+        "approach": "If user-scoped dashboards need cost data under JWT, add SELECT policies joining audit_runs → projects. If only service_role reads this table, document and optionally REVOKE direct API access.",
+        "steps": [
+          "Decide access model for model_usage.",
+          "Add policies or document service-only access."
+        ]
+      },
+      "estimated_effort": "small"
+    },
+    {
+      "id": "f-6af2fc10",
+      "category": "migration_hygiene",
+      "severity": "nit",
+      "priority": "P3",
+      "type": "debt",
+      "status": "open",
+      "confidence": "inference",
+      "title": "repair_service migration DROP POLICY names may not match earlier migration",
+      "description": "20260402231116_repair_service.sql drops policies named users_can_view_repair_jobs, etc. The earlier 20260402163740_rls_policies.sql creates policies named \"Users can access repair jobs for their projects\". IF EXISTS avoids errors, but the older FOR ALL policy may remain alongside newer SELECT/INSERT policies, producing redundant or confusing policy sets until manually reconciled.",
+      "file_path": "supabase/migrations/20260402231116_repair_service.sql",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "DROP uses different names than CREATE in 002",
+          "value": "DROP POLICY IF EXISTS \"users_can_view_repair_jobs\" vs CREATE POLICY \"Users can access repair jobs for their projects\"",
+          "file": "supabase/migrations/20260402231116_repair_service.sql",
+          "start_line": 155
+        }
+      ],
+      "suggested_fix": {
+        "approach": "In a follow-up migration, list policies on repair_jobs in production and drop obsolete ones explicitly.",
+        "steps": [
+          "SELECT polname FROM pg_policy JOIN pg_class ... WHERE relname = 'repair_jobs';",
+          "DROP redundant policies; document intended final set."
+        ]
+      },
+      "estimated_effort": "trivial"
+    },
+    {
+      "id": "f-58c68aa7",
+      "category": "security",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "question",
+      "status": "open",
+      "confidence": "evidence",
+      "title": "Broad GRANT on repair_jobs to anon and authenticated",
+      "description": "Migration grants SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated. RLS still applies, but widening table privileges increases blast radius if policies are misconfigured or bypassed. Confirm this matches intended Supabase API surface.",
+      "file_path": "supabase/migrations/20260402231116_repair_service.sql",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "GRANT lines",
+          "value": "GRANT SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated;",
+          "file": "supabase/migrations/20260402231116_repair_service.sql",
+          "start_line": 253
+        }
+      ],
+      "suggested_fix": {
+        "approach": "If only Edge Functions and server should mutate repair_jobs, prefer narrower GRANTs plus strict RLS tests.",
+        "steps": [
+          "Review product requirement for client-side repair job creation.",
+          "Add automated policy tests or integration tests for anon/authenticated."
+        ]
+      },
+      "estimated_effort": "small"
+    },
+    {
+      "id": "f-7dc35572",
+      "category": "referential_integrity",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "title": "FKs removed from penny_audit_* and related tables for async sync",
+      "description": "20260403110028_fix_audit_table_schemas.sql drops foreign keys from penny_audit_jobs, penny_audit_runs, penny_orchestration_events, and penny_project_snapshots to penny_projects so jobs can exist before the project row. This trades referential integrity for pipeline flexibility; orphan rows and typos in project_name are possible.",
+      "file_path": "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "DROP CONSTRAINT",
+          "value": "DROP CONSTRAINT IF EXISTS penny_audit_jobs_project_name_fkey",
+          "file": "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
+          "start_line": 20
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Periodic cleanup job or CHECK using validated project_name from application layer; optional deferred FK via materialized project registry.",
+        "steps": []
+      },
+      "estimated_effort": "medium"
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 0, "major": 1, "minor": 4, "nit": 1 },
+    "by_category": {
+      "rls": 2,
+      "schema_drift": 1,
+      "migration_hygiene": 1,
+      "security": 1,
+      "referential_integrity": 1
+    },
+    "by_type": { "bug": 0, "enhancement": 0, "debt": 5, "question": 1 },
+    "by_status": { "open": 6 }
+  },
+  "next_actions": [
+    {
+      "priority": "P1",
+      "action": "Verify PostgREST exposure and GRANTs for penny_* tables in the live Supabase project; add RLS or revoke API access as needed.",
+      "finding_ids": ["f-9ef3f9e1"]
+    },
+    {
+      "priority": "P2",
+      "action": "Align FindingStatus TypeScript with penny_finding_status (add 'assigned' or migrate enum).",
+      "finding_ids": ["f-2c1c5aa4"]
+    },
+    {
+      "priority": "P2",
+      "action": "Decide model_usage access model and add policies or document service-only reads.",
+      "finding_ids": ["f-9e051198"]
+    },
+    {
+      "priority": "P3",
+      "action": "Reconcile repair_jobs policies in DB after comparing pg_policy to migration intent.",
+      "finding_ids": ["f-6af2fc10"]
+    }
+  ]
+}

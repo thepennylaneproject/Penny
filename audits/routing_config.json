@@ -1,0 +1,5 @@
+{
+  "_doc": "LLM routing configuration for constraint audits. The worker reads this file with priority: file > env var > code default.",
+  "_comment": "Set strategy to 'precision' to use Claude Sonnet (high quality, ~$0.30/task), 'balanced' for GPT-4o mini (~$0.15/task), or 'aggressive' for HuggingFace Llama (~$0.02/task)",
+  "strategy": "balanced"
+}

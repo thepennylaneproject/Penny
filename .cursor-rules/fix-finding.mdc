@@ -1,0 +1,41 @@
+---
+description: Fix a LYRA audit finding. Trigger with "fix finding", "fix f-xxx", or when referencing a finding ID.
+globs:
+  - audits/findings/**
+  - audits/open_findings.json
+---
+
+# LYRA Fix Mode
+
+When fixing an audit finding:
+
+## 1. Load Context
+
+Before writing any code:
+- Read the finding case file: `audits/findings/<finding_id>.md`
+- Check `audits/open_findings.json` for the full finding record
+- Read the `suggested_fix.approach` and `affected_files`
+- Check `related_ids` for connected findings that might be addressed together
+- Review the history timeline for prior attempts or hypotheses
+
+## 2. Fix Rules
+
+- **Minimal diff.** Change only what is necessary.
+- **No adjacent refactors.** If you spot something else to fix nearby, note it but do not fix it in this change.
+- **Boring code.** If a fix requires a comment to explain why it works, it is too clever.
+- **Tests.** Check `suggested_fix.tests_needed` and write at least one test that would have caught the bug.
+
+## 3. After Fixing
+
+Tell the user to run:
+```bash
+python3 audits/session.py done <finding_id> <commit_sha>
+```
+
+This updates the finding status to `fixed_pending_verify` and shows which audit agent to re-run for verification.
+
+## 4. Do NOT
+
+- Do not change the finding's status directly in JSON (session.py handles this)
+- Do not fix multiple unrelated findings in one commit
+- Do not refactor surrounding code as part of a bug fix

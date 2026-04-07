@@ -515,7 +515,7 @@ function normalizePriority(s: string): string {
   return "P2";
 }
 
-// ─── Lane audit adapter ───────────────────────────────────────────────────────
+// ─── Lane adapter ─────────────────────────────────────────────────────────────
 
 import { laneAudit, type LaneAuditFinding } from "./lane-client.js";
 import { isLaneDegradedAuditFinding } from "./lane-degraded-audit.js";

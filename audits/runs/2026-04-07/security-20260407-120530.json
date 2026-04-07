@@ -1,0 +1,183 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "security",
+  "run_id": "security-20260407-120530",
+  "run_metadata": {
+    "timestamp": "2026-04-07T12:05:30.000Z",
+    "branch": "main",
+    "commit": "6b84450",
+    "environment": "local",
+    "tool_platform": "cursor",
+    "model": "agent-security-audit",
+    "notes": "Threat model: Penny’s dashboard API is gated by a shared secret, Supabase JWT, or HMAC session cookie (apps/dashboard/proxy.ts). The Python repair API requires REPAIR_SERVICE_SECRET. Primary residual risks are (1) forged inbound webhooks if verification is incomplete, (2) shared-secret tenancy (any authenticated caller can act on any project name), and (3) XSS stealing secrets stored in browser storage. Analysis stopped early after confirming a webhook auth bypass (LYRA stop condition)."
+  },
+  "agent": {
+    "name": "security-and-privacy-auditor",
+    "role": "Identify practical security and privacy risks with evidence-backed findings and remediation.",
+    "inputs_used": [
+      "apps/dashboard/proxy.ts",
+      "apps/dashboard/lib/dashboard-secret.ts",
+      "apps/dashboard/lib/auth-session.ts",
+      "apps/dashboard/app/api/auth/login/route.ts",
+      "apps/dashboard/lib/api-fetch.ts",
+      "apps/dashboard/app/api/import/route.ts",
+      "apps/dashboard/app/api/projects/[name]/route.ts",
+      "services/repair/api/auth.py",
+      "supabase/functions/github-webhook/index.ts",
+      ".env.example",
+      "audits/open_findings.json"
+    ],
+    "stop_conditions_hit": [
+      "critical_auth_bypass: GitHub webhook HMAC not verified (LYRA: stop further analysis)"
+    ]
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/proxy.ts",
+      "apps/dashboard/lib/dashboard-secret.ts",
+      "apps/dashboard/lib/auth-session.ts",
+      "apps/dashboard/app/api/auth/login/route.ts",
+      "apps/dashboard/lib/api-fetch.ts",
+      "apps/dashboard/app/api/import/route.ts",
+      "apps/dashboard/app/api/projects/[name]/route.ts",
+      "services/repair/api/auth.py",
+      "supabase/functions/github-webhook/index.ts",
+      ".env.example"
+    ],
+    "files_skipped": [
+      "apps/worker/** — spot-checked grep only; no full pass after webhook blocker",
+      "Full Supabase RLS policies — not reviewed in this run"
+    ],
+    "coverage_complete": false,
+    "incomplete_reason": "Stopped after P0 webhook verification gap per agent-security.md stop condition; did not exhaust all API routes or worker paths."
+  },
+  "findings": [
+    {
+      "finding_id": "f-a3622a1a",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "blocker",
+      "priority": "P0",
+      "confidence": "evidence",
+      "title": "GitHub webhook accepts any signature header without HMAC verification",
+      "description": "The Supabase Edge function for GitHub webhooks rejects requests in production only when the x-hub-signature-256 header is missing. It never computes HMAC-SHA256 over the raw body with GITHUB_WEBHOOK_SECRET or compares it to the header. An attacker who discovers the deployed function URL can send POST requests with a dummy x-hub-signature-256 value and trigger audit_runs inserts using the service role client, causing unauthorized queue load and potential cost/DoS.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Production only requires presence of signature header; no HMAC verify implementation before processing body.",
+          "file": "supabase/functions/github-webhook/index.ts",
+          "symbol": "serve",
+          "start_line": 12,
+          "end_line": 18
+        },
+        {
+          "hook_type": "repro_steps",
+          "summary": "Illustrative attack shape against a deployed endpoint (verify legally on your own stack only).",
+          "steps": [
+            "Obtain the public URL of the github-webhook function.",
+            "POST JSON mimicking a push event with header x-hub-signature-256: sha256=fake.",
+            "Observe that the request is not rejected for bad MAC (only missing header fails in production)."
+          ]
+        }
+      ],
+      "repro_steps": [
+        "Deploy or run the function with NODE_ENV=production.",
+        "POST valid JSON with x-github-event: push and x-hub-signature-256: sha256=00 (non-empty).",
+        "Confirm handler proceeds past the signature check without cryptographic verification."
+      ],
+      "impact": "Unauthorized job enqueue into audit_runs, compute spend, and database writes as the Supabase service role. Same shared secret cannot mitigate inbound spoofing because verification is absent.",
+      "suggested_fix": {
+        "approach": "Verify GitHub's HMAC-SHA256: read raw body, compute HMAC with GITHUB_WEBHOOK_SECRET, timing-safe compare to x-hub-signature-256 (strip sha256= prefix). Reject on mismatch. Use raw body before JSON parse.",
+        "affected_files": ["supabase/functions/github-webhook/index.ts"],
+        "estimated_effort": "small",
+        "risk_notes": "Ensure the handler uses the raw request body for HMAC; parsing JSON first can break signature verification.",
+        "tests_needed": [
+          "Unit test: valid signature passes; wrong secret fails; tampered body fails.",
+          "Integration: GitHub delivery with real signature in staging."
+        ]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-07T12:05:30.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-8603ee3b",
+      "type": "debt",
+      "category": "client-storage",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Orchestration enqueue secret can be read from sessionStorage by page scripts",
+      "description": "apiFetchWithEnqueueSecret merges a user-supplied enqueue secret from sessionStorage into Authorization headers. Any XSS in the dashboard origin can read sessionStorage and exfiltrate the secret, extending compromise beyond httpOnly cookie session theft.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Session storage value is attached as Bearer token when present.",
+          "file": "apps/dashboard/lib/api-fetch.ts",
+          "symbol": "mergeEnqueueSecretFromStorage",
+          "start_line": 4,
+          "end_line": 16
+        }
+      ],
+      "impact": "A successful XSS can steal the shared enqueue secret and replay API calls until rotation.",
+      "suggested_fix": {
+        "approach": "Prefer httpOnly cookie-only auth for orchestration; if a second factor is required, use short-lived CSRF-protected forms or subresource isolation. Minimize secret lifetime in sessionStorage.",
+        "affected_files": ["apps/dashboard/lib/api-fetch.ts", "apps/dashboard/components/OrchestrationPanel.tsx"],
+        "estimated_effort": "medium",
+        "risk_notes": "Changing auth UX may affect operators who paste secrets into the UI."
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-07T12:05:30.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created"
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": {
+      "blocker": 1,
+      "major": 0,
+      "minor": 1,
+      "nit": 0
+    },
+    "by_category": {
+      "auth-bypass": 1,
+      "client-storage": 1
+    },
+    "by_type": {
+      "bug": 1,
+      "enhancement": 0,
+      "debt": 1,
+      "question": 0
+    },
+    "by_status": {
+      "open": 2
+    }
+  },
+  "next_actions": [
+    {
+      "action": "Implement HMAC-SHA256 verification for GitHub webhooks using raw body and GITHUB_WEBHOOK_SECRET; deploy and regression-test.",
+      "finding_id": "f-a3622a1a",
+      "rationale": "P0 blocker: prevents forged webhook traffic and abuse of service-role inserts."
+    },
+    {
+      "action": "After webhook fix, run a focused pass on remaining apps/dashboard/app/api/** routes for IDOR patterns if multi-tenant hosting is planned.",
+      "finding_id": "f-a3622a1a",
+      "rationale": "Shared-secret model does not separate projects by principal; confirm product intent."
+    },
+    {
+      "action": "Evaluate reducing reliance on sessionStorage for enqueue secrets or scope to memory with explicit user re-entry per session.",
+      "finding_id": "f-8603ee3b",
+      "rationale": "Reduces XSS blast radius for orchestration credentials."
+    }
+  ]
+}

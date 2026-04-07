@@ -5,23 +5,27 @@ import { useRuntimeConfig } from "@/components/RuntimeConfigProvider";
 import { runLaneAudit, type LaneAuditResponse } from "@/lib/lane";
 import { isDegradedAuditPlaceholderFinding } from "@/lib/degraded-audit-finding";
 
-interface LaneAuditPanelProps {
+interface LanePanelProps {
   projectName: string;
   repositoryUrl?: string;
 }
 
-export function LaneAuditPanel({
+export function LanePanel({
   projectName,
   repositoryUrl,
-}: LaneAuditPanelProps) {
+}: LanePanelProps) {
   const { laneBaseUrl, laneServerConfigured } = useRuntimeConfig();
   const [audit, setAudit] = useState<LaneAuditResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const actionableFindings = audit?.findings.filter(
+    (finding) => !isDegradedAuditPlaceholderFinding(finding)
+  ) ?? [];
+  const degradedFindingCount = audit ? audit.findings.length - actionableFindings.length : 0;
 
   const runAudit = async () => {
     if (!repositoryUrl) {
-      setError("Add a project repository URL before running a Lane audit.");
+      setError("Add a project repository URL before running Lane.");
       return;
     }
 
@@ -37,7 +41,7 @@ export function LaneAuditPanel({
       });
       setAudit(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lane audit failed.");
+      setError(err instanceof Error ? err.message : "Lane request failed.");
     } finally {
       setLoading(false);
     }
@@ -64,7 +68,7 @@ export function LaneAuditPanel({
               marginBottom: "0.25rem",
             }}
           >
-            Lane audit
+            Lane
           </div>
           <div style={{ fontSize: "12px", color: "var(--ink-text-3)", lineHeight: 1.5 }}>
             Run Lane directly from Penny and keep the findings in Penny's operator UI.
@@ -84,7 +88,7 @@ export function LaneAuditPanel({
           disabled={loading || !laneBaseUrl}
           style={{ fontSize: "11px", fontFamily: "var(--font-mono)", padding: "0.45rem 0.75rem" }}
         >
-          {loading ? "Running…" : "Run Lane audit"}
+          {loading ? "Running…" : "Run Lane"}
         </button>
       </div>
 
@@ -101,52 +105,48 @@ export function LaneAuditPanel({
             {" "}
             <span style={{ fontFamily: "var(--font-mono)" }}>{audit.run_id}</span>
           </div>
-          {audit.findings.length === 0 ? (
-            <div style={{ fontSize: "11px", color: "var(--ink-text-4)" }}>
-              Lane completed without returning findings.
+          {actionableFindings.length === 0 ? (
+            <div style={{ fontSize: "11px", color: degradedFindingCount > 0 ? "var(--ink-amber)" : "var(--ink-text-4)" }}>
+              {degradedFindingCount > 0
+                ? "Lane returned only a runtime placeholder. Retry when Lane capacity is healthy."
+                : "Lane completed without returning findings."}
             </div>
           ) : (
-            audit.findings.map((finding) => {
-              const degraded = isDegradedAuditPlaceholderFinding(finding);
-              return (
-                <div
-                  key={finding.id}
-                  style={{
-                    border: degraded
-                      ? "0.5px solid var(--ink-amber-border)"
-                      : "0.5px solid var(--ink-border-faint)",
-                    borderRadius: "var(--radius-md)",
-                    padding: "0.65rem 0.75rem",
-                    background: degraded ? "var(--ink-amber-bg)" : "var(--ink-bg-raised)",
-                  }}
-                >
-                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
-                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                      {finding.id}
-                    </span>
-                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: degraded ? "var(--ink-amber)" : "var(--ink-text-4)" }}>
-                      {degraded ? "audit degraded" : finding.severity}
-                    </span>
-                    <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                      {degraded ? "operator review" : finding.type}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: "12px", color: "var(--ink-text-2)", marginBottom: degraded ? "0.45rem" : "0.35rem" }}>
-                    {finding.message}
-                  </div>
-                  {degraded ? (
-                    <div style={{ fontSize: "10px", lineHeight: 1.5, color: "var(--ink-text-3)" }}>
-                      Treat this as a Lane runtime limitation, not a confirmed code defect. Run a scoped review or retry the audit when Lane capacity is healthy.
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
-                      {finding.file}
-                    </div>
-                  )}
+            actionableFindings.map((finding) => (
+              <div
+                key={finding.id}
+                style={{
+                  border: "0.5px solid var(--ink-border-faint)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "0.65rem 0.75rem",
+                  background: "var(--ink-bg-raised)",
+                }}
+              >
+                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "0.35rem" }}>
+                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                    {finding.id}
+                  </span>
+                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                    {finding.severity}
+                  </span>
+                  <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                    {finding.type}
+                  </span>
                 </div>
-              );
-            })
+                <div style={{ fontSize: "12px", color: "var(--ink-text-2)", marginBottom: "0.35rem" }}>
+                  {finding.message}
+                </div>
+                <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)" }}>
+                  {finding.file}
+                </div>
+              </div>
+            ))
           )}
+          {degradedFindingCount > 0 && actionableFindings.length > 0 ? (
+            <div style={{ fontSize: "10px", color: "var(--ink-amber)" }}>
+              Lane dropped {degradedFindingCount} runtime placeholder finding{degradedFindingCount === 1 ? "" : "s"}.
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

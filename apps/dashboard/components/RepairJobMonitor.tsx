@@ -46,8 +46,11 @@ const ACTION_LABELS: Record<string, string> = {
   do_not_repair:      "Blocked",
 };
 
+const STALE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
 export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
   const [elapsed, setElapsed] = useState<string>("");
+  const [elapsedMs, setElapsedMs] = useState<number>(0);
 
   useEffect(() => {
     const updateElapsed = () => {
@@ -58,6 +61,7 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
         ? new Date(job.completed_at).getTime()
         : Date.now();
       const ms = end - start;
+      setElapsedMs(ms);
       const seconds = Math.floor(ms / 1000);
       const minutes = Math.floor(seconds / 60);
       const hours = Math.floor(minutes / 60);
@@ -70,6 +74,11 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
     const interval = setInterval(updateElapsed, 1000);
     return () => clearInterval(interval);
   }, [job]);
+
+  const isStale =
+    (job.status === "queued" || job.status === "in_progress") &&
+    !job.completed_at &&
+    elapsedMs > STALE_THRESHOLD_MS;
 
   const confidencePercent = job.confidence_score ?? 0;
   const statusStyle = STATUS_BADGE[job.status] ?? STATUS_BADGE.blocked;
@@ -247,6 +256,44 @@ export function RepairJobMonitor({ job, onRefresh }: RepairJobMonitorProps) {
           <p style={{ fontSize: "11px", color: "var(--ink-red)", margin: 0 }}>
             {job.error_message}
           </p>
+        </div>
+      )}
+
+      {/* Staleness warning */}
+      {isStale && (
+        <div
+          style={{
+            background:   "var(--ink-bg-sunken)",
+            border:       "0.5px solid var(--ink-amber)",
+            borderRadius: "var(--radius-sm)",
+            padding:      "0.5rem 0.75rem",
+            fontSize:     "11px",
+            fontFamily:   "var(--font-mono)",
+            color:        "var(--ink-amber)",
+            lineHeight:   1.45,
+          }}
+        >
+          Job appears stalled — no progress in {elapsed}.
+          {onRefresh && (
+            <> <button
+              type="button"
+              onClick={onRefresh}
+              style={{
+                marginLeft:     "0.35rem",
+                fontSize:       "11px",
+                fontFamily:     "var(--font-mono)",
+                textDecoration: "underline",
+                background:     "none",
+                border:         "none",
+                color:          "inherit",
+                cursor:         "pointer",
+                padding:        0,
+              }}
+            >
+              Refresh
+            </button></>
+          )}
+          {" "}The worker may be offline or overloaded.
         </div>
       )}
 

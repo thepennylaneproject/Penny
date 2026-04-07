@@ -55,11 +55,15 @@ function isBetterBacklog(
 }
 
 /**
- * Prefer a maintenance backlog item (same cross-project tie-break as legacy dashboard).
- * If none, use the top active finding portfolio-wide (P0 before P1, then severity).
+ * Resolve the top-priority next action across the portfolio.
+ *
+ * Considers both maintenance backlog items and active findings, returning
+ * whichever has the higher priority/severity — so a P3 backlog item never
+ * beats a P0 finding.
  */
 export function resolveNextAction(projects: Project[]): ResolvedNextAction | null {
-  let best: ResolvedNextAction | null = null;
+  // --- best backlog candidate ---
+  let bestBacklog: ResolvedNextAction | null = null;
 
   for (const p of projects) {
     const backlog = sortMaintenanceBacklog(
@@ -73,10 +77,10 @@ export function resolveNextAction(projects: Project[]): ResolvedNextAction | nul
     if (!fid) continue;
 
     if (
-      !best ||
-      isBetterBacklog(first.priority, first.severity, best.priority, best.severity)
+      !bestBacklog ||
+      isBetterBacklog(first.priority, first.severity, bestBacklog.priority, bestBacklog.severity)
     ) {
-      best = {
+      bestBacklog = {
         source: "backlog",
         projectName: p.name,
         title: first.title ?? "",
@@ -90,8 +94,7 @@ export function resolveNextAction(projects: Project[]): ResolvedNextAction | nul
     }
   }
 
-  if (best) return best;
-
+  // --- best finding candidate ---
   const candidates: { project: Project; finding: Finding }[] = [];
   for (const p of projects) {
     for (const f of p.findings ?? []) {
@@ -100,19 +103,29 @@ export function resolveNextAction(projects: Project[]): ResolvedNextAction | nul
       }
     }
   }
-  if (candidates.length === 0) return null;
 
-  const sorted = sortFindings(candidates.map((c) => c.finding));
-  const top = sorted[0];
-  const owner = candidates.find((c) => c.finding.finding_id === top.finding_id);
-  if (!owner) return null;
+  let bestFinding: ResolvedNextAction | null = null;
+  if (candidates.length > 0) {
+    const sorted = sortFindings(candidates.map((c) => c.finding));
+    const top = sorted[0];
+    const owner = candidates.find((c) => c.finding.finding_id === top.finding_id);
+    if (owner) {
+      bestFinding = {
+        source: "finding",
+        projectName: owner.project.name,
+        title: top.title ?? "",
+        findingId: top.finding_id,
+        severity: top.severity ?? "nit",
+        priority: top.priority ?? "P3",
+      };
+    }
+  }
 
-  return {
-    source: "finding",
-    projectName: owner.project.name,
-    title: top.title ?? "",
-    findingId: top.finding_id,
-    severity: top.severity ?? "nit",
-    priority: top.priority ?? "P3",
-  };
+  if (!bestBacklog) return bestFinding;
+  if (!bestFinding) return bestBacklog;
+
+  // Return whichever scores higher — backlog wins on a tie (preserves original behaviour).
+  return isBetterBacklog(bestFinding.priority, bestFinding.severity, bestBacklog.priority, bestBacklog.severity)
+    ? bestFinding
+    : bestBacklog;
 }

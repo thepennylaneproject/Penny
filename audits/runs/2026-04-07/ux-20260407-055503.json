@@ -1,0 +1,226 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "ux",
+  "run_id": "ux-20260407-055503",
+  "agent": {
+    "name": "ux-flow-auditor",
+    "role": "Map dashboard routes for loading/error/empty states; audit copy consistency, navigation, accessibility, and error recovery.",
+    "inputs_used": [
+      "audits/prompts/agent-ux.md",
+      "audits/open_findings.json",
+      "audits/findings/TEMPLATE.md",
+      "audits/artifacts/_run_/build.txt",
+      "apps/dashboard/app/layout.tsx",
+      "apps/dashboard/app/page.tsx",
+      "apps/dashboard/app/error.tsx",
+      "apps/dashboard/app/global-error.tsx",
+      "apps/dashboard/app/activity/page.tsx",
+      "apps/dashboard/app/repairs/page.tsx",
+      "apps/dashboard/app/projects/[name]/page.tsx",
+      "apps/dashboard/components/DashboardRouteShell.tsx",
+      "apps/dashboard/components/Shell.tsx",
+      "apps/dashboard/components/ProjectPageClient.tsx",
+      "apps/dashboard/components/JobQueueView.tsx",
+      "apps/dashboard/components/EngineView.tsx",
+      "apps/dashboard/components/sentry-verify-button.tsx",
+      "apps/dashboard/lib/ui-copy.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "routes_mapped": ["/", "/activity", "/repairs", "/projects/[name]"],
+    "files_examined": 17,
+    "notes": "Preflight build/tests/lint were not executed in this session; audits/artifacts/_run_/build.txt contains a placeholder note only. Core dashboard routes and shared shell reviewed.",
+    "coverage_complete": true,
+    "incomplete_reason": null
+  },
+  "findings": [
+    {
+      "finding_id": "f-90f28fa8",
+      "title": "Root global-error UI has no path back to portfolio (unlike app/error.tsx)",
+      "category": "missing-boundary",
+      "severity": "major",
+      "priority": "P1",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "description": "Segment-level error.tsx offers Try again plus a Link to /. global-error.tsx only renders a heading, raw message, and Try again with no link to / or full layout. After a root layout failure, users lack the same recovery affordance as nested route errors.",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/global-error.tsx: return body has h1, p with error.message, button reset only — no Link href=\"/\"."
+        },
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/error.tsx:38-49 — Try again plus Link href=\"/\" labeled Portfolio for comparison."
+        },
+        {
+          "hook_type": "ui_path",
+          "detail": "Global root error surface (any fault that triggers global-error boundary)."
+        }
+      ],
+      "history": [
+        {
+          "event": "created",
+          "at": "2026-04-07T05:55:03.000Z",
+          "note": "Compared global-error vs segment error components."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-122e7405",
+      "title": "Product name casing is inconsistent (Penny vs penny)",
+      "category": "inconsistent-label",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "question",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "small",
+      "description": "README and repo branding use “Penny”; root metadata title and in-app strings use lowercase “penny” (e.g. layout metadata, document.title suffixes, footer). Decide a single public-facing rule (sentence case in prose, lowercase wordmark in UI, etc.) and align metadata, titles, and marketing copy.",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/layout.tsx:26-28 metadata.title \"penny\""
+        },
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/page.tsx:102 document.title \"Portfolio — penny\"; footer \"penny v3.0\""
+        },
+        {
+          "hook_type": "command",
+          "detail": "README.md title \"Penny v3.0\" vs dashboard metadata."
+        }
+      ],
+      "history": [
+        {
+          "event": "created",
+          "at": "2026-04-07T05:55:03.000Z",
+          "note": "No prior open_findings entry; branding question for default voice."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-ea12bf0f",
+      "title": "Portfolio project card overlay buttons rely on title= only (export/remove)",
+      "category": "a11y-gap",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "description": "Export (↓) and remove (×) controls use title attributes for tooltips but omit aria-label. Screen reader users get unclear accessible names compared to visible icon-only affordances elsewhere that use aria-label (e.g. dismiss buttons on the same page).",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/page.tsx:610-630 — buttons with title=\"Export\" and title=\"Remove\" only."
+        }
+      ],
+      "history": [
+        {
+          "event": "created",
+          "at": "2026-04-07T05:55:03.000Z",
+          "note": "Compared with other buttons on page using aria-label."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-23e02a8c",
+      "title": "Nav label “Activity” vs page headline “Job queue”",
+      "category": "copy-mismatch",
+      "severity": "minor",
+      "priority": "P3",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "description": "Sidebar nav shows “Activity” (Shell.tsx NAV_ITEMS) while the page eyebrow also says Activity but the H1 reads “Job queue”. Not wrong, but users may wonder if they are the same section; consider aligning headline with nav or adding a short subline.",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/components/Shell.tsx:89-93 — nav label \"Activity\" for jobs view."
+        },
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/components/JobQueueView.tsx:643-653 — eyebrow \"Activity\", h1 \"Job queue\"."
+        }
+      ],
+      "history": [
+        {
+          "event": "created",
+          "at": "2026-04-07T05:55:03.000Z",
+          "note": "Terminology drift within single view."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-4607195c",
+      "title": "Browser tab title only updated on home and project pages",
+      "category": "inconsistent-label",
+      "severity": "nit",
+      "priority": "P3",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "description": "document.title is set in app/page.tsx and ProjectPageClient for portfolio and project contexts. /activity and /repairs leave the default metadata title (“penny”), so multi-tab users cannot distinguish Activity vs Repairs from the tab alone.",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/app/page.tsx:101-103 — useEffect sets document.title for portfolio only."
+        },
+        {
+          "hook_type": "code_ref",
+          "detail": "apps/dashboard/components/ProjectPageClient.tsx:96-98 — project tab title."
+        },
+        {
+          "hook_type": "ui_path",
+          "detail": "/activity and /repairs — no matching document.title updates found in JobQueueView or EngineView."
+        }
+      ],
+      "history": [
+        {
+          "event": "created",
+          "at": "2026-04-07T05:55:03.000Z",
+          "note": "grep apps/dashboard for document.title shows only two call sites."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 0, "major": 1, "minor": 3, "nit": 1 },
+    "by_category": { "missing-boundary": 1, "inconsistent-label": 2, "a11y-gap": 1, "copy-mismatch": 1 },
+    "by_type": { "bug": 0, "enhancement": 3, "debt": 1, "question": 1 },
+    "by_status": { "open": 5, "accepted": 0, "in_progress": 0, "fixed_pending_verify": 0, "fixed_verified": 0, "wont_fix": 0, "deferred": 0, "duplicate": 0, "converted_to_enhancement": 0 }
+  },
+  "next_actions": [
+    {
+      "action": "Add a home/portfolio link (and optional minimal styling tokens) to global-error.tsx to match app/error.tsx recovery paths.",
+      "finding_id": "f-90f28fa8",
+      "rationale": "Parity with segment error UX; reduces dead-end feeling on root boundary failures."
+    },
+    {
+      "action": "Decide official “Penny” vs “penny” rules; update metadata, document.title patterns, and README references accordingly.",
+      "finding_id": "f-122e7405",
+      "rationale": "Resolves product voice before broad copy work."
+    },
+    {
+      "action": "Add aria-label=\"Export findings\" and aria-label=\"Remove project\" (or similar) to overlay buttons on portfolio cards.",
+      "finding_id": "f-ea12bf0f",
+      "rationale": "Low-effort a11y win for keyboard/AT users."
+    },
+    {
+      "action": "Either rename Job queue H1 to Activity, add explanatory subtitle, or rename nav to match queue terminology.",
+      "finding_id": "f-23e02a8c",
+      "rationale": "Clears navigation ↔ page cognitive match."
+    },
+    {
+      "action": "Set document.title in Activity and Repairs client views (or use per-route layout metadata) for tab disambiguation.",
+      "finding_id": "f-4607195c",
+      "rationale": "Improves multi-tab and bookmark clarity."
+    }
+  ]
+}

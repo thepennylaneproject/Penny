@@ -15,7 +15,7 @@ import { useUndo } from "@/contexts/UndoContext";
 import { getUndoLabel, formatUndoTime } from "@/lib/undo-machine";
 
 export function UndoNotification() {
-  const { undoState, canUndo, remainingTime, undo, isUndoing, undoError } = useUndo();
+  const { undoState, canUndo, remainingTime, undo, clear, isUndoing, undoError } = useUndo();
   const [displayTime, setDisplayTime] = useState(0);
 
   useEffect(() => {
@@ -65,35 +65,54 @@ export function UndoNotification() {
           </div>
         ) : null}
       </div>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleUndo();
-        }}
-        disabled={isUndoing}
-        style={{
-          padding: "0.4rem 0.75rem",
-          borderRadius: "var(--radius-sm)",
-          background: "var(--ink-bg)",
-          color: "var(--ink-text)",
-          border: "none",
-          fontSize: "11px",
-          fontWeight: 600,
-          cursor: isUndoing ? "progress" : "pointer",
-          opacity: isUndoing ? 0.7 : 1,
-          whiteSpace: "nowrap",
-          transition: "opacity 150ms ease-out",
-        }}
-        onMouseEnter={(e) => {
-          (e.target as HTMLButtonElement).style.opacity = "0.8";
-        }}
-        onMouseLeave={(e) => {
-          (e.target as HTMLButtonElement).style.opacity = "1";
-        }}
-      >
-        {isUndoing ? "Undoing..." : "Undo"}
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: "0.4rem", flexShrink: 0 }}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleUndo();
+          }}
+          disabled={isUndoing}
+          style={{
+            padding: "0.4rem 0.75rem",
+            borderRadius: "var(--radius-sm)",
+            background: "var(--ink-bg)",
+            color: "var(--ink-text)",
+            border: "none",
+            fontSize: "11px",
+            fontWeight: 600,
+            cursor: isUndoing ? "progress" : "pointer",
+            opacity: isUndoing ? 0.7 : 1,
+            whiteSpace: "nowrap",
+            transition: "opacity 150ms ease-out",
+          }}
+        >
+          {isUndoing ? "Undoing…" : "Undo"}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            clear();
+          }}
+          disabled={isUndoing}
+          aria-label="Keep change and dismiss"
+          title="Keep change"
+          style={{
+            padding: "0.4rem 0.5rem",
+            borderRadius: "var(--radius-sm)",
+            background: "transparent",
+            color: "var(--ink-bg)",
+            border: "0.5px solid rgba(255,255,255,0.25)",
+            fontSize: "12px",
+            lineHeight: 1,
+            cursor: "pointer",
+            opacity: isUndoing ? 0.4 : 0.7,
+          }}
+        >
+          ×
+        </button>
+      </div>
     </div>
   );
 }

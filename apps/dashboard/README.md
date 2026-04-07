@@ -19,7 +19,7 @@ Orchestration events/snapshots still use `penny_orchestration_events` / `penny_p
 
 `POST /api/orchestration/queue/clear` (same auth) **obliterates** the `penny-audit` BullMQ queue and marks all DB rows still in `queued` as `failed`. The orchestration panel includes a **Clear queue (Redis + DB)** button.
 
-Dashboard UI: paste the same secret once (session storage) to enable Run buttons. That value is also sent as **`Authorization: Bearer`** on **`apiFetch`** calls (e.g. Linear sync, project audit history) so `/api/*` middleware accepts the same gate as orchestration without a separate login cookie.
+Dashboard UI: paste the same secret once (session storage) to enable Run buttons. That value is also sent as **`Authorization: Bearer`** on **`apiFetch`** calls (e.g. Linear sync, project run history) so `/api/*` middleware accepts the same gate as orchestration without a separate login cookie.
 
 `GET /api/orchestration/runs?project=<name>` — recent `penny_audit_runs` and `penny_audit_jobs` for one project (used by the project view **Worker audit history** block).
 
@@ -67,7 +67,7 @@ npm run dev
 | Variable | Description |
 |----------|-------------|
 | `DATABASE_URL` | Postgres (Supabase). Enables `penny_projects` + job tables + durable state. |
-| `NEXT_PUBLIC_LANE_API_BASE_URL` | **Public** Lane API origin for direct browser audit / patch requests from Penny. Server-only/private hosts like `lane.railway.internal` will not work from the browser. |
+| `NEXT_PUBLIC_LANE_API_BASE_URL` | **Public** Lane API origin for direct browser Lane / patch requests from Penny. Server-only/private hosts like `lane.railway.internal` will not work from the browser. |
 | `LANE_API_BASE_URL` | Optional server-only Lane origin for future server-to-server use. It is not exposed to the browser UI. |
 | `ORCHESTRATION_ENQUEUE_SECRET` | Bearer token for enqueue API + Netlify scheduler. |
 | `REDIS_URL` / `penny_REDIS_URL` | Push jobs to BullMQ (worker). |

@@ -31,6 +31,45 @@ function repairStatusCaption(jobs: RepairJob[], queuedInUi: boolean): string {
   return repairLedgerCaption(jobs[0], queuedInUi);
 }
 
+function getLifecycleNextSteps(status: FindingStatus, isQueued: boolean): string[] {
+  if (status === "fixed_verified" || status === "wont_fix" || status === "converted_to_enhancement") {
+    return ["This finding is closed. No further action needed."];
+  }
+  if (status === "duplicate") {
+    return ["Resolved as duplicate. Reopen to accepted if re-evaluation is needed."];
+  }
+  if (status === "deferred") {
+    return ["When ready to resume, change status to Accepted."];
+  }
+  if (status === "fixed_pending_verify") {
+    return [
+      "Verify the fix is working as expected.",
+      "Mark as Fixed & Verified to close the finding.",
+      "Or revert to Accepted if issues are found.",
+    ];
+  }
+  if (status === "in_progress") {
+    return [
+      "Implement the fix per the suggested approach above.",
+      "Mark as Fixed (Pending Verification) when the change is ready.",
+      "Verify and mark Fixed & Verified to close.",
+    ];
+  }
+  if (isQueued) {
+    return [
+      "The model router will generate a patch automatically.",
+      "Once complete, review the repair candidates and select the best patch.",
+      "Verify the fix and update status to Fixed & Verified.",
+    ];
+  }
+  // open / accepted
+  return [
+    "Queue for automatic repair, or implement the fix manually.",
+    "Mark as Fixed (Pending Verification) when the change is ready.",
+    "Verify the fix and mark Fixed & Verified to close.",
+  ];
+}
+
 const WORKFLOW_HINTS: Record<FindingStatus, string> = {
   open: "Finding is new and unresolved. Start work or defer.",
   accepted: "Finding is acknowledged and pending action.",
@@ -102,14 +141,19 @@ export function FindingDetail({
   const stripe   = SEVERITY_BORDER[finding.severity ?? ""] ?? "var(--ink-border)";
 
   // Repair job hooks (if repair_job_id exists on finding)
-  const { job, loading: jobLoading } = useRepairJob(finding.repair_job_id ?? null);
+  const { job, loading: jobLoading, refresh: refreshRepairJob } = useRepairJob(finding.repair_job_id ?? null);
   const { candidates } = useRepairCandidates(finding.repair_job_id ?? null);
   const { events } = useOrchestrationEvents(finding.repair_job_id ?? null);
 
   const { changeFindingStatus } = useFindingStatusChangeUndo({
     onChangeSuccess: () => {
-      // Refresh lifecycle after status change
       void loadLifecycle();
+    },
+    onUndoSuccess: () => {
+      void loadLifecycle();
+      // finding.status here is captured at action-time (the pre-change value),
+      // so calling onAction restores the parent's local state and triggers refetch.
+      onAction(finding.finding_id, finding.status);
     },
   });
 
@@ -413,7 +457,7 @@ export function FindingDetail({
                   lineHeight: 1.5,
                 }}
               >
-                {UI_COPY.lifecycleNextSteps.map((step, idx) => (
+                {getLifecycleNextSteps(finding.status, isQueued).map((step, idx) => (
                   <li key={idx} style={{ marginBottom: "0.25rem" }}>
                     {step}
                   </li>
@@ -528,9 +572,7 @@ export function FindingDetail({
           <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
             <RepairJobMonitor
               job={job}
-              onRefresh={async () => {
-                // Re-fetch by manually refreshing
-              }}
+              onRefresh={refreshRepairJob}
             />
             {candidates.length > 0 && (
               <CandidateComparison
@@ -542,12 +584,6 @@ export function FindingDetail({
               <PRManager
                 pr={job}
                 findingId={finding.finding_id}
-                onApprove={async () => {
-                  // Handle PR approval
-                }}
-                onMerge={async () => {
-                  // Handle PR merge
-                }}
               />
             )}
             {events.length > 0 && <RepairHistory events={events} />}
@@ -561,7 +597,7 @@ export function FindingDetail({
           <SectionLabel>Configure Auto-Repair</SectionLabel>
             <RepairConfigTuner
               findingId={finding.finding_id}
-              onSubmit={handleSubmitRepair}
+              onSubmit={laneBaseUrl ? handleSubmitRepair : undefined}
               isLoading={repairSubmitting}
               submitLabel="Generate Lane patch"
             />

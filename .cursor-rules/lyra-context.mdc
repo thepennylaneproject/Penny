@@ -1,0 +1,39 @@
+---
+description: LYRA audit system context. Loaded when working in the audits directory or discussing audit findings.
+globs:
+  - audits/**
+  - "*.audit.*"
+---
+
+# LYRA Audit System Context
+
+This project uses the LYRA v1.1 multi-agent audit system. Key files:
+
+- `audits/open_findings.json` -- canonical current state of all findings
+- `audits/index.json` -- run history
+- `audits/findings/*.md` -- per-finding case files with history
+- `audits/prompts/*.md` -- agent prompts (paste-and-run)
+- `audits/schema/audit-output.schema.json` -- JSON Schema v1.1.0
+
+## Enum Rules (strict)
+
+When creating or modifying audit findings, use ONLY these values:
+
+- severity: blocker | major | minor | nit
+- priority: P0 | P1 | P2 | P3
+- type: bug | enhancement | debt | question
+- status: open | accepted | in_progress | fixed_pending_verify | fixed_verified | wont_fix | deferred | duplicate | converted_to_enhancement
+- confidence: evidence | inference | speculation
+- estimated_effort: trivial | small | medium | large | epic
+
+## Finding ID Format
+
+`f-` + first 8 hex chars of SHA-256 of `type|category|file_path|symbol|title`.
+Fallback: `f-<category>-<file_slug>-<NNN>` (max 50 characters).
+
+## When the user asks about audits
+
+- Check `audits/open_findings.json` for current state
+- Check `audits/findings/<id>.md` for history on specific findings
+- Reference `audits/prompts/` for available agent prompts
+- Use `python3 audits/session.py` for workflow guidance

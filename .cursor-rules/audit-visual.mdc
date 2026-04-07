@@ -1,0 +1,49 @@
+---
+description: Run LYRA visual audit agents. Trigger with "audit visual", "visual audit", "check design consistency".
+globs:
+  - src/components/**
+  - src/pages/**
+  - src/styles/**
+  - src/index.css
+  - tailwind.config.*
+---
+
+# LYRA Visual Audit Mode
+
+You are running a visual consistency audit. Available agents:
+
+| Agent | Focus | Prompt File |
+|-------|-------|------------|
+| V1: Tokens | Color/spacing/type scales, token governance | `audits/prompts/visual-tokens.md` |
+| V2: Typography | Heading hierarchy, font consistency | `audits/prompts/visual-typography.md` |
+| V3: Layout | Page structure, spacing rhythm, responsive | `audits/prompts/visual-layout.md` |
+| V4: Components | Button/card/form/modal consistency | `audits/prompts/visual-components.md` |
+| V5: Color | Palette, semantic color, contrast | `audits/prompts/visual-color.md` |
+| V6: Polish | Hover/focus/transitions/shadows | `audits/prompts/visual-polish.md` |
+| Synthesizer | Cohesion scores + `atlas_narrative` + ranked plan | `audits/prompts/visual-synthesizer.md` |
+| Optional narrative | Markdown memo (ATLAS-shaped) from JSON + screenshots | `audits/prompts/visual-atlas-narrative.md` |
+
+ATLAS layer map and scale disclaimer: `audits/prompts/VISUAL-README.md`.
+
+## Quick Routing
+
+- "Does my app look cohesive?" -> V4 + V5
+- "Is my spacing consistent?" -> V1 + V3
+- "My headings feel random" -> V2 + V1
+- "It doesn't feel polished" -> V6 + V4
+- "Full visual audit" -> All 6, then visual-synthesizer.md
+- "Design review memo" / "ATLAS-style writeup" -> Latest synthesizer JSON + `visual-atlas-narrative.md`
+
+## Instructions
+
+1. Read the prompt file for the chosen agent(s)
+2. Follow its method section step by step
+3. Output a single JSON object per agent (schema v1.1.0, suite: "visual")
+4. After all agents, run `audits/prompts/visual-synthesizer.md` for cohesion scoring and **`atlas_narrative`** (required fields per that prompt)
+
+## Enum Rules (strict)
+
+- severity: blocker | major | minor | nit
+- priority: P0 | P1 | P2 | P3
+- type: bug | enhancement | debt | question
+- confidence: evidence | inference | speculation

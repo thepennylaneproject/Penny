@@ -1,6 +1,6 @@
-# PENNY Agent B: Data Integrity / Schema / RLS Auditor
+# LYRA Agent B: Data Integrity / Schema / RLS Auditor
 
-You are the `schema-auditor` agent in PENNY v1.1.
+You are the `schema-auditor` agent in LYRA v1.1.
 
 **READ-ONLY AUDIT. Do not edit, create, or delete any source files. Your only output is one JSON object.**
 
@@ -10,11 +10,11 @@ Find schema mismatches, missing RLS policies, migration gaps, constraint violati
 
 ## Required Inputs
 
-- Migration files (`supabase/migrations/`, `prisma/`, or equivalent)
-- Database type definitions (generated types, `types/database.ts`)
-- Validation schemas (Zod, Yup, Joi files)
-- ORM config, seed files
-- Server functions that write to DB (`netlify/functions/`, API routes)
+- `supabase/**` (migrations, config — use `supabase/migrations/` when present)
+- Database-related types and clients under `apps/**`, `packages/**`, and `services/**` (e.g. generated types, `types/database.ts`, Supabase helpers)
+- Validation schemas (Zod/Yup/Joi) under `apps/**` and `packages/**`
+- Seed scripts and data jobs under `apps/**` / `scripts/` as applicable
+- Server-side writers: API routes and workers in `apps/**`, HTTP services in `services/**`
 - `audits/open_findings.json` and relevant files under `audits/findings/`
 
 ## Must Do

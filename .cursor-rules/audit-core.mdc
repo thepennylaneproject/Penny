@@ -1,0 +1,41 @@
+---
+description: Run a LYRA core audit agent. Trigger with "audit data", "audit security", "audit performance", "audit ux", "audit deploy".
+globs:
+  - src/**
+  - netlify/**
+  - supabase/**
+---
+
+# LYRA Core Audit Mode
+
+You are running a LYRA v1.1 core audit. Choose the agent based on what was asked:
+
+| Keyword | Agent | Prompt File |
+|---------|-------|------------|
+| "audit logic" / "audit bugs" | Runtime & Logic Bug Hunter | `audits/prompts/agent-logic.md` |
+| "audit data" / "audit schema" | Data / Schema / RLS Auditor | `audits/prompts/agent-data.md` |
+| "audit ux" / "audit copy" | UX Flow & Copy Auditor | `audits/prompts/agent-ux.md` |
+| "audit perf" / "audit performance" | Performance & Cost Auditor | `audits/prompts/agent-performance.md` |
+| "audit security" | Security & Privacy Auditor | `audits/prompts/agent-security.md` |
+| "audit deploy" / "audit build" | Build/Deploy & Observability | `audits/prompts/agent-deploy.md` |
+
+## Instructions
+
+1. Read `audits/open_findings.json` for existing findings (avoid duplicates)
+2. Read the full prompt file for the chosen agent
+3. Follow its method step by step
+4. Output a single JSON object (schema v1.1.0, kind: "agent_output")
+5. Save to `audits/runs/<today>/<suite>-<YYYYMMDD>-<HHmmss>.json`
+
+## Enum Rules (strict -- no substitutions)
+
+- severity: blocker | major | minor | nit
+- priority: P0 | P1 | P2 | P3
+- type: bug | enhancement | debt | question
+- status: open
+- confidence: evidence | inference | speculation
+- estimated_effort: trivial | small | medium | large | epic
+
+## After Running
+
+Tell the user: "Run `python3 audits/session.py` to see what to do next."

@@ -1,0 +1,39 @@
+
+> penny@3.0.0 lint /Users/sarahsahl/Desktop/penny
+> turbo run lint
+
+• turbo 2.9.3
+
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running lint in 3 packages
+   • Remote caching disabled
+
+penny-dashboard:lint: cache bypass, force executing c3753846d53cb5b3
+penny-dashboard:lint: 
+penny-dashboard:lint: > penny-dashboard@0.1.0 lint /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:lint: > eslint app components lib hooks --ext .ts,.tsx
+penny-dashboard:lint: 
+penny-dashboard:lint: 
+penny-dashboard:lint: Oops! Something went wrong! :(
+penny-dashboard:lint: 
+penny-dashboard:lint: ESLint: 9.39.4
+penny-dashboard:lint: 
+penny-dashboard:lint: Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@eslint/eslintrc' imported from /Users/sarahsahl/Desktop/penny/apps/dashboard/eslint.config.mjs
+penny-dashboard:lint:     at Object.getPackageJSONURL (node:internal/modules/package_json_reader:266:9)
+penny-dashboard:lint:     at packageResolve (node:internal/modules/esm/resolve:767:81)
+penny-dashboard:lint:     at moduleResolve (node:internal/modules/esm/resolve:853:18)
+penny-dashboard:lint:     at defaultResolve (node:internal/modules/esm/resolve:983:11)
+penny-dashboard:lint:     at #cachedDefaultResolve (node:internal/modules/esm/loader:731:20)
+penny-dashboard:lint:     at ModuleLoader.resolve (node:internal/modules/esm/loader:708:38)
+penny-dashboard:lint:     at ModuleLoader.getModuleJobForImport (node:internal/modules/esm/loader:310:38)
+penny-dashboard:lint:     at ModuleJob._link (node:internal/modules/esm/module_job:183:49)
+penny-dashboard:lint:  ELIFECYCLE  Command failed with exit code 2.
+ ERROR  penny-dashboard#lint: command (/Users/sarahsahl/Desktop/penny/apps/dashboard) /Users/sarahsahl/.npm-global/bin/pnpm run lint exited (2)
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    499ms 
+Failed:    penny-dashboard#lint
+
+ ERROR  run failed: command  exited (2)
+ ELIFECYCLE  Command failed with exit code 2.

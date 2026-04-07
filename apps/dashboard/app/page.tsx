@@ -65,11 +65,20 @@ export default function Home() {
   const [removeError, setRemoveError] = useState<string | null>(null);
   const [pendingRemoveName, setPendingRemoveName] = useState<string | null>(null);
   const [patternsOpen, setPatternsOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     void fetchProjects();
     void fetchQueue();
   }, [fetchProjects, fetchQueue]);
+
+  // Re-fetch queue every 30 s so "queued" badges stay accurate without a full page reload.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      void fetchQueue();
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [fetchQueue]);
 
   useEffect(() => {
     const handleUndoSuccess = () => {
@@ -437,7 +446,30 @@ export default function Home() {
             {projects.length} project{projects.length !== 1 ? "s" : ""}
           </h1>
         </div>
-        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center" }}>
+          <button
+            type="button"
+            aria-label="Refresh portfolio"
+            title="Refresh"
+            disabled={refreshing}
+            onClick={async () => {
+              setRefreshing(true);
+              await Promise.all([fetchProjects(), fetchQueue()]);
+              setRefreshing(false);
+            }}
+            style={{
+              fontSize:   "11px",
+              fontFamily: "var(--font-mono)",
+              padding:    "4px 8px",
+              background: "transparent",
+              border:     "0.5px solid var(--ink-border-faint)",
+              color:      refreshing ? "var(--ink-text-4)" : "var(--ink-text-3)",
+              cursor:     refreshing ? "default" : "pointer",
+              opacity:    refreshing ? 0.6 : 1,
+            }}
+          >
+            ↺
+          </button>
           <button
             type="button"
             onClick={() => setShowImportMode("repository")}
@@ -487,7 +519,9 @@ export default function Home() {
           onQueue={() => void runQueueRepair(nextAction.findingId, nextAction.projectName)}
           onOpen={() => {
             setQueueActionError(null);
-            router.push(`/projects/${encodeURIComponent(nextAction.projectName)}`);
+            router.push(
+              `/projects/${encodeURIComponent(nextAction.projectName)}?finding=${encodeURIComponent(nextAction.findingId)}`
+            );
           }}
           queueError={queueActionError}
           onDismissQueueError={() => setQueueActionError(null)}
@@ -633,7 +667,7 @@ export default function Home() {
             paddingTop: "1rem",
           }}
         >
-          penny v1.1 · findings persist via api
+          penny v3.0 · findings persist via api
         </div>
       )}
 

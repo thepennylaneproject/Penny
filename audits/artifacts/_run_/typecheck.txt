@@ -1,0 +1,25 @@
+
+> penny@3.0.0 typecheck /Users/sarahsahl/Desktop/penny
+> turbo run typecheck
+
+• turbo 2.9.3
+
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running typecheck in 3 packages
+   • Remote caching disabled
+
+@penny/shared-types:typecheck: cache bypass, force executing 692da068af3833b3
+penny-dashboard:typecheck: cache bypass, force executing b6d2b2f409128b3c
+penny-dashboard:typecheck: 
+penny-dashboard:typecheck: > penny-dashboard@0.1.0 typecheck /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:typecheck: > tsc --noEmit
+penny-dashboard:typecheck: 
+@penny/shared-types:typecheck: 
+@penny/shared-types:typecheck: > @penny/shared-types@3.0.0 typecheck /Users/sarahsahl/Desktop/penny/packages/shared-types
+@penny/shared-types:typecheck: > tsc --noEmit
+@penny/shared-types:typecheck: 
+
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    2.885s 
+

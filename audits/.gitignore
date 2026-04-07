@@ -1,0 +1,9 @@
+# Cleanup script backups
+*.pre-cleanup.bak
+
+# macOS
+.DS_Store
+
+# Preflight artifacts are regenerated each run -- optionally track or ignore
+# Uncomment to ignore:
+# artifacts/_run_/

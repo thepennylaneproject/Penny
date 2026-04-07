@@ -11,7 +11,7 @@ import {
   type AuditScope,
   buildIntelligenceContext,
 } from "./context.js";
-import { auditWithLlm, auditWithLane, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
+import { auditWithLane, resolveModelChain, resolveRoutingPolicy } from "./llm.js";
 import { isLaneConfigured, lanePatch } from "./lane-client.js";
 import {
   claimJob,
@@ -1108,6 +1108,9 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
       if (!["active", "draft"].includes(projectStatus)) {
         throw new Error(`Project "${project.name}" has status "${projectStatus}" and cannot be audited`);
       }
+      if (!isLaneConfigured()) {
+        throw new Error("Lane must be configured to run Penny audits.");
+      }
       const execution = await executeProjectAudit(project, payload, pool);
       try {
         jobManifestRevision = execution.manifestRevision;
@@ -1138,7 +1141,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             execution.repoRoot,
             ["./"]
           );
-          const llm = await (isLaneConfigured() ? auditWithLane : auditWithLlm)(
+          const llm = await auditWithLane(
             core,
             auditAgent,
             expectations,
@@ -1235,7 +1238,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         // or once the project-level budget/fallback threshold is exceeded.
         const PASS_CONCURRENCY = resolvePassConcurrency();
         const passTaskResults: Array<{
-          llm: Awaited<ReturnType<typeof auditWithLlm>>;
+          llm: Awaited<ReturnType<typeof auditWithLane>>;
           pass: { label: string; files: string[] };
           codeContextChars: number;
         }> = [];
@@ -1260,7 +1263,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
                 scanRoots,
                 passScope
               );
-              const llm = await (isLaneConfigured() ? auditWithLane : auditWithLlm)(
+              const llm = await auditWithLane(
                 core,
                 auditAgent,
                 expectations,

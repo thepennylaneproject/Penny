@@ -1,0 +1,667 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "lyra-audit-output-v1.1",
+  "title": "LYRA Audit Output v1.1",
+  "description": "Schema for all LYRA audit agent and synthesizer outputs. Every run must produce JSON conforming to this schema. v1.1 adds: kind field, typed proof hooks, coverage declaration, structured ranked_plan, preflight support.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "kind",
+    "run_id",
+    "run_metadata",
+    "suite",
+    "agent",
+    "findings",
+    "rollups",
+    "next_actions"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.1.0",
+      "description": "Schema version. Breaking changes increment major, additions increment minor."
+    },
+    "kind": {
+      "type": "string",
+      "enum": ["agent_output", "synthesizer_output"],
+      "description": "Distinguishes raw agent output from merged synthesizer output. Downstream tooling can branch on this without parsing agent/suite fields."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Unique ID for this run. Format: <suite>-<YYYYMMDD>-<HHmmss>. Example: logic-20250304-143022"
+    },
+    "run_metadata": {
+      "type": "object",
+      "required": ["timestamp", "branch", "environment", "tool_platform", "model"],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of run start."
+        },
+        "branch": {
+          "type": "string",
+          "description": "Git branch name. Use 'unknown' if not in a git repo."
+        },
+        "commit": {
+          "type": "string",
+          "description": "Git commit SHA (short or full). Use 'unknown' if unavailable."
+        },
+        "environment": {
+          "type": "string",
+          "enum": ["local", "ci", "staging", "production"],
+          "description": "Where the audit was executed."
+        },
+        "tool_platform": {
+          "type": "string",
+          "description": "Platform used. Examples: cursor, github-copilot, claude-code, manual"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model identifier. Examples: claude-sonnet-4-5, gpt-4o, gemini-2.0-flash"
+        },
+        "preflight_artifacts": {
+          "type": "object",
+          "description": "Optional. Paths to baseline captures taken before agents ran. Agents should reference these for evidence.",
+          "properties": {
+            "test_output": { "type": "string", "description": "Path to test runner output, e.g. audits/artifacts/_run_/tests.txt" },
+            "lint_output": { "type": "string", "description": "Path to linter output" },
+            "build_output": { "type": "string", "description": "Path to build output" },
+            "typecheck_output": { "type": "string", "description": "Path to typecheck output" },
+            "bundle_stats": { "type": "string", "description": "Path to bundle analysis output" }
+          }
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional free-text context about this run."
+        }
+      }
+    },
+    "suite": {
+      "type": "string",
+      "description": "Suite name. One of: logic, data, ux, performance, security, deploy, synthesized"
+    },
+    "agent": {
+      "type": "object",
+      "required": ["name", "role"],
+      "description": "Agent identity and self-reported metadata.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Agent identifier. Examples: runtime-bug-hunter, schema-auditor, ux-flow-auditor, synthesizer"
+        },
+        "role": {
+          "type": "string",
+          "description": "One-sentence description of what this agent does."
+        },
+        "inputs_used": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files, commands, logs, or artifacts the agent actually examined."
+        },
+        "stop_conditions_hit": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Any stop conditions triggered during this run."
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "What the agent examined and what it skipped. Helps the Synthesizer decide if re-audit is needed.",
+      "properties": {
+        "files_examined": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Repo-relative paths or glob patterns the agent inspected."
+        },
+        "files_skipped": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths skipped and why (e.g., 'dist/** - generated code')."
+        },
+        "coverage_complete": {
+          "type": "boolean",
+          "description": "True if the agent exhausted its scope. False if it stopped early (hit finding limit, stop condition, or context window)."
+        },
+        "incomplete_reason": {
+          "type": "string",
+          "description": "Required when coverage_complete is false. Why the agent stopped early."
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Finding"
+      }
+    },
+    "rollups": {
+      "type": "object",
+      "required": ["by_severity", "by_category", "by_type", "by_status"],
+      "properties": {
+        "by_severity": {
+          "type": "object",
+          "properties": {
+            "blocker": { "type": "integer" },
+            "major": { "type": "integer" },
+            "minor": { "type": "integer" },
+            "nit": { "type": "integer" }
+          }
+        },
+        "by_category": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "by_type": {
+          "type": "object",
+          "properties": {
+            "bug": { "type": "integer" },
+            "enhancement": { "type": "integer" },
+            "debt": { "type": "integer" },
+            "question": { "type": "integer" }
+          }
+        },
+        "by_status": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" },
+          "description": "Distribution by lifecycle status. Example: {open: 5, in_progress: 2, fixed_verified: 3}"
+        }
+      }
+    },
+    "next_actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["action", "finding_id", "rationale"],
+        "properties": {
+          "action": { "type": "string" },
+          "finding_id": { "type": "string" },
+          "rationale": { "type": "string" }
+        }
+      },
+      "description": "Top 3-5 recommended next actions from this agent."
+    },
+    "diff_summary": {
+      "type": "object",
+      "description": "Synthesizer output only. Summary of changes vs prior open_findings.json.",
+      "required": ["compared_against", "new_findings", "resolved_findings"],
+      "properties": {
+        "compared_against": {
+          "type": "string",
+          "description": "Run ID or path of the prior state compared against. Use 'none' for first run."
+        },
+        "new_findings": { "type": "array", "items": { "type": "string" } },
+        "resolved_findings": { "type": "array", "items": { "type": "string" } },
+        "changed_severity": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["finding_id", "old_severity", "new_severity"],
+            "properties": {
+              "finding_id": { "type": "string" },
+              "old_severity": { "type": "string" },
+              "new_severity": { "type": "string" }
+            }
+          }
+        },
+        "changed_status": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["finding_id", "old_status", "new_status"],
+            "properties": {
+              "finding_id": { "type": "string" },
+              "old_status": { "type": "string" },
+              "new_status": { "type": "string" }
+            }
+          }
+        },
+        "converted_type": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["finding_id", "old_type", "new_type"],
+            "properties": {
+              "finding_id": { "type": "string" },
+              "old_type": { "type": "string" },
+              "new_type": { "type": "string" }
+            }
+          }
+        },
+        "merged_findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["canonical_id", "merged_ids"],
+            "properties": {
+              "canonical_id": { "type": "string" },
+              "merged_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    "ranked_plan": {
+      "type": "object",
+      "description": "Synthesizer output only. Structured execution plan.",
+      "required": ["top_fixes", "commit_plan", "regression_checklist", "reaudit_plan"],
+      "properties": {
+        "top_fixes": {
+          "type": "array",
+          "maxItems": 10,
+          "items": {
+            "$ref": "#/$defs/PlanItem"
+          },
+          "description": "Top 10 fixes ranked by severity, priority, confidence, then effort (smallest first)."
+        },
+        "commit_plan": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CommitPlan"
+          },
+          "description": "Commit-sized patch steps for the top fixes."
+        },
+        "regression_checklist": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Concrete checks to run after applying patches. Tied to touched surfaces."
+        },
+        "reaudit_plan": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["agent", "scope"],
+            "properties": {
+              "agent": { "type": "string", "description": "Which agent to re-run." },
+              "scope": { "type": "string", "description": "Which files or surfaces to focus on." },
+              "reason": { "type": "string" }
+            }
+          },
+          "description": "Targeted re-audit assignments. Only affected agents and surfaces."
+        }
+      }
+    },
+    "cohesion_scores": {
+      "type": "object",
+      "description": "Visual design synthesizer (`suite: visual`, kind: synthesizer_output). Five 1-5 cohesion dimensions plus overall; not the same scale as ATLAS per-item 0-4 scores.",
+      "properties": {
+        "systematic": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "hierarchical": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "consistent": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "communicative": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "polished": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "overall": { "type": "number", "description": "Average of the five dimensions, typically one decimal." },
+        "interpretation": { "type": "string" },
+        "top_dimension_to_improve": { "type": "string" },
+        "why": { "type": "string" }
+      }
+    },
+    "atlas_narrative": {
+      "type": "object",
+      "description": "ATLAS-protocol-shaped narrative derived from LYRA findings (visual synthesizer or optional narrative pass). Optional on all outputs; expected on visual synthesizer runs.",
+      "properties": {
+        "source": {
+          "type": "string",
+          "description": "e.g. derived_from_lyra_findings (synthesizer) or narrative_supplement (optional human-facing pass)."
+        },
+        "disclaimer": { "type": "string" },
+        "critical_issues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AtlasNarrativeItem" }
+        },
+        "high_impact_improvements": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AtlasNarrativeItem" }
+        },
+        "strengths_to_preserve": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "three_moves": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1,
+          "maxItems": 3,
+          "description": "Visual synthesizer aims for exactly three moves; narrative pass may emit fewer."
+        },
+        "recommended_redesign_scope": {
+          "type": "string",
+          "enum": ["polish", "refinement", "redesign", "rethink"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "AtlasNarrativeItem": {
+      "type": "object",
+      "required": ["title", "remediation"],
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "description": "Required for synthesizer-derived rows; must match a finding in the same document. Optional for narrative_supplement prose."
+        },
+        "title": { "type": "string" },
+        "remediation": { "type": "string" }
+      },
+      "description": "Single row in atlas_narrative issue lists."
+    },
+    "Finding": {
+      "type": "object",
+      "required": [
+        "finding_id",
+        "type",
+        "category",
+        "severity",
+        "priority",
+        "confidence",
+        "title",
+        "description",
+        "proof_hooks",
+        "impact",
+        "suggested_fix",
+        "status",
+        "history"
+      ],
+      "properties": {
+        "finding_id": {
+          "type": "string",
+          "description": "Stable deterministic ID. Preferred: 'f-' + first 8 hex chars of SHA-256(type|category|file_path|symbol|title). Fallback: f-<category_slug>-<file_slug>-<counter>."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["bug", "enhancement", "debt", "question"],
+          "description": "bug = broken behavior. enhancement = missing capability. debt = working but fragile/costly. question = ambiguous, needs human decision."
+        },
+        "category": {
+          "type": "string",
+          "description": "Agent-specific category. Examples: null-ref, missing-rls, copy-mismatch, n-plus-one, xss, missing-error-boundary, auth-bypass, bundle-size"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["blocker", "major", "minor", "nit"],
+          "description": "Harm and correctness risk. Blocker = app broken or data loss. Major = significant degraded experience. Minor = cosmetic or edge case. Nit = style or preference."
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2", "P3"],
+          "description": "Sequencing and value. P0 = fix before next deploy. P1 = fix this sprint. P2 = fix this cycle. P3 = backlog."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["evidence", "inference", "speculation"],
+          "description": "evidence = directly observed/reproduced. inference = logically deduced from code/config. speculation = pattern-based guess, must include verification steps."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "One-line summary. Max 120 characters."
+        },
+        "description": {
+          "type": "string",
+          "description": "Full explanation. Include what is wrong, why it matters, and what triggers it."
+        },
+        "proof_hooks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProofHook"
+          },
+          "minItems": 1,
+          "description": "At least one proof hook is required. These anchor the finding to specific code, runtime output, or UI behavior."
+        },
+        "repro_steps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered steps to reproduce the issue. Optional for enhancements and debt."
+        },
+        "impact": {
+          "type": "string",
+          "description": "What happens if this is not fixed. Be specific: user-visible effect, data risk, cost risk."
+        },
+        "suggested_fix": {
+          "type": "object",
+          "required": ["approach"],
+          "properties": {
+            "approach": {
+              "type": "string",
+              "description": "Brief fix strategy. Prefer minimal diffs."
+            },
+            "affected_files": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "estimated_effort": {
+              "type": "string",
+              "enum": ["trivial", "small", "medium", "large", "epic"],
+              "description": "trivial = <15min. small = <1hr. medium = <4hr. large = <1day. epic = multi-day."
+            },
+            "risk_notes": {
+              "type": "string",
+              "description": "What could go wrong with this fix. Regressions, side effects."
+            },
+            "tests_needed": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Specific tests to write or run to verify the fix."
+            }
+          }
+        },
+        "owner": {
+          "type": "string",
+          "default": "solo-dev",
+          "description": "Who is responsible. Default solo-dev for solo projects."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "open",
+            "accepted",
+            "in_progress",
+            "fixed_pending_verify",
+            "fixed_verified",
+            "wont_fix",
+            "deferred",
+            "duplicate",
+            "converted_to_enhancement"
+          ]
+        },
+        "related_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Finding IDs that are duplicates, dependencies, or share root cause."
+        },
+        "history": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/HistoryEvent"
+          },
+          "minItems": 1,
+          "description": "Timeline of events. Must contain at least one 'created' event."
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Repo-relative paths under audits/artifacts/<FINDING_ID>/. Logs, screenshots, traces, profiles."
+        }
+      }
+    },
+    "ProofHook": {
+      "type": "object",
+      "required": ["hook_type", "summary"],
+      "description": "Typed proof hook. Each hook_type carries specific optional fields. The summary field is always required as a human-readable one-liner.",
+      "properties": {
+        "hook_type": {
+          "type": "string",
+          "enum": ["code_ref", "error_text", "command", "repro_steps", "ui_path", "data_shape", "log_line", "config_key", "query", "artifact_ref"],
+          "description": "code_ref = file+symbol+lines. error_text = runtime error. command = CLI invocation. repro_steps = numbered steps. ui_path = route+interaction. data_shape = expected vs observed schema. log_line = log excerpt. config_key = env/config. query = SQL/DB. artifact_ref = path to captured file."
+        },
+        "summary": {
+          "type": "string",
+          "description": "Human-readable one-liner explaining what this hook proves."
+        },
+        "file": {
+          "type": "string",
+          "description": "Repo-relative file path. Used by: code_ref, log_line, config_key."
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Function, component, or class name. Used by: code_ref."
+        },
+        "start_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Starting line number. Used by: code_ref."
+        },
+        "end_line": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Ending line number. Used by: code_ref."
+        },
+        "error_text": {
+          "type": "string",
+          "description": "Exact error message. Used by: error_text."
+        },
+        "command": {
+          "type": "string",
+          "description": "CLI command to run. Used by: command."
+        },
+        "expected": {
+          "type": "string",
+          "description": "Expected output. Used by: command, data_shape."
+        },
+        "actual": {
+          "type": "string",
+          "description": "Actual output. Used by: command, data_shape."
+        },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Numbered steps. Used by: repro_steps, ui_path."
+        },
+        "route": {
+          "type": "string",
+          "description": "URL path or route name. Used by: ui_path."
+        },
+        "selector": {
+          "type": "string",
+          "description": "CSS selector or component name. Used by: ui_path."
+        },
+        "observed_schema": {
+          "type": "string",
+          "description": "What the data actually looks like. Used by: data_shape."
+        },
+        "expected_schema": {
+          "type": "string",
+          "description": "What the data should look like. Used by: data_shape."
+        },
+        "config_key": {
+          "type": "string",
+          "description": "Configuration key name. Used by: config_key."
+        },
+        "config_value": {
+          "type": "string",
+          "description": "Configuration value (redact secrets). Used by: config_key."
+        },
+        "query_text": {
+          "type": "string",
+          "description": "SQL or database query. Used by: query."
+        },
+        "artifact_path": {
+          "type": "string",
+          "description": "Repo-relative path to an artifact file. Used by: artifact_ref, and optionally by any hook type."
+        }
+      }
+    },
+    "HistoryEvent": {
+      "type": "object",
+      "required": ["timestamp", "actor", "event"],
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "actor": {
+          "type": "string",
+          "description": "Who or what created this event. Examples: runtime-bug-hunter, solo-dev, synthesizer"
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "created",
+            "repro_confirmed",
+            "hypothesis_added",
+            "patch_proposed",
+            "patch_applied",
+            "verification_passed",
+            "verification_failed",
+            "reopened",
+            "deferred",
+            "wont_fix",
+            "linked_duplicate",
+            "scope_changed",
+            "severity_changed",
+            "split_into_children",
+            "converted_type",
+            "note_added"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "artifacts": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Paths to artifacts created during this event."
+        },
+        "commit": {
+          "type": "string",
+          "description": "Git commit SHA if relevant."
+        },
+        "pr": {
+          "type": "string",
+          "description": "Pull request URL or number if relevant."
+        }
+      }
+    },
+    "PlanItem": {
+      "type": "object",
+      "required": ["finding_id", "why_now", "estimated_effort"],
+      "properties": {
+        "finding_id": { "type": "string" },
+        "why_now": { "type": "string", "description": "Why this fix is ranked here. Impact, risk, and effort reasoning." },
+        "risk": { "type": "string", "description": "What could go wrong if we fix this (or do not)." },
+        "estimated_effort": {
+          "type": "string",
+          "enum": ["trivial", "small", "medium", "large", "epic"]
+        }
+      }
+    },
+    "CommitPlan": {
+      "type": "object",
+      "required": ["title", "finding_ids", "steps", "affected_files", "tests_or_checks"],
+      "description": "One commit-sized unit of work. May address one or more related findings.",
+      "properties": {
+        "title": { "type": "string", "description": "Git commit message for this unit of work." },
+        "finding_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Finding IDs addressed by this commit."
+        },
+        "steps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Ordered steps to implement the fix."
+        },
+        "affected_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "tests_or_checks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tests to write or run to verify this commit."
+        }
+      }
+    }
+  }
+}

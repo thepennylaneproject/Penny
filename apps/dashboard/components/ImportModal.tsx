@@ -45,6 +45,7 @@ export function ImportModal({
   const [dragging,  setDragging]  = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [onboardedName, setOnboardedName] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -59,7 +60,7 @@ export function ImportModal({
   const modalTitle = isRepositoryMode ? "New project from repository" : "Import findings";
 
   const handleClose = () => {
-    if (importSummary) {
+    if (importSummary || onboardedName) {
       onClose();
       return;
     }
@@ -125,6 +126,7 @@ export function ImportModal({
           repository_url: trimmedRepo,
           default_branch: defaultBranch.trim() || undefined,
         });
+        setOnboardedName(projectName);
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : String(e));
       } finally {
@@ -224,7 +226,47 @@ export function ImportModal({
         </button>
       </div>
 
-      {importSummary ? (
+      {onboardedName ? (
+        <div>
+          <div
+            style={{
+              fontSize: "9px",
+              fontFamily: "var(--font-mono)",
+              fontWeight: 500,
+              color: "var(--ink-green)",
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              marginBottom: "0.65rem",
+            }}
+          >
+            Project onboarded
+          </div>
+          <p
+            style={{
+              margin: "0 0 0.5rem 0",
+              fontSize: "13px",
+              color: "var(--ink-text)",
+              fontWeight: 500,
+            }}
+          >
+            {onboardedName}
+          </p>
+          <p
+            style={{
+              margin: "0 0 1rem 0",
+              fontSize: "11px",
+              fontFamily: "var(--font-mono)",
+              color: "var(--ink-text-4)",
+              lineHeight: 1.5,
+            }}
+          >
+            The project is being set up. Findings will appear once the first audit run completes — this usually takes a few minutes.
+          </p>
+          <button type="button" onClick={() => onClose()} style={{ padding: "5px 16px" }}>
+            Done
+          </button>
+        </div>
+      ) : importSummary ? (
         <div>
           <div
             style={{

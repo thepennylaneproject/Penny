@@ -17,6 +17,7 @@ import { UI_COPY } from "@/lib/ui-copy";
 
 interface ProjectPageClientProps {
   projectName: string;
+  initialFindingId?: string;
 }
 
 function ProjectMissingState({
@@ -68,7 +69,7 @@ function ProjectMissingState({
   );
 }
 
-export function ProjectPageClient({ projectName }: ProjectPageClientProps) {
+export function ProjectPageClient({ projectName, initialFindingId }: ProjectPageClientProps) {
   const router = useRouter();
   const {
     projects,
@@ -234,6 +235,7 @@ export function ProjectPageClient({ projectName }: ProjectPageClientProps) {
         refetchProject={refetchProject}
         onQueueRepair={queueRepair}
         queuedFindingIds={queuedFindingIds}
+        initialFindingId={initialFindingId}
       />
     </DashboardRouteShell>
   );
