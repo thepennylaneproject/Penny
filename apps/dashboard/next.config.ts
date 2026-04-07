@@ -6,6 +6,10 @@ import { withSentryConfig } from "@sentry/nextjs";
 /**
  * Next only auto-loads `.env*` from the dashboard directory. Many monorepo setups
  * keep secrets in the repo root — merge those first so LINEAR_* / DATABASE_URL work.
+ *
+ * This is a build-time-only operation: next.config.ts is never included in the
+ * server bundle. The explicit NEXT_PHASE check signals to NFT that fs reads here
+ * are not needed at runtime.
  */
 function mergeEnvLocal(filePath: string, overrideDefinedKeys: boolean) {
   if (!fs.existsSync(filePath)) return;
@@ -32,12 +36,37 @@ function mergeEnvLocal(filePath: string, overrideDefinedKeys: boolean) {
   }
 }
 
-const repoRoot = path.join(__dirname, "../..");
-mergeEnvLocal(path.join(repoRoot, ".env.local"), false);
-mergeEnvLocal(path.join(__dirname, ".env.local"), true);
+// Guard: next.config.ts is executed at build / dev startup only.
+// NEXT_PHASE is set by Next.js before evaluating the config module; its absence
+// (e.g. when Jest imports the file) is also safe because we are not in a server
+// runtime context.
+if (
+  typeof process.env.NEXT_PHASE === "undefined" ||
+  process.env.NEXT_PHASE !== "phase-production-server"
+) {
+  const repoRoot = path.join(__dirname, "../..");
+  mergeEnvLocal(path.join(repoRoot, ".env.local"), false);
+  mergeEnvLocal(path.join(__dirname, ".env.local"), true);
+}
 
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname, "../.."),
+  // Prevent non-app monorepo directories from being pulled into the server
+  // bundle trace when outputFileTracingRoot is set to the workspace root.
+  outputFileTracingExcludes: {
+    "*": [
+      "../../apps/worker/**",
+      "../../backend/**",
+      "../../docs/**",
+      "../../services/**",
+      "../../audits/**",
+      "../../auditsv2/**",
+      "../../infra/**",
+      "../../supabase/**",
+      "../../.git/**",
+      "../../**/.env.local",
+    ],
+  },
   turbopack: {
     root: path.join(__dirname, "../.."),
   },

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { basename, extname, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import type {
-  AuditKind,
   DecisionEvent,
   OnboardingState,
   Project,
@@ -13,6 +12,15 @@ import type {
   ProjectProfileSummary,
   ProjectSourceType,
 } from "./types";
+// Pure helpers with no filesystem access — import from the lightweight module so
+// that code paths that only need data-manipulation logic are not forced to drag
+// this entire file (and its fs/child_process imports) into the server trace.
+import { makeDecisionEvent } from "./onboarding-pure";
+export {
+  makeDecisionEvent,
+  updateOnboardingArtifacts,
+  summarizeAuditDecision,
+} from "./onboarding-pure";
 
 const TEXT_EXTENSIONS = new Set([
   ".ts",
@@ -195,21 +203,6 @@ function makeArtifact(
   return status === "active" ? { active: version } : { draft: version };
 }
 
-export function makeDecisionEvent(
-  actor: string,
-  eventType: string,
-  targetType: DecisionEvent["target_type"],
-  extras: Partial<DecisionEvent> = {}
-): DecisionEvent {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: new Date().toISOString(),
-    actor,
-    event_type: eventType,
-    target_type: targetType,
-    ...extras,
-  };
-}
 
 function resolveRepoAccess(input: OnboardRepositoryInput): RepoAccess {
   const repoUrl = input.repository_url?.trim();
@@ -2297,224 +2290,3 @@ function formatCommands(commands: RepoSnapshot["commands"]): string {
   return lines.join("\n");
 }
 
-export function updateOnboardingArtifacts(
-  project: Project,
-  input: {
-    actor?: string;
-    profileContent?: string;
-    expectationsContent?: string;
-    approveProfile?: boolean;
-    approveExpectations?: boolean;
-    activate?: boolean;
-    notes?: string;
-  }
-): Project {
-  const actor = input.actor?.trim() || "dashboard";
-  const now = new Date().toISOString();
-  const decisionHistory = [...(project.decisionHistory ?? [])];
-  const onboardingEvents = [...(project.onboardingState?.events ?? [])];
-  let nextProfile = project.profile ?? {};
-  let nextExpectations = project.expectations ?? {};
-  let nextStatus = project.status ?? "draft";
-  const onboardingState: OnboardingState = {
-    stage: project.onboardingState?.stage ?? "operator_review",
-    reviewRequired: true,
-    updatedAt: now,
-    ...project.onboardingState,
-  };
-
-  if (typeof input.profileContent === "string") {
-    const previous = nextProfile.draft ?? nextProfile.active;
-    nextProfile = {
-      ...nextProfile,
-      draft: {
-        version: (previous?.version ?? 0) + 1,
-        status: "draft",
-        content: input.profileContent,
-        generatedAt: now,
-        source: "manual",
-      },
-    };
-    const draftVersion = nextProfile.draft?.version ?? previous?.version ?? 1;
-    const event = makeDecisionEvent(actor, "profile_edited", "profile", {
-      notes: input.notes,
-      before: { version: previous?.version },
-      after: { version: draftVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (typeof input.expectationsContent === "string") {
-    const previous = nextExpectations.draft ?? nextExpectations.active;
-    nextExpectations = {
-      ...nextExpectations,
-      draft: {
-        version: (previous?.version ?? 0) + 1,
-        status: "draft",
-        content: input.expectationsContent,
-        generatedAt: now,
-        source: "manual",
-      },
-    };
-    const draftVersion = nextExpectations.draft?.version ?? previous?.version ?? 1;
-    const event = makeDecisionEvent(actor, "expectations_edited", "expectations", {
-      notes: input.notes,
-      before: { version: previous?.version },
-      after: { version: draftVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.approveProfile && nextProfile.draft) {
-    const approvedDraft = nextProfile.draft;
-    nextProfile = {
-      ...nextProfile,
-      active: { ...approvedDraft, status: "active" },
-    };
-    onboardingState.profileApprovedAt = now;
-    const activeVersion = nextProfile.active?.version ?? approvedDraft.version;
-    const event = makeDecisionEvent(actor, "profile_approved", "profile", {
-      notes: input.notes,
-      after: { version: activeVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.approveExpectations && nextExpectations.draft) {
-    const approvedDraft = nextExpectations.draft;
-    nextExpectations = {
-      ...nextExpectations,
-      active: { ...approvedDraft, status: "active" },
-    };
-    onboardingState.expectationsApprovedAt = now;
-    const activeVersion =
-      nextExpectations.active?.version ?? approvedDraft.version;
-    const event = makeDecisionEvent(actor, "expectations_approved", "expectations", {
-      notes: input.notes,
-      after: { version: activeVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.activate) {
-    if (!nextProfile.active || !nextExpectations.active) {
-      throw new Error("Profile and expectations must both be approved before activation");
-    }
-    nextStatus = "active";
-    onboardingState.stage = "completed";
-    onboardingState.reviewRequired = false;
-    onboardingState.activatedAt = now;
-    const event = makeDecisionEvent(actor, "project_activated", "project", {
-      notes: input.notes,
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  } else {
-    onboardingState.stage = "operator_review";
-    onboardingState.reviewRequired = true;
-  }
-
-  onboardingState.updatedAt = now;
-  onboardingState.events = onboardingEvents;
-
-  return {
-    ...project,
-    profile: nextProfile,
-    expectations: nextExpectations,
-    status: nextStatus,
-    onboardingState,
-    decisionHistory,
-    lastUpdated: now,
-  };
-}
-
-export function summarizeAuditDecision(
-  actor: string,
-  eventType: string,
-  targetType: DecisionEvent["target_type"],
-  args: {
-    auditKind?: AuditKind;
-    scopeType?: DecisionEvent["scope_type"];
-    scopePaths?: string[];
-    notes?: string;
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-  }
-): DecisionEvent {
-  return makeDecisionEvent(actor, eventType, targetType, {
-    notes: args.notes,
-    audit_kind: args.auditKind,
-    scope_type: args.scopeType,
-    scope_paths: args.scopePaths,
-    before: args.before,
-    after: args.after,
-  });
-}
-
-// ── Cluster-Aware Onboarding Utilities ─────────────────────────────────────────
-
-export async function collectGitHistory(repoPath: string): Promise<string> {
-  try {
-    const log = execFileSync("git", ["-C", repoPath, "log", "-n", "100", "--oneline", "--stat"], {
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-    return log.slice(0, 15000);
-  } catch (e) {
-    return "Git history unavailable: " + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-export async function collectDependencyManifest(repoPath: string): Promise<string> {
-  const pkgPath = join(repoPath, "package.json");
-  if (!existsSync(pkgPath)) return "No package.json found.";
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    return JSON.stringify(deps, null, 2);
-  } catch (e) {
-    return "Failed to parse dependencies.";
-  }
-}
-
-export async function generateModuleManifest(repoPath: string): Promise<Record<string, unknown>> {
-  const tree = describeTopLevel(repoPath);
-  return {
-    revision: "v1-onboarding",
-    generated_at: new Date().toISOString(),
-    source_root: repoPath,
-    exhaustiveness: "exhaustive",
-    modules: tree.map((t) => ({
-      name: t.path,
-      path: t.path,
-      description: t.note,
-      complexity: "medium",
-      dependencies: [],
-    })),
-    domains: [],
-  };
-}
-
-export async function generateCssTokenMap(repoPath: string): Promise<string> {
-  const out = [];
-  const candidates = [
-    "tailwind.config.js",
-    "tailwind.config.ts",
-    "globals.css",
-    "src/globals.css",
-    "src/index.css",
-    "styles/globals.css",
-    "src/styles/globals.css" // Added based on penny project structure
-  ];
-  for (const f of candidates) {
-    const p = join(repoPath, f);
-    if (existsSync(p)) {
-      out.push(`--- ${f} ---\n` + readFileSync(p, "utf8").slice(0, 3000));
-    }
-  }
-  return out.length > 0 ? out.join("\n\n") : "No standard CSS token maps found.";
-}
