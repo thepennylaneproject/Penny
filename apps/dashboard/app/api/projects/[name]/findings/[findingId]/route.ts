@@ -3,7 +3,7 @@ import { getRepository } from "@/lib/repository-instance";
 import type { Finding, FindingStatus } from "@/lib/types";
 import { apiErrorMessage } from "@/lib/api-error";
 import { validatePartialFinding } from "@/lib/finding-validation";
-import { summarizeAuditDecision } from "@/lib/onboarding";
+import { summarizeAuditDecision } from "@/lib/onboarding-pure";
 import { normalizeMaintenanceBacklog } from "@/lib/maintenance-backlog";
 import { upsertMaintenanceBacklogItems } from "@/lib/maintenance-store";
 import { hasSupabaseProjectsStore } from "@/lib/store-supabase";

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
 import { apiErrorMessage } from "@/lib/api-error";
-import { updateOnboardingArtifacts } from "@/lib/onboarding";
+import { updateOnboardingArtifacts } from "@/lib/onboarding-pure";
 
 type Params = { params: Promise<{ name: string }> };
 

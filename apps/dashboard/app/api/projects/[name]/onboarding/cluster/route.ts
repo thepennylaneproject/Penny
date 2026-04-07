@@ -6,7 +6,7 @@ import {
   collectDependencyManifest,
   generateModuleManifest,
   generateCssTokenMap,
-} from "@/lib/onboarding";
+} from "@/lib/onboarding-collectors";
 import type { AuditCluster } from "@/lib/types";
 
 type Params = { params: Promise<{ name: string }> };
