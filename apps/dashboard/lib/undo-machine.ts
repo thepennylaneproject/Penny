@@ -5,16 +5,20 @@
  * Users can recover from mistakes within a 5-second window.
  */
 
+import type { Project } from "./types";
+
 export type UndoableAction = "remove_project" | "change_finding_status" | "delete_finding";
 
 export interface UndoState {
   action: UndoableAction;
   timestamp: Date;
+  performUndo: () => Promise<void>;
   data: {
     projectName?: string;
     findingId?: string;
     previousStatus?: string;
     newStatus?: string;
+    project?: Project;
     label: string;
   };
 }
@@ -73,7 +77,16 @@ export interface UndoContextValue {
   undoState: UndoState | null;
   canUndo: boolean;
   remainingTime: number;
+  isUndoing: boolean;
+  undoError: string | null;
   undo: () => Promise<void>;
   clear: () => void;
   setUndoState: (state: UndoState | null) => void;
+}
+
+export const UNDO_SUCCESS_EVENT = "penny:undo-success";
+
+export interface UndoSuccessDetail {
+  action: UndoableAction;
+  data: UndoState["data"];
 }

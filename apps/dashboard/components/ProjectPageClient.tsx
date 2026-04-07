@@ -126,6 +126,17 @@ export function ProjectPageClient({ projectName }: ProjectPageClientProps) {
     }
   }, [projectName, setProjects]);
 
+  useEffect(() => {
+    const handleUndoSuccess = () => {
+      void fetchProjects();
+      void fetchQueue();
+      void refetchProject();
+    };
+
+    window.addEventListener("penny:undo-success", handleUndoSuccess);
+    return () => window.removeEventListener("penny:undo-success", handleUndoSuccess);
+  }, [fetchProjects, fetchQueue, refetchProject]);
+
   const onUpdateFinding = useCallback(
     async (resolvedProjectName: string, findingId: string, status: FindingStatus) => {
       const res = await apiFetch(

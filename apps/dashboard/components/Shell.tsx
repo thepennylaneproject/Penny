@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api-fetch";
 import type { EngineStatus } from "@/lib/audit-reader";
 import { UI_COPY } from "@/lib/ui-copy";
 import { workflowsDocHref } from "@/lib/docs-links";
+import { UndoNotification } from "./UndoNotification";
 
 export type NavView = "portfolio" | "engine" | "jobs";
 
@@ -379,6 +380,7 @@ export function Shell({ children, activeView, navHighlightView, onNavigate, onAu
       >
         {children}
       </main>
+      <UndoNotification />
     </div>
   );
 }

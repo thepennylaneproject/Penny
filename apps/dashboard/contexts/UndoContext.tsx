@@ -8,8 +8,14 @@
  */
 
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
-import type { UndoState, UndoContextValue } from "@/lib/undo-machine";
-import { isUndoValid, getRemainingUndoTime } from "@/lib/undo-machine";
+import {
+  isUndoValid,
+  getRemainingUndoTime,
+  type UndoState,
+  type UndoContextValue,
+  UNDO_SUCCESS_EVENT,
+  type UndoSuccessDetail,
+} from "@/lib/undo-machine";
 
 const UndoContext = createContext<UndoContextValue | undefined>(undefined);
 
@@ -20,22 +26,29 @@ export interface UndoProviderProps {
 export function UndoProvider({ children }: UndoProviderProps) {
   const [undoState, setUndoState] = useState<UndoState | null>(null);
   const [remainingTime, setRemainingTime] = useState(0);
+  const [isUndoing, setIsUndoing] = useState(false);
+  const [undoError, setUndoError] = useState<string | null>(null);
 
   // Timer for updating remaining time
   useEffect(() => {
     if (!undoState || !isUndoValid(undoState)) {
       setUndoState(null);
       setRemainingTime(0);
+      setUndoError(null);
+      setIsUndoing(false);
       return;
     }
 
+    setRemainingTime(getRemainingUndoTime(undoState));
     const interval = setInterval(() => {
       const remaining = getRemainingUndoTime(undoState);
       setRemainingTime(remaining);
-      
+
       if (remaining <= 0) {
         setUndoState(null);
         setRemainingTime(0);
+        setUndoError(null);
+        setIsUndoing(false);
       }
     }, 100);
 
@@ -45,23 +58,39 @@ export function UndoProvider({ children }: UndoProviderProps) {
   const canUndo = undoState !== null && isUndoValid(undoState);
 
   const undo = useCallback(async () => {
-    if (!undoState) return;
+    if (!undoState || isUndoing) return;
 
-    // Caller should handle the actual undo operation
-    // This just clears the undo state
-    setUndoState(null);
-    setRemainingTime(0);
-  }, [undoState]);
+    setIsUndoing(true);
+    setUndoError(null);
+    try {
+      await undoState.performUndo();
+      const detail: UndoSuccessDetail = {
+        action: undoState.action,
+        data: undoState.data,
+      };
+      window.dispatchEvent(new CustomEvent<UndoSuccessDetail>(UNDO_SUCCESS_EVENT, { detail }));
+      setUndoState(null);
+      setRemainingTime(0);
+    } catch (error) {
+      setUndoError(error instanceof Error ? error.message : "Undo failed.");
+    } finally {
+      setIsUndoing(false);
+    }
+  }, [isUndoing, undoState]);
 
   const clear = useCallback(() => {
     setUndoState(null);
     setRemainingTime(0);
+    setUndoError(null);
+    setIsUndoing(false);
   }, []);
 
   const value: UndoContextValue = {
     undoState,
     canUndo,
     remainingTime,
+    isUndoing,
+    undoError,
     undo,
     clear,
     setUndoState,

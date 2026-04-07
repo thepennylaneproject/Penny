@@ -15,7 +15,7 @@ import { useUndo } from "@/contexts/UndoContext";
 import { getUndoLabel, formatUndoTime } from "@/lib/undo-machine";
 
 export function UndoNotification() {
-  const { undoState, canUndo, remainingTime, clear } = useUndo();
+  const { undoState, canUndo, remainingTime, undo, isUndoing, undoError } = useUndo();
   const [displayTime, setDisplayTime] = useState(0);
 
   useEffect(() => {
@@ -29,12 +29,7 @@ export function UndoNotification() {
   const label = getUndoLabel(undoState.action, undoState.data);
 
   const handleUndo = () => {
-    // Clear undo state
-    clear();
-    // In a real implementation, this would:
-    // 1. Call an API endpoint to restore the item
-    // 2. Update local state to reflect restoration
-    // For now, we just show that the action can be undone
+    void undo();
   };
 
   return (
@@ -64,6 +59,11 @@ export function UndoNotification() {
         <div style={{ fontSize: "11px", opacity: 0.8 }}>
           Undo in {formatUndoTime(displayTime)}
         </div>
+        {undoError ? (
+          <div style={{ fontSize: "11px", opacity: 0.85, marginTop: "0.35rem" }}>
+            {undoError}
+          </div>
+        ) : null}
       </div>
       <button
         type="button"
@@ -71,6 +71,7 @@ export function UndoNotification() {
           e.stopPropagation();
           handleUndo();
         }}
+        disabled={isUndoing}
         style={{
           padding: "0.4rem 0.75rem",
           borderRadius: "var(--radius-sm)",
@@ -79,7 +80,8 @@ export function UndoNotification() {
           border: "none",
           fontSize: "11px",
           fontWeight: 600,
-          cursor: "pointer",
+          cursor: isUndoing ? "progress" : "pointer",
+          opacity: isUndoing ? 0.7 : 1,
           whiteSpace: "nowrap",
           transition: "opacity 150ms ease-out",
         }}
@@ -90,7 +92,7 @@ export function UndoNotification() {
           (e.target as HTMLButtonElement).style.opacity = "1";
         }}
       >
-        Undo
+        {isUndoing ? "Undoing..." : "Undo"}
       </button>
     </div>
   );

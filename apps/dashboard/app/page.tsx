@@ -15,7 +15,6 @@ import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { DashboardRouteShell } from "@/components/DashboardRouteShell";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { SignInPrompt, ConfigurationError, RetryableError } from "@/components/AppReadinessUI";
-import { UndoNotification } from "@/components/UndoNotification";
 import { STATUS_GROUPS } from "@/lib/constants";
 import { isInQueuedSet } from "@/lib/finding-validation";
 import { fragileShortPathSet, overlappingFragileShortPaths } from "@/lib/fragile-files";
@@ -70,6 +69,16 @@ export default function Home() {
   useEffect(() => {
     void fetchProjects();
     void fetchQueue();
+  }, [fetchProjects, fetchQueue]);
+
+  useEffect(() => {
+    const handleUndoSuccess = () => {
+      void fetchProjects();
+      void fetchQueue();
+    };
+
+    window.addEventListener("penny:undo-success", handleUndoSuccess);
+    return () => window.removeEventListener("penny:undo-success", handleUndoSuccess);
   }, [fetchProjects, fetchQueue]);
 
   useEffect(() => {
@@ -628,7 +637,6 @@ export default function Home() {
         </div>
       )}
 
-      <UndoNotification />
     </DashboardRouteShell>
   );
 }

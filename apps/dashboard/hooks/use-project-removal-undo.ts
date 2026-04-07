@@ -14,6 +14,8 @@ import type { Project } from "@/lib/types";
 export interface UseProjectRemovalUndoOptions {
   onRemoveSuccess?: () => void;
   onRemoveError?: (error: Error) => void;
+  onUndoSuccess?: () => void;
+  onUndoError?: (error: Error) => void;
 }
 
 export function useProjectRemovalUndo(options?: UseProjectRemovalUndoOptions) {
@@ -36,9 +38,32 @@ export function useProjectRemovalUndo(options?: UseProjectRemovalUndoOptions) {
         setUndoState({
           action: "remove_project",
           timestamp: new Date(),
+          performUndo: async () => {
+            const restoreResponse = await apiFetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(project),
+            });
+
+            if (!restoreResponse.ok) {
+              const message = await restoreResponse
+                .json()
+                .then((data: unknown) => {
+                  if (data && typeof data === "object" && "error" in data) {
+                    return String((data as { error?: unknown }).error ?? restoreResponse.statusText);
+                  }
+                  return restoreResponse.statusText;
+                })
+                .catch(() => restoreResponse.statusText);
+              throw new Error(`Failed to restore project: ${message}`);
+            }
+
+            options?.onUndoSuccess?.();
+          },
           data: {
             projectName: project.name,
             label: `Removed project "${project.name}"`,
+            project,
           },
         });
 

@@ -13,6 +13,7 @@ import { apiFetch } from "@/lib/api-fetch";
 export interface UseFindingStatusChangeUndoOptions {
   onChangeSuccess?: () => void;
   onChangeError?: (error: Error) => void;
+  onUndoSuccess?: () => void;
 }
 
 export function useFindingStatusChangeUndo(options?: UseFindingStatusChangeUndoOptions) {
@@ -43,6 +44,34 @@ export function useFindingStatusChangeUndo(options?: UseFindingStatusChangeUndoO
         setUndoState({
           action: "change_finding_status",
           timestamp: new Date(),
+          performUndo: async () => {
+            const undoResponse = await apiFetch(
+              `/api/projects/${encodeURIComponent(projectName)}/findings/${encodeURIComponent(findingId)}`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  status: previousStatus,
+                  notes: `Undo status change to ${previousStatus}`,
+                }),
+              }
+            );
+
+            if (!undoResponse.ok) {
+              const message = await undoResponse
+                .json()
+                .then((data: unknown) => {
+                  if (data && typeof data === "object" && "error" in data) {
+                    return String((data as { error?: unknown }).error ?? undoResponse.statusText);
+                  }
+                  return undoResponse.statusText;
+                })
+                .catch(() => undoResponse.statusText);
+              throw new Error(`Failed to restore finding status: ${message}`);
+            }
+
+            options?.onUndoSuccess?.();
+          },
           data: {
             projectName,
             findingId,
