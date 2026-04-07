@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint app components lib hooks --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "test": "vitest --run",
+    "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
