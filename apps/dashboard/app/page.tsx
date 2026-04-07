@@ -99,7 +99,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    document.title = "Portfolio — penny";
+    document.title = "Portfolio — Penny";
   }, []);
 
   const setPatternsOpenPersist = (open: boolean) => {
@@ -667,7 +667,7 @@ export default function Home() {
             paddingTop: "1rem",
           }}
         >
-          penny v3.0 · findings persist via api
+          Penny v3.0 · findings persist via api
         </div>
       )}
 

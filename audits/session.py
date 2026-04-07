@@ -9,15 +9,15 @@ One script for the entire audit-fix-ship cycle. Reduces cognitive load to:
   4. Ship when it says you can
 
 Usage:
-  python3 session.py                  # Show what to do next
-  python3 session.py triage           # Show prioritized fix list
-  python3 session.py fix <finding_id> # Mark a finding as in-progress
-  python3 session.py done <finding_id> [commit_sha]  # Mark fix applied
-  python3 session.py skip <finding_id> [reason]      # Defer a finding
-  python3 session.py reaudit          # Show which agents to re-run
-  python3 session.py status           # Full dashboard
-  python3 session.py canship          # Am I ready to deploy?
-  python3 session.py decide <finding_id> <decision>  # Answer a question finding
+  python3 audits/session.py                  # Show what to do next
+  python3 audits/session.py triage           # Show prioritized fix list
+  python3 audits/session.py fix <finding_id> # Mark a finding as in-progress
+  python3 audits/session.py done <finding_id> [commit_sha]  # Mark fix applied
+  python3 audits/session.py skip <finding_id> [reason]      # Defer a finding
+  python3 audits/session.py reaudit          # Show which agents to re-run
+  python3 audits/session.py status           # Full dashboard
+  python3 audits/session.py canship          # Am I ready to deploy?
+  python3 audits/session.py decide <finding_id> <decision>  # Answer a question finding
 """
 
 import json
@@ -326,7 +326,7 @@ def cmd_fix(finding_id):
                     for t in tests:
                         print(f"  - {t}")
             print()
-            print(f"When done: python3 session.py done {finding_id} [commit_sha]")
+            print(f"When done: python3 audits/session.py done {finding_id} [commit_sha]")
             return
     print(f"Finding not found: {finding_id}")
 
@@ -507,15 +507,15 @@ def cmd_default():
             print(f"  {f['finding_id']}: {f.get('title','?')}")
         print()
         print("Finish them or defer:")
-        print(f"  python3 session.py done <finding_id> [commit]")
-        print(f"  python3 session.py skip <finding_id> 'reason'")
+        print(f"  python3 audits/session.py done <finding_id> [commit]")
+        print(f"  python3 audits/session.py skip <finding_id> 'reason'")
         return
 
     if pending:
         print(f"You have {len(pending)} fix(es) pending verification.")
         print()
         print("Run a targeted re-audit:")
-        print(f"  python3 session.py reaudit")
+        print(f"  python3 audits/session.py reaudit")
         print()
         print("Then run the synthesizer to verify fixes.")
         return
@@ -525,7 +525,7 @@ def cmd_default():
         for b in sorted(blockers, key=sort_key):
             _print_finding_line(b)
         fid = blockers[0]["finding_id"]
-        print(f"Start: python3 session.py fix {fid}")
+        print(f"Start: python3 audits/session.py fix {fid}")
         return
 
     if open_questions:
@@ -537,8 +537,8 @@ def cmd_default():
                 print(f"    Options: {fix['approach'][:120]}")
         print()
         qid = open_questions[0]["finding_id"]
-        print(f"Decide: python3 session.py decide {qid} 'your decision'")
-        print(f"Or defer: python3 session.py skip {qid} 'reason'")
+        print(f"Decide: python3 audits/session.py decide {qid} 'your decision'")
+        print(f"Or defer: python3 audits/session.py skip {qid} 'reason'")
         return
 
     if todo:
@@ -549,8 +549,8 @@ def cmd_default():
         for f in top:
             _print_finding_line(f)
         fid = top[0]["finding_id"]
-        print(f"Start: python3 session.py fix {fid}")
-        print(f"Or see full list: python3 session.py triage")
+        print(f"Start: python3 audits/session.py fix {fid}")
+        print(f"Or see full list: python3 audits/session.py triage")
         return
 
     # Nothing actionable
@@ -574,24 +574,24 @@ def main():
         cmd_triage()
     elif cmd == "fix":
         if len(sys.argv) < 3:
-            print("Usage: python3 session.py fix <finding_id>")
+            print("Usage: python3 audits/session.py fix <finding_id>")
             sys.exit(1)
         cmd_fix(sys.argv[2])
     elif cmd == "done":
         if len(sys.argv) < 3:
-            print("Usage: python3 session.py done <finding_id> [commit_sha]")
+            print("Usage: python3 audits/session.py done <finding_id> [commit_sha]")
             sys.exit(1)
         commit = sys.argv[3] if len(sys.argv) > 3 else None
         cmd_done(sys.argv[2], commit)
     elif cmd == "skip":
         if len(sys.argv) < 3:
-            print("Usage: python3 session.py skip <finding_id> [reason]")
+            print("Usage: python3 audits/session.py skip <finding_id> [reason]")
             sys.exit(1)
         reason = " ".join(sys.argv[3:]) if len(sys.argv) > 3 else None
         cmd_skip(sys.argv[2], reason)
     elif cmd == "decide":
         if len(sys.argv) < 4:
-            print("Usage: python3 session.py decide <finding_id> <decision>")
+            print("Usage: python3 audits/session.py decide <finding_id> <decision>")
             sys.exit(1)
         decision = " ".join(sys.argv[3:])
         cmd_decide(sys.argv[2], decision)
@@ -603,7 +603,7 @@ def main():
         print(__doc__)
     else:
         print(f"Unknown command: {cmd}")
-        print("Run 'python3 session.py help' for usage.")
+        print("Run 'python3 audits/session.py help' for usage.")
         sys.exit(1)
 
 

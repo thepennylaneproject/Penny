@@ -92,7 +92,7 @@ export function DashboardLogin({
             marginBottom:   "0.5rem",
           }}
         >
-          penny dashboard
+          Penny dashboard
         </div>
         <h1 style={{ fontSize: "15px", fontWeight: 500, margin: "0 0 1rem" }}>
           Sign in

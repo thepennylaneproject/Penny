@@ -24,7 +24,7 @@ const dmSerifDisplay = DM_Serif_Display({
 });
 
 export const metadata: Metadata = {
-  title: "penny",
+  title: "Penny",
   description: "Autonomous audit & patch system",
 };
 

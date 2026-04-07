@@ -93,16 +93,30 @@ function getGit(): string {
  */
 function loadClusterPrompts(auditKind?: string): { core: string; auditAgent: string } {
   const root = repoRoot();
-  const promptsDir = join(root, "audits", "prompts");
+  const promptDirs = [
+    join(root, "audits", "prompts"),
+    join(root, "apps", "worker", "audits", "prompts"),
+    join(root, "auditsv2", "prompts"),
+  ];
   const legacyDir = join(root, "legacy");
 
-  const corePath = join(promptsDir, "core_system_prompt.md");
-  const corePathLegacy = join(legacyDir, "core_system_prompt.md");
-  const coreResolved = existsSync(corePath) ? corePath : corePathLegacy;
-  if (!existsSync(coreResolved)) {
+  function resolvePromptPath(filename: string): string | null {
+    for (const dir of promptDirs) {
+      const candidate = join(dir, filename);
+      if (existsSync(candidate)) return candidate;
+    }
+    const legacyCandidate = join(legacyDir, filename);
+    if (existsSync(legacyCandidate)) return legacyCandidate;
+    return null;
+  }
+
+  const coreResolved = resolvePromptPath("core_system_prompt.md");
+  if (!coreResolved) {
+    const checkedLocations = [...promptDirs, legacyDir]
+      .map((dir) => join(dir, "core_system_prompt.md"))
+      .join(", ");
     throw new Error(
-      `core_system_prompt.md not found at ${corePath}` +
-        (corePathLegacy !== corePath ? ` (or ${corePathLegacy})` : "")
+      `core_system_prompt.md not found. Checked: ${checkedLocations}`
     );
   }
   const core = readCachedPrompt(coreResolved);
@@ -112,11 +126,10 @@ function loadClusterPrompts(auditKind?: string): { core: string; auditAgent: str
    * Returns empty string if the file exists in neither location (never throws).
    */
   function prompt(filename: string): string {
-    const auditPath = join(promptsDir, filename);
-    if (existsSync(auditPath)) return readCachedPrompt(auditPath);
-    const legacyPath = join(legacyDir, filename);
-    if (existsSync(legacyPath)) return readCachedPrompt(legacyPath);
-    return readCachedPrompt(auditPath);
+    const resolved = resolvePromptPath(filename);
+    if (resolved) return readCachedPrompt(resolved);
+    // Keep previous behavior: cache the first expected location as empty.
+    return readCachedPrompt(join(promptDirs[0], filename));
   }
 
   // Map audit_kind → prompt file(s), concatenated

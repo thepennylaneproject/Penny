@@ -94,7 +94,7 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
   }, [fetchProjects, fetchQueue]);
 
   useEffect(() => {
-    document.title = `${projectName} — penny`;
+    document.title = `${projectName} — Penny`;
   }, [projectName]);
 
   const onAuditSynced = useCallback(() => {

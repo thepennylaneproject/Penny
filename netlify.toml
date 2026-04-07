@@ -1,3 +1,6 @@
+# Penny dashboard: production hosting for this Next.js app is Netlify (see README).
+# Do not reintroduce apps/dashboard/vercel.json — it invited duplicate build config drift.
+
 [build]
 command = "turbo run build --filter penny-dashboard"
 publish = "apps/dashboard/.next"

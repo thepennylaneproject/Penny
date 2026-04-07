@@ -4,6 +4,38 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1"
 // --- CONFIGURATION ---
 const GITHUB_SECRET = Deno.env.get('GITHUB_WEBHOOK_SECRET') || '';
 
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
+}
+
+async function verifyGitHubSignature(
+  rawBody: string,
+  signatureHeader: string | null,
+): Promise<boolean> {
+  if (!GITHUB_SECRET) return false;
+  if (!signatureHeader?.startsWith('sha256=')) return false;
+
+  const providedDigest = signatureHeader.slice('sha256='.length).toLowerCase();
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(GITHUB_SECRET),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const sig = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+  const expectedDigest = Array.from(new Uint8Array(sig))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('');
+  return timingSafeEqualHex(expectedDigest, providedDigest);
+}
+
 serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
@@ -11,14 +43,19 @@ serve(async (req) => {
 
   // 1. Verify GitHub Signature (Crucial for security)
   const signature = req.headers.get('x-hub-signature-256');
-  if (!signature && Deno.env.get('NODE_ENV') === 'production') {
+  if (!signature) {
     return new Response('Missing GitHub Signature', { status: 401 });
   }
-  // Note: In production, use crypto.subtle to verify HMAC-SHA256 of the payload
 
   try {
+    const rawBody = await req.text();
+    const isValidSignature = await verifyGitHubSignature(rawBody, signature);
+    if (!isValidSignature) {
+      return new Response('Invalid GitHub Signature', { status: 401 });
+    }
+
     const eventType = req.headers.get('x-github-event');
-    const payload = await req.json();
+    const payload = JSON.parse(rawBody);
 
     // We only trigger audits on PRs or pushes to main
     if (eventType !== 'pull_request' && eventType !== 'push') {

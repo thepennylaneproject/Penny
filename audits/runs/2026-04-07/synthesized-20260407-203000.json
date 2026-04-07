@@ -1,0 +1,75 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "synthesizer_output",
+  "suite": "synthesized",
+  "run_id": "synthesized-20260407-203000",
+  "agent": {
+    "name": "synthesizer",
+    "role": "Merge, deduplicate, normalize, rank, and plan across all agent outputs."
+  },
+  "coverage": {
+    "files_examined": [
+      "supabase/functions/github-webhook/index.ts",
+      "apps/worker/src/process-job.ts"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [],
+  "rollups": {
+    "by_severity": {
+      "blocker": 0,
+      "major": 0,
+      "minor": 0,
+      "nit": 0
+    },
+    "by_category": {},
+    "by_type": {},
+    "by_status": {}
+  },
+  "next_actions": [
+    {
+      "action": "Decide or defer remaining question findings (session.py decide/skip).",
+      "finding_ids": [
+        "f-122e7405",
+        "f-ed623fc2",
+        "f-e114710d",
+        "f-58c68aa7"
+      ],
+      "rationale": "P0 fixed_pending_verify items verified and removed from open_findings."
+    }
+  ],
+  "diff_summary": {
+    "compared_against": "synthesized-20260407-184500",
+    "new_findings": [],
+    "resolved_findings": [
+      "f-a3622a1a",
+      "f-b73a32d8"
+    ],
+    "changed_severity": [],
+    "changed_status": [
+      {
+        "finding_id": "f-a3622a1a",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      },
+      {
+        "finding_id": "f-b73a32d8",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      }
+    ],
+    "converted_type": [],
+    "merged_findings": []
+  },
+  "ranked_plan": {
+    "top_fixes": [],
+    "commit_plan": [],
+    "regression_checklist": [
+      "POST webhook with invalid HMAC returns 401",
+      "Worker loadClusterPrompts resolves core_system_prompt.md from apps/worker/audits/prompts"
+    ],
+    "reaudit_plan": []
+  }
+}

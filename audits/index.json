@@ -2,6 +2,19 @@
   "schema_version": "1.1.0",
   "runs": [
     {
+      "run_id": "synthesized-20260407-203000",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-07T17:41:09.000Z",
+      "source_run_ids": [
+        "logic-20260407-201500",
+        "security-20260407-201400"
+      ],
+      "finding_count_total": 26,
+      "open_count": 17,
+      "duplicate_count": 4
+    },
+    {
       "run_id": "synthesized-20260407-184500",
       "kind": "synthesizer_output",
       "suite": "synthesized",
