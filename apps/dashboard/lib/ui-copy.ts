@@ -1,11 +1,19 @@
 /**
  * User-facing copy for repair / worker concepts (keep implementation terms out of UI).
+ *
+ * Branding: the product name in prose/UI is "Penny". Keep lowercase for code
+ * identifiers (queue names, env vars, DOM ids, event names) and path slugs.
  */
 
 export const UI_COPY = {
   navPortfolio: "Portfolio",
   /** Sidebar + engine view nav label */
   navRepairLedger: "Repairs",
+  /** Sidebar + /activity view — audit jobs, orchestration, repair runs */
+  navActivity: "Activity",
+  /** /activity page — clarifies the combined job list under the Activity headline */
+  activityPageSubline:
+    "Audit jobs, repair runs, and orchestration events in one place.",
   /** Count badge next to nav item */
   navLedgerCountTitle: "Findings queued for auto-repair",
   /** Engine footer / queue section */
@@ -25,14 +33,14 @@ export const UI_COPY = {
   ledgerRecorded: "Queued for repair",
   /** Finding detail — closure loop */
   lifecycleSection: "Closure loop",
-  lifecyclepenny: "penny record",
+  lifecyclePennyRecord: "Penny record",
   lifecycleRepairLedger: "Repair queue",
   lifecycleLinear: "Linear",
   lifecycleNextHeading: "What happens next",
   lifecycleLinearNotConfigured: "Linear integration not configured.",
   lifecycleLinearNoIssue: "No Linear issue linked for this finding.",
   lifecycleLinearDrift:
-    "Linear last saw a different status than penny does now — push an update from the Linear panel if you use issues for tracking.",
+    "Linear last saw a different status than Penny does now — push an update from the Linear panel if you use issues for tracking.",
   lifecycleRepairNone: "Not queued for repair.",
   lifecycleRepairQueued:
     "Queued — the worker will dispatch this automatically through the model router.",
@@ -70,7 +78,7 @@ export const UI_COPY = {
   /** Confirm dialog */
   confirmRemoveProjectTitle: "Remove project?",
   confirmRemoveProjectBody:
-    "This removes the project from penny: dashboard record, durable snapshots and events for this project, and queued/completed audit jobs tied to it. Linear mappings and maintenance rows cascade with the project. Your git repository is not affected.",
+    "This removes the project from Penny: dashboard record, durable snapshots and events for this project, and queued/completed audit jobs tied to it. Linear mappings and maintenance rows cascade with the project. Your git repository is not affected.",
   confirmDiscardImportTitle: "Discard form?",
   confirmDiscardImportBody: "You have unsaved text in the onboard form.",
   confirmCancel: "Cancel",

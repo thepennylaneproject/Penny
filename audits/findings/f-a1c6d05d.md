@@ -1,6 +1,6 @@
 # Finding: f-a1c6d05d
 
-> **Status:** open | **Severity:** minor | **Priority:** P2 | **Type:** enhancement | **Confidence:** inference
+> **Status:** fixed_verified | **Severity:** minor | **Priority:** P2 | **Type:** enhancement | **Confidence:** inference
 
 ## Title
 

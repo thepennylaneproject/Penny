@@ -90,7 +90,7 @@ pnpm clean
 
 ## Deployment
 
-**Dashboard hosting:** Production uses the repo-root [`netlify.toml`](./netlify.toml) (Next.js on Netlify). There is no `apps/dashboard/vercel.json`; keep deploy config in one place to avoid drift.
+**Dashboard hosting:** Production uses the repo-root [`netlify.toml`](./netlify.toml) (Next.js on Netlify). There is intentionally no `apps/dashboard/vercel.json` — Netlify is authoritative; a second platform file would duplicate install/build commands and env conventions.
 
 ### Dashboard → Netlify
 

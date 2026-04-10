@@ -112,7 +112,7 @@ export function ImportModal({
 
     if (mode === "repository") {
       if (!trimmedRepo) {
-        setError("Enter a repository URL (HTTPS or SSH). penny clones it on the server.");
+        setError("Enter a repository URL (HTTPS or SSH). Penny clones it on the server.");
         return;
       }
       if (!projectName) {
@@ -384,7 +384,7 @@ export function ImportModal({
             Repository <span style={{ color: "var(--ink-red)" }}>required</span>
           </div>
           <div style={{ fontSize: "10px", color: "var(--ink-text-4)", marginBottom: "0.75rem", lineHeight: 1.45 }}>
-            penny clones this URL on the server (no local checkout required). Project name is optional if the URL contains the repo name. Private repos need network access and credentials on the host running the dashboard.
+            Penny clones this URL on the server (no local checkout required). Project name is optional if the URL contains the repo name. Private repos need network access and credentials on the host running the dashboard.
           </div>
           <input
             type="text"

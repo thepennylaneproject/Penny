@@ -364,7 +364,7 @@ export function FindingDetail({
               }}
             >
               <li>
-                <span style={{ color: "var(--ink-text-4)" }}>{UI_COPY.lifecyclepenny}: </span>
+                <span style={{ color: "var(--ink-text-4)" }}>{UI_COPY.lifecyclePennyRecord}: </span>
                 {finding.status?.replace(/_/g, " ") ?? "—"}
                 <span style={{ color: "var(--ink-text-4)" }}> — </span>
                 {WORKFLOW_HINTS[finding.status] ?? "—"}

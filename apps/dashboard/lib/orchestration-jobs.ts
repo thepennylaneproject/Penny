@@ -5,6 +5,24 @@
 import { createPostgresPool, readDatabaseConfig } from "./postgres";
 import { randomUUID } from "node:crypto";
 import { normalizeProjectName } from "./project-identity";
+import type { EngineStatus, RepairRunSummary } from "./audit-reader";
+import { getEngineStatus } from "./audit-reader";
+import { listRecentRepairJobs } from "./maintenance-store";
+import type { RepairJob } from "./types";
+
+function repairJobToRunSummary(job: RepairJob): RepairRunSummary {
+  return {
+    run_id: String(job.id ?? job.finding_id),
+    finding_id: job.finding_id,
+    project_name: job.project_name,
+    started_at: job.started_at,
+    completed_at: job.completed_at,
+    total_cost_usd: job.cost_usd,
+    patch_applied: job.patch_applied,
+    provider_alias: job.provider_used,
+    model: job.model_used,
+  };
+}
 
 export type pennyJobType =
   | "weekly_audit"
@@ -121,6 +139,30 @@ export function jobsStoreConfigured(): boolean {
   return readDatabaseConfig().configured;
 }
 
+/** Ensures a penny_projects row exists so FK constraints can reference it (async sync safe). */
+async function ensurePennyProjectPlaceholder(
+  db: ReturnType<typeof pool>,
+  projectName: string,
+  repositoryUrl: string | null
+): Promise<void> {
+  const name = projectName.trim();
+  if (!name) return;
+  const now = new Date().toISOString();
+  const projectJson = {
+    name,
+    findings: [],
+    lastUpdated: now,
+    status: "active",
+    sourceType: "orchestration_placeholder",
+  };
+  await db.query(
+    `INSERT INTO penny_projects (name, repository_url, project_json, updated_at)
+     VALUES ($1, $2, $3::jsonb, now())
+     ON CONFLICT (name) DO NOTHING`,
+    [name, repositoryUrl, JSON.stringify(projectJson)]
+  );
+}
+
 export async function insertAuditJob(
   jobType: pennyJobType,
   opts: {
@@ -134,6 +176,19 @@ export async function insertAuditJob(
 ): Promise<pennyAuditJobRow> {
   const id = randomUUID();
   const db = pool();
+  const projectName =
+    typeof opts.project_name === "string"
+      ? opts.project_name.trim() || null
+      : null;
+  if (projectName) {
+    await ensurePennyProjectPlaceholder(
+      db,
+      projectName,
+      typeof opts.repository_url === "string"
+        ? opts.repository_url.trim() || null
+        : null
+    );
+  }
   const rows = await db.query(
     `INSERT INTO penny_audit_jobs (
        id,
@@ -151,8 +206,10 @@ export async function insertAuditJob(
     [
       id,
       jobType,
-      opts.project_name ?? null,
-      opts.repository_url ?? null,
+      projectName,
+      typeof opts.repository_url === "string"
+        ? opts.repository_url.trim() || null
+        : null,
       opts.manifest_revision ?? null,
       opts.checklist_id ?? null,
       opts.repo_ref ?? null,
@@ -272,4 +329,30 @@ export async function countActiveAuditJobs(): Promise<number> {
     `SELECT COUNT(*) AS count FROM penny_audit_jobs WHERE status IN ('queued', 'running')`
   );
   return Number(rows[0]?.count ?? 0);
+}
+
+/**
+ * Same data sources as GET /api/engine/status: Postgres when the jobs store is
+ * configured, otherwise audit files via {@link getEngineStatus}.
+ */
+export async function resolveEngineStatus(): Promise<EngineStatus> {
+  if (!jobsStoreConfigured()) {
+    return getEngineStatus();
+  }
+  const [runs, repairJobs, activeAuditJobs] = await Promise.all([
+    listRecentAuditRuns(100),
+    listRecentRepairJobs(100),
+    countActiveAuditJobs(),
+  ]);
+  const completed = repairJobs.filter((job) => job.status === "completed");
+  return {
+    last_audit_date: runs[0]?.created_at ?? null,
+    audit_run_count: runs.length,
+    repair_run_count: completed.length,
+    total_cost_usd: repairJobs.reduce((sum, job) => sum + (job.cost_usd ?? 0), 0),
+    queue_size: repairJobs.filter((job) => job.status === "queued").length,
+    queued_findings: repairJobs,
+    recent_repair_runs: completed.slice(0, 5).map(repairJobToRunSummary),
+    active_audit_jobs: activeAuditJobs,
+  };
 }

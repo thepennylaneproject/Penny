@@ -1,5 +1,13 @@
 -- Enforce authz at the database layer for dashboard penny_* tables.
 -- Service-role access remains available for backend jobs.
+--
+-- Deploy verification (f-23063538): after `supabase db push` / migrate on staging and production, confirm:
+--   SELECT c.relname, c.relrowsecurity
+--   FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+--   WHERE n.nspname = 'public' AND c.relkind = 'r' AND c.relname LIKE 'penny\_%' ESCAPE '\';
+-- Expect relrowsecurity = true for each penny_* table listed below.
+-- Client access: dashboard routes using createSupabaseServerClient use the end-user JWT (authenticated);
+-- maintenance-store / worker use DATABASE_URL or service_role and bypass RLS—intended for server-side jobs.
 
 ALTER TABLE penny_projects
   ADD COLUMN IF NOT EXISTS owner_id UUID REFERENCES auth.users(id) DEFAULT auth.uid();

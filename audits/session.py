@@ -19,7 +19,9 @@ Usage:
   python3 audits/session.py audit-batch      # Preflight + re-audit plan + one batched checklist file
   python3 audits/session.py audit-batch --full   # Same, but all 6 agents + monorepo scope (no WIP required)
   python3 audits/session.py audit-batch --skip-preflight  # Plan + checklist only (reuse last artifacts)
+  python3 audits/session.py ingest-synth audits/runs/<date>/synthesized-<id>.json  # Merge synth JSON → open_findings + case files + index
   python3 audits/session.py verify <finding_id>  # Mark re-audit passed (fixed_pending_verify -> fixed_verified)
+  python3 audits/session.py prune-closed [--dry-run]  # Drop terminal findings from open_findings.json (case .md kept)
   python3 audits/session.py status           # Full dashboard
   python3 audits/session.py canship          # Am I ready to deploy?
   python3 audits/session.py decide <finding_id> <decision>  # Answer a question finding
@@ -28,6 +30,7 @@ Usage:
 import json
 import sys
 import os
+import shutil
 import subprocess
 from datetime import datetime, timezone
 from collections import defaultdict
@@ -78,6 +81,11 @@ AGENT_PROMPTS = {
 
 # Stable order for batched checklists and terminal output
 AGENT_ORDER = ["logic", "data", "ux", "performance", "security", "deploy"]
+
+# Removed from open_findings.json by prune-closed (history remains in audits/findings/*.md and run JSON).
+PRUNE_CLOSED_STATUSES = frozenset(
+    {"fixed_verified", "wont_fix", "duplicate", "converted_to_enhancement"}
+)
 
 # What "changed" means for triggering re-audit
 TRIGGER_MAP = {
@@ -265,22 +273,25 @@ def collect_reaudit_plan(full_scope=False):
 
 
 def cmd_preflight():
-    """Run dashboard lint, typecheck, test, build into audits/artifacts/_run_/."""
+    """Run lint, typecheck, test, build into audits/artifacts/_run_/."""
     root = repo_root()
     art = os.path.join(root, "audits", "artifacts", "_run_")
     os.makedirs(art, exist_ok=True)
     dash = os.path.join(root, "apps", "dashboard")
-    if not os.path.isdir(dash):
-        print("preflight: apps/dashboard not found; skipping.")
-        return
+    if os.path.isdir(dash):
+        cwd = dash
+        pkg = "pnpm"
+    else:
+        cwd = root
+        pkg = "npm"
 
     steps = [
-        ("lint", ["pnpm", "run", "lint"]),
-        ("typecheck", ["pnpm", "run", "typecheck"]),
-        ("tests", ["pnpm", "run", "test"]),
-        ("build", ["pnpm", "run", "build"]),
+        ("lint", [pkg, "run", "lint"]),
+        ("typecheck", [pkg, "run", "typecheck"]),
+        ("tests", [pkg, "run", "test"]),
+        ("build", [pkg, "run", "build"]),
     ]
-    print("Preflight (dashboard) → audits/artifacts/_run_/")
+    print(f"Preflight ({cwd}) → audits/artifacts/_run_/")
     print("=" * 50)
     for name, cmd in steps:
         log = os.path.join(art, f"{name}.txt")
@@ -288,7 +299,7 @@ def cmd_preflight():
             with open(log, "w", encoding="utf-8") as fp:
                 p = subprocess.run(
                     cmd,
-                    cwd=dash,
+                    cwd=cwd,
                     stdout=fp,
                     stderr=subprocess.STDOUT,
                     timeout=900,
@@ -327,6 +338,13 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
     latest = os.path.join(batch_dir, "LATEST.md")
 
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+    findings_snapshot, _ = load_findings()
+    pending_verify = sorted(
+        f["finding_id"]
+        for f in findings_snapshot
+        if f.get("status") == "fixed_pending_verify" and f.get("finding_id")
+    )
+
     lines = [
         "# LYRA audit batch",
         "",
@@ -339,7 +357,7 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
         "",
         "- `audits/artifacts/_run_/lint.txt`",
         "- `audits/artifacts/_run_/typecheck.txt`",
-        "- `audits/artifacts/_run_/tests.txt`  _(from `pnpm run test`)_",
+        "- `audits/artifacts/_run_/tests.txt`  _(from `npm run test` at repo root, or `pnpm run test` in `apps/dashboard`)_",
         "- `audits/artifacts/_run_/build.txt`",
         "",
         "(If you used `--skip-preflight`, re-run `python3 audits/session.py preflight` first.)",
@@ -352,6 +370,28 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
             lines.append(f"- `{p}`")
     else:
         lines.append("- _(none — use repo-wide prompts)_")
+    lines.extend(["", "## Pending verification (carry-forward required)", ""])
+    if pending_verify:
+        lines.append(
+            f"`audits/open_findings.json` has **{len(pending_verify)}** row(s) with status `fixed_pending_verify`:"
+        )
+        lines.append("")
+        for fid in pending_verify:
+            lines.append(f"- `{fid}`")
+        lines.extend(
+            [
+                "",
+                "Each agent in this batch **must** include one `findings[]` object per listed ID that falls under that agent’s domain, using the **same `finding_id`**. Re-check proof hooks in the repo (or explain why hosted/external verification is still impossible). Use `fixed_verified` when substantiated; otherwise keep `fixed_pending_verify` or `open` with refreshed `proof_hooks` / `history`. Skip IDs outside your suite’s scope (other agents in this batch own them).",
+                "",
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "_No `fixed_pending_verify` rows at batch generation time — no carry-forward requirement._",
+                "",
+            ]
+        )
     lines.extend(
         [
             "",
@@ -373,11 +413,16 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
     lines.extend(
         [
             "",
-            f"{step}. **synthesizer** — read `audits/prompts/synthesizer.md`, ingest all agent JSON above, write `synthesized-{run_ts}.json`",
+            f"{step}. **synthesizer** — read `audits/prompts/synthesizer.md`, merge all agent JSON above, write `synthesized-{run_ts}.json`",
+            "",
+            f"{step + 1}. **canonical merge** — `python3 audits/session.py ingest-synth audits/runs/{day}/synthesized-{run_ts}.json`  _(updates `open_findings.json`, `findings/*.md` for new IDs, `index.json`)_",
             "",
             "## One-block prompt (paste into Cursor / ChatGPT)",
             "",
-            "Read-only audit. Do not edit source files. For each agent prompt below, read the prompt file and emit exactly one JSON object per LYRA output contract. Use preflight artifacts under `audits/artifacts/_run_/`, `audits/open_findings.json`, and focus on the paths listed under Focus paths. Save outputs under `audits/runs/<YYYY-MM-DD>/` with the run_id format shown in each prompt.",
+            (
+                "Audit pass: do not edit application code (backend/**, frontend/**, infra/**, etc.). For each agent prompt below, read the prompt file and emit exactly one JSON object per LYRA output contract. Use preflight artifacts under `audits/artifacts/_run_/`, read `audits/open_findings.json`, and focus on the paths listed under Focus paths. Save agent and synthesizer JSON under `audits/runs/<YYYY-MM-DD>/` with the run_id format shown in each prompt. After the synthesizer JSON is saved, run the **ingest-synth** command from the checklist so canonical audit files update. "
+                "**Pending verification:** obey the “Pending verification (carry-forward required)” section above — for each listed `finding_id` your suite can assess, emit that ID in your `findings` array (not only brand-new issues). Omitting IDs you should cover leaves them in `diff_summary.not_rereported` and canonical state unchanged for those rows."
+            ),
             "",
         ]
     )
@@ -585,8 +630,12 @@ def cmd_done(finding_id, commit=None):
             print(f"  Agent: {AGENT_PROMPTS.get(agent, agent)}")
             print(f"  Scope: {', '.join(files) if files else 'affected files'}")
             print()
-            print("After re-audit: merge synthesizer output into open_findings.json, or run:")
+            print("After re-audit: merge the synthesizer JSON into canonical state:")
+            print("  python3 audits/session.py ingest-synth audits/runs/<YYYY-MM-DD>/synthesized-<id>.json")
+            print("Or mark verified without a full merge:")
             print(f"  python3 audits/session.py verify {finding_id}")
+            print()
+            print("Push to Linear:  python3 audits/linear_sync.py push")
             return
     print(f"Finding not found: {finding_id}")
 
@@ -602,6 +651,7 @@ def cmd_skip(finding_id, reason=None):
             print(f"Deferred: {finding_id}")
             if reason:
                 print(f"Reason: {reason}")
+            print("Push to Linear:  python3 audits/linear_sync.py push")
             return
     print(f"Finding not found: {finding_id}")
 
@@ -682,8 +732,7 @@ def cmd_verify(finding_id):
         save_findings(data, findings)
         print(f"Verified: {finding_id} -> fixed_verified")
         print()
-        print("Optional: push to Linear (updates mapped issues; also closes Linear when a finding")
-        print("  row was removed from open_findings.json — see audits/WORKFLOW.md §4b).")
+        print("Optional: push status to Linear (maps to Done):")
         print("  python3 audits/linear_sync.py push")
         return
     print(f"Finding not found: {finding_id}")
@@ -741,6 +790,52 @@ def cmd_canship():
         print("Remaining open items are P1+ non-blockers. Safe to deploy.")
 
 
+def cmd_prune_closed(dry_run: bool = False):
+    """Remove terminal-status rows from open_findings.json; keep audits/findings/*.md as archive."""
+    findings, data = load_findings()
+    if not findings:
+        print("No findings to prune.")
+        return
+
+    pruned = [f for f in findings if f.get("status") in PRUNE_CLOSED_STATUSES]
+    kept = [f for f in findings if f.get("status") not in PRUNE_CLOSED_STATUSES]
+    pruned_ids = {f["finding_id"] for f in pruned}
+    kept_ids = {f["finding_id"] for f in kept}
+
+    for f in kept:
+        rel = f.get("related_ids")
+        if not rel:
+            continue
+        new_rel = [r for r in rel if r in kept_ids]
+        if new_rel != rel:
+            f["related_ids"] = new_rel
+
+    print(f"Prune-closed ({'DRY RUN' if dry_run else 'live'})")
+    print(f"  Ledger rows: {len(findings)} -> {len(kept)} (removing {len(pruned)} terminal)")
+    if pruned:
+        for f in sorted(pruned, key=lambda x: x.get("finding_id", "")):
+            print(f"    - {f.get('finding_id')}: {f.get('status')} — {f.get('title', '')[:70]}")
+    print()
+
+    if not pruned_ids:
+        print("Nothing to prune — no fixed_verified / wont_fix / duplicate / converted_to_enhancement rows.")
+        return
+
+    if dry_run:
+        print("Dry run complete. Run without --dry-run to write open_findings.json.")
+        print("Afterward: python3 audits/linear_sync.py prune   # drop orphan Linear map entries")
+        return
+
+    backup = OPEN_FINDINGS + ".pre-prune.bak"
+    shutil.copy2(OPEN_FINDINGS, backup)
+    print(f"Backup: {backup}")
+
+    data["prune_closed_applied"] = NOW
+    save_findings(data, kept)
+    print(f"Written: {OPEN_FINDINGS} ({len(kept)} rows)")
+    print("Next: python3 audits/linear_sync.py prune   # if you use Linear sync")
+
+
 def cmd_default():
     """The zero-thought entry point. Just tells you what to do next."""
     findings, _ = load_findings()
@@ -780,9 +875,10 @@ def cmd_default():
         for f in pending:
             print(f"  {f['finding_id']}: {f.get('title', '?')}")
         print()
-        print("Re-audit + synthesizer (updates audits/open_findings.json from LLM output):")
+        print("Re-audit + synthesizer, then apply canonical merge:")
         print("  python3 audits/session.py reaudit")
-        print("  # then agent JSON -> audits/prompts/synthesizer.md -> merge result into repo")
+        print("  # agents → synthesizer JSON → ingest:")
+        print("  python3 audits/session.py ingest-synth audits/runs/<YYYY-MM-DD>/synthesized-<id>.json")
         print()
         print("Or, if you already confirmed fixes (tests/code review), mark verified:")
         print("  python3 audits/session.py verify <finding_id>")
@@ -872,11 +968,21 @@ def main():
         skip = "--skip-preflight" in rest or "--no-preflight" in rest
         full = "--full" in rest
         cmd_audit_batch(skip_preflight=skip, full_scope=full)
+    elif cmd in ("ingest-synth", "ingest-synthesizer"):
+        if len(sys.argv) < 3:
+            print("Usage: python3 audits/session.py ingest-synth <path/to/synthesized-*.json>")
+            sys.exit(1)
+        ingest_mod = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ingest_synthesizer.py")
+        r = subprocess.run([sys.executable, ingest_mod, sys.argv[2]], cwd=repo_root())
+        sys.exit(r.returncode)
     elif cmd == "verify":
         if len(sys.argv) < 3:
             print("Usage: python3 session.py verify <finding_id>")
             sys.exit(1)
         cmd_verify(sys.argv[2])
+    elif cmd in ("prune-closed", "prune_closed"):
+        dry = "--dry-run" in sys.argv or "-n" in sys.argv
+        cmd_prune_closed(dry_run=dry)
     elif cmd == "canship":
         cmd_canship()
     elif cmd == "help":

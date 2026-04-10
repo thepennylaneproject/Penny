@@ -94,6 +94,7 @@ Collect coverage declarations from all agents. If any agent has `coverage_comple
 - If a finding exists in prior `open_findings.json`: compare fields, append history events for changes.
 - If two agents report the same issue with different IDs: keep higher-confidence one, mark other as `duplicate`.
 - Findings in prior state but not re-reported: list in `diff_summary.not_rereported`. Do NOT auto-close them.
+- **`not_rereported` vs prior `fixed_pending_verify`:** Let `pending_prior` be every `finding_id` whose status in prior `open_findings.json` was `fixed_pending_verify`. Let `skipped` = `pending_prior ∩ diff_summary.not_rereported`. If `skipped` is non-empty, agents did not carry those rows forward — **add one `next_actions` entry** (in Step 8) so humans see verification never ran: `finding_id` = first element of `skipped` sorted lexicographically; `action` = one sentence stating that these `fixed_pending_verify` IDs were not re-reported in agent JSON so canonical status was left unchanged; `rationale` = comma-separated list of all IDs in `skipped`.
 
 ## Step 5: Resolve Conflicts
 
@@ -116,6 +117,7 @@ Compare new vs prior `open_findings.json`:
 
 ## Step 8: Produce Ranked Plan
 
+- `next_actions`: include the usual top 3–5 recommendations **plus** the mandatory entry from Step 4 when `skipped` (prior `fixed_pending_verify` ∩ `not_rereported`) is non-empty. When both apply, the pipeline-gap entry may sit alongside other actions (total items may exceed 5 briefly — prefer keeping the gap visible).
 - `top_fixes` (max 10): rank by P0 Blockers > P0 Majors > P1 Blockers > etc. Within ties, prefer higher confidence then lower effort.
 - `commit_plan`: commit-sized steps with `title`, `finding_ids`, `steps`, `affected_files`, `tests_or_checks`.
 - `regression_checklist`: concrete checks to run after patches.

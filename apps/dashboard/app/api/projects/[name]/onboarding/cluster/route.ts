@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
 import { apiErrorMessage } from "@/lib/api-error";
-import type { AuditCluster } from "@/lib/types";
+import type { AuditCluster, Project } from "@/lib/types";
 
 /** Dynamic import keeps fs-heavy collectors out of the static route → next.config NFT trace (f-203ecae0). */
 async function loadClusterSnapshot() {
@@ -74,11 +74,21 @@ export async function POST(request: Request, { params }: Params) {
         return NextResponse.json({ error: "Standard cluster has no secondary onboarding" }, { status: 400 });
     }
 
-    // In a full implementation, we would save these collected artifacts to the Project model in the DB
-    // e.g. project.clusterArtifacts[cluster] = result; await repo.update(project);
-    // For now, we return them to the client to prove the pipeline works.
-    
-    return NextResponse.json({ success: true, cluster, artifacts: result });
+    const merged: Project = {
+      ...project,
+      clusterArtifacts: {
+        ...(project.clusterArtifacts ?? {}),
+        [cluster]: result,
+      },
+    };
+    const saved = await repo.update(merged);
+
+    return NextResponse.json({
+      success: true,
+      cluster,
+      artifacts: result,
+      lastUpdated: saved.lastUpdated,
+    });
   } catch (e) {
     console.error(`POST /api/projects/[name]/onboarding/cluster`, e);
     return NextResponse.json({ error: apiErrorMessage(e) }, { status: 500 });

@@ -52,6 +52,9 @@ export async function PUT(request: Request, { params }: Params) {
       manifest: body.manifest ?? existing.manifest,
       maintenanceBacklog: body.maintenanceBacklog ?? existing.maintenanceBacklog,
       maintenanceTasks: body.maintenanceTasks ?? existing.maintenanceTasks,
+      clusterSummaries: body.clusterSummaries ?? existing.clusterSummaries,
+      clusterArtifacts: body.clusterArtifacts ?? existing.clusterArtifacts,
+      metaSummary: body.metaSummary ?? existing.metaSummary,
     };
     const project = await repo.update(updated);
     return NextResponse.json(project);

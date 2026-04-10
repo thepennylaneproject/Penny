@@ -18,6 +18,8 @@ Find N+1 queries, missing indexes, redundant API calls, oversized bundles, unnec
 
 ## Must Do
 
+**Re-audit / `fixed_pending_verify`:** Every row in `audits/open_findings.json` with status `fixed_pending_verify` that this suite can assess must appear in your output `findings` array with the **same `finding_id`**. Re-check proof hooks in the repo; set `fixed_verified` when substantiated, or keep `fixed_pending_verify` / `open` with refreshed evidence and `history`. Skip IDs outside this suite’s scope (other agents own them in a batched run).
+
 1. Perform history lookup first to avoid duplicate findings.
 2. Find every DB query: SELECT *? Inside a loop? Unbounded results? Missing index?
 3. Map outbound API calls: redundant? Missing cache? No pagination?

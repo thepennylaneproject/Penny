@@ -6,21 +6,21 @@
 
  RUN  v2.1.9 /Users/sarahsahl/Desktop/penny/apps/dashboard
 
- ✓ lib/__tests__/middleware.test.ts (22 tests) 8ms
- ✓ lib/__tests__/audit-run-forensics.test.ts (11 tests) 9ms
- ✓ lib/__tests__/fragile-files.test.ts (5 tests) 4ms
- ✓ lib/__tests__/repository.test.ts (10 tests) 8ms
- ✓ lib/__tests__/resolve-next-action.test.ts (7 tests) 4ms
- ✓ lib/__tests__/linear.test.ts (23 tests) 8ms
- ✓ lib/__tests__/auth-session.test.ts (12 tests) 13ms
+ ✓ lib/__tests__/middleware.test.ts (22 tests) 9ms
+ ✓ lib/__tests__/linear.test.ts (23 tests) 5ms
+ ✓ lib/__tests__/auth-session.test.ts (12 tests) 5ms
+ ✓ lib/__tests__/audit-run-forensics.test.ts (11 tests) 4ms
+ ✓ lib/__tests__/repository.test.ts (10 tests) 10ms
+ ✓ lib/__tests__/fragile-files.test.ts (5 tests) 3ms
+ ✓ lib/__tests__/resolve-next-action.test.ts (7 tests) 5ms
+ ✓ lib/__tests__/repair-proof.test.ts (6 tests) 3ms
+ ✓ lib/__tests__/import-summary.test.ts (4 tests) 3ms
+ ✓ lib/__tests__/dashboard-secret.test.ts (4 tests) 2ms
  ✓ lib/__tests__/degraded-audit-finding.test.ts (3 tests) 2ms
  ✓ lib/__tests__/runtime-config.test.ts (3 tests) 2ms
- ✓ lib/__tests__/dashboard-secret.test.ts (4 tests) 4ms
- ✓ lib/__tests__/repair-proof.test.ts (6 tests) 3ms
- ✓ lib/__tests__/import-summary.test.ts (4 tests) 9ms
 
  Test Files  12 passed (12)
       Tests  110 passed (110)
-   Start at  12:01:31
-   Duration  945ms (transform 364ms, setup 0ms, collect 563ms, tests 74ms, environment 2ms, prepare 1.77s)
+   Start at  17:19:09
+   Duration  715ms (transform 370ms, setup 0ms, collect 629ms, tests 53ms, environment 2ms, prepare 1.12s)
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "1.1.0",
-  "last_updated": "2026-04-10T20:28:12Z",
+  "last_updated": "2026-04-10T18:51:24Z",
   "run_id": "synthesized-20260410-182313",
   "synthesized_from": [
     "logic-20260410-170148",
@@ -10,6 +10,81 @@
     "synthesized-20260410-170148"
   ],
   "open_findings": [
+    {
+      "finding_id": "f-23e02a8c",
+      "category": "copy-mismatch",
+      "title": "Nav label \u201cActivity\u201d vs page header: eyebrow \u201cJob queue\u201d and H1 \u201cActivity\u201d",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "status": "fixed_verified",
+      "description": "Sidebar nav uses Activity. JobQueueView eyebrow reads Job queue and H1 Activity \u2014 nav matches H1; eyebrow remains a third label. Align naming or add explainer.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Shell.tsx nav label Activity",
+          "file": "apps/dashboard/components/Shell.tsx",
+          "start_line": 88,
+          "end_line": 93
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "JobQueueView eyebrow Job queue, H1 Activity",
+          "file": "apps/dashboard/components/JobQueueView.tsx",
+          "start_line": 631,
+          "end_line": 654
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-07T05:55:03.000Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "Terminology drift within single view."
+        },
+        {
+          "timestamp": "2026-04-07T18:45:00.000Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Normalized proof_hooks from agent hooks[] field."
+        },
+        {
+          "timestamp": "2026-04-10T18:20:47Z",
+          "actor": "solo-dev",
+          "event": "patch_proposed",
+          "notes": "Marked in-progress via session runner."
+        },
+        {
+          "timestamp": "2026-04-10T18:23:13Z",
+          "actor": "ux-flow-auditor",
+          "event": "note_added",
+          "notes": "ux-20260410-182313: refreshed copy \u2014 eyebrow/H1 order changed in code."
+        },
+        {
+          "timestamp": "2026-04-10T18:25:00Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Title and proof_hooks updated from re-audit."
+        },
+        {
+          "timestamp": "2026-04-10T18:51:24Z",
+          "actor": "solo-dev",
+          "event": "patch_applied",
+          "notes": "Fix applied via session runner."
+        },
+        {
+          "timestamp": "2026-04-10T18:51:24Z",
+          "actor": "solo-dev",
+          "event": "verified",
+          "notes": "Marked fixed_verified via session runner after re-audit confirmation."
+        }
+      ],
+      "sources": [
+        "ux-20260407-055503"
+      ]
+    },
     {
       "finding_id": "f-6af2fc10",
       "category": "migration_hygiene",
@@ -74,7 +149,7 @@
       "priority": "P2",
       "confidence": "inference",
       "estimated_effort": "small",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "README and repo branding use \u201cPenny\u201d; root metadata title and in-app strings use lowercase \u201cpenny\u201d (e.g. layout metadata, document.title suffixes, footer). Decide a single public-facing rule (sentence case in prose, lowercase wordmark in UI, etc.) and align metadata, titles, and marketing copy.",
       "proof_hooks": [
         {
@@ -108,12 +183,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: Penny"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-577): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -129,7 +198,7 @@
       "priority": "P2",
       "confidence": "evidence",
       "estimated_effort": "small",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "Migration grants SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated. RLS still applies, but widening table privileges increases blast radius if policies are misconfigured or bypassed. Confirm this matches intended Supabase API surface.",
       "proof_hooks": [
         {
@@ -159,12 +228,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: Narrow GRANTs"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-600): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -180,7 +243,7 @@
       "priority": "P2",
       "confidence": "inference",
       "estimated_effort": "small",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "`netlify.toml` defines the dashboard build (`turbo run build --filter penny-dashboard`) and Next plugin, while `apps/dashboard/vercel.json` specifies framework, output directory, and npm-based install/build. It is unclear which platform is authoritative for production, which affects env var naming, build commands, and review of deployment safety.",
       "proof_hooks": [
         {
@@ -213,12 +276,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: Netlify is where Penny will be deployed"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-593): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -234,7 +291,7 @@
       "priority": "P2",
       "confidence": "inference",
       "estimated_effort": "small",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "Migrations define idx_findings_project and idx_findings_status separately. Dashboard queries often filter by project_id and optionally status with ordering by created_at. A composite index may reduce heap fetches versus BitmapAnd of two indexes, but this should be validated with real row counts and plans.",
       "proof_hooks": [
         {
@@ -269,12 +326,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: Add index"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-588): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -290,7 +341,7 @@
       "priority": "P2",
       "confidence": "inference",
       "estimated_effort": "small",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "Repository includes 20260408120000_penny_tables_rls.sql (RLS on penny_* tables). f-9ef3f9e1 is closed as fixed_verified in-repo. Confirm this migration has been applied to production/staging Supabase and that clients use the intended role (service vs authenticated).",
       "proof_hooks": [
         {
@@ -329,12 +380,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: confirmed"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-631): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -352,7 +397,7 @@
       "priority": "P2",
       "confidence": "evidence",
       "estimated_effort": "medium",
-      "status": "fixed_pending_verify",
+      "status": "accepted",
       "description": "POST /api/projects/[name]/onboarding/cluster collects cluster-specific artifacts (git history, manifests, CSS tokens) and returns them in JSON. The handler documents that a full implementation would save into the Project model; without that, only the client retains the payload across navigation unless it re-fetches or stores locally.",
       "proof_hooks": [
         {
@@ -388,12 +433,6 @@
           "actor": "solo-dev",
           "event": "note_added",
           "notes": "Decision: proceed with a full implementation"
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-636): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -436,12 +475,6 @@
           "actor": "synthesizer",
           "event": "merged",
           "notes": "synthesized-20260410-182313."
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-639): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -530,12 +563,6 @@
           "actor": "synthesizer",
           "event": "merged",
           "notes": "synthesized-20260410-182313."
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-641): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -581,12 +608,6 @@
           "actor": "synthesizer",
           "event": "merged",
           "notes": "synthesized-20260410-182313."
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-642): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -632,12 +653,6 @@
           "actor": "synthesizer",
           "event": "merged",
           "notes": "synthesized-20260410-182313."
-        },
-        {
-          "timestamp": "2026-04-10T20:27:52Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-643): In Review -> fixed_pending_verify"
         }
       ],
       "sources": [
@@ -692,85 +707,7 @@
         "estimated_effort": "small",
         "tests_needed": []
       }
-    },
-    {
-      "finding_id": "f-23e02a8c",
-      "category": "copy-mismatch",
-      "title": "Nav label \u201cActivity\u201d vs page header: eyebrow \u201cJob queue\u201d and H1 \u201cActivity\u201d",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P3",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "in_progress",
-      "description": "Sidebar nav uses Activity. JobQueueView eyebrow reads Job queue and H1 Activity \u2014 nav matches H1; eyebrow remains a third label. Align naming or add explainer.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "Shell.tsx nav label Activity",
-          "file": "apps/dashboard/components/Shell.tsx",
-          "start_line": 88,
-          "end_line": 93
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "JobQueueView eyebrow Job queue, H1 Activity",
-          "file": "apps/dashboard/components/JobQueueView.tsx",
-          "start_line": 631,
-          "end_line": 654
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T05:55:03.000Z",
-          "actor": "ux-flow-auditor",
-          "event": "created",
-          "notes": "Terminology drift within single view."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from agent hooks[] field."
-        },
-        {
-          "timestamp": "2026-04-10T18:20:47Z",
-          "actor": "solo-dev",
-          "event": "patch_proposed",
-          "notes": "Marked in-progress via session runner."
-        },
-        {
-          "timestamp": "2026-04-10T18:23:13Z",
-          "actor": "ux-flow-auditor",
-          "event": "note_added",
-          "notes": "ux-20260410-182313: refreshed copy \u2014 eyebrow/H1 order changed in code."
-        },
-        {
-          "timestamp": "2026-04-10T18:25:00Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Title and proof_hooks updated from re-audit."
-        },
-        {
-          "timestamp": "2026-04-10T20:08:14Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-645): In Review -> fixed_pending_verify"
-        }
-      ],
-      "sources": [
-        "ux-20260407-055503",
-        "ux-20260410-182313"
-      ],
-      "impact": "",
-      "suggested_fix": {
-        "approach": "See synthesizer / agent notes.",
-        "affected_files": [],
-        "estimated_effort": "small",
-        "tests_needed": []
-      }
     }
   ],
-  "cleanup_applied": "2026-04-10T17:50:31Z",
-  "prune_closed_applied": "2026-04-10T18:51:29Z"
+  "cleanup_applied": "2026-04-10T17:50:31Z"
 }

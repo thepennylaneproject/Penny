@@ -1,6 +1,8 @@
-# penny Dashboard
+# Penny Dashboard
 
 Next.js UI for projects, findings, orchestration, and Linear sync.
+
+**Hosting (single source of truth):** Production builds use the repo-root [`netlify.toml`](../netlify.toml) (`turbo run build --filter penny-dashboard`, Next plugin). Do not add `vercel.json` here — duplicate platform config drifts from Netlify env and build commands (see root [README.md](../README.md) — Deployment).
 
 ## Storage
 
@@ -29,7 +31,7 @@ Dev: if `ORCHESTRATION_ENQUEUE_SECRET` is unset, POST is allowed without auth.
 
 ## Netlify
 
-Repo root [`netlify.toml`](../netlify.toml) sets `base = "dashboard"`. Scheduled function enqueues weekly audit Monday 09:00 UTC.
+Repo root [`netlify.toml`](../netlify.toml) defines the dashboard build command and publish directory (`apps/dashboard/.next`). Configure the linked site in the Netlify UI from the monorepo root unless your team uses a different base path. Scheduled function (if configured) enqueues weekly audit Monday 09:00 UTC.
 
 Env on Netlify: `DATABASE_URL`, `ORCHESTRATION_ENQUEUE_SECRET`, `REDIS_URL` (recommended), plus existing Linear/routing vars as needed.
 

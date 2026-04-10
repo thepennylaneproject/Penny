@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
-import { getEngineStatus } from "@/lib/audit-reader";
 import {
-  countActiveAuditJobs,
   jobsStoreConfigured,
-  listRecentAuditRuns,
+  resolveEngineStatus,
 } from "@/lib/orchestration-jobs";
-import { listRecentRepairJobs } from "@/lib/maintenance-store";
 import { apiErrorMessage } from "@/lib/api-error";
 import { getOrSetRuntimeCache, getRuntimeCacheStats } from "@/lib/runtime-cache";
 
@@ -27,33 +24,23 @@ export async function GET() {
       ENGINE_STATUS_CACHE_KEY,
       ENGINE_STATUS_CACHE_TTL_MS,
       async () => {
+        const base = await resolveEngineStatus();
         if (jobsStoreConfigured()) {
-          const [runs, repairJobs, activeAuditJobs] = await Promise.all([
-            listRecentAuditRuns(100),
-            listRecentRepairJobs(100),
-            countActiveAuditJobs(),
-          ]);
+          const oldest_queued_job_age_ms = base.queued_findings
+            .filter((job) => job.status === "queued")
+            .map((job) => {
+              const queuedAt = Date.parse(job.queued_at);
+              return Number.isFinite(queuedAt) ? Math.max(0, Date.now() - queuedAt) : 0;
+            })
+            .reduce((max, age) => Math.max(max, age), 0);
           return {
-            last_audit_date: runs[0]?.created_at ?? null,
-            audit_run_count: runs.length,
-            repair_run_count: repairJobs.filter((job) => job.status === "completed").length,
-            total_cost_usd: repairJobs.reduce((sum, job) => sum + (job.cost_usd ?? 0), 0),
-            queue_size: repairJobs.filter((job) => job.status === "queued").length,
-            oldest_queued_job_age_ms: repairJobs
-              .filter((job) => job.status === "queued")
-              .map((job) => {
-                const queuedAt = Date.parse(job.queued_at);
-                return Number.isFinite(queuedAt) ? Math.max(0, Date.now() - queuedAt) : 0;
-              })
-              .reduce((max, age) => Math.max(max, age), 0),
-            queued_findings: repairJobs,
-            recent_repair_runs: repairJobs.filter((job) => job.status === "completed").slice(0, 5),
-            active_audit_jobs: activeAuditJobs,
+            ...base,
+            oldest_queued_job_age_ms,
             runtime_cache: getRuntimeCacheStats(),
           };
         }
         return {
-          ...getEngineStatus(),
+          ...base,
           runtime_cache: getRuntimeCacheStats(),
         };
       }

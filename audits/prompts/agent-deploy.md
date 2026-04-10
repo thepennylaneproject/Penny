@@ -21,6 +21,8 @@ Find gaps in build config, CI/CD pipelines, error boundaries, logging, environme
 
 ## Must Do
 
+**Re-audit / `fixed_pending_verify`:** Every row in `audits/open_findings.json` with status `fixed_pending_verify` that this suite can assess must appear in your output `findings` array with the **same `finding_id`**. Re-check proof hooks in the repo; set `fixed_verified` when substantiated, or keep `fixed_pending_verify` / `open` with refreshed evidence and `history`. Skip IDs outside this suite’s scope (other agents own them in a batched run).
+
 1. Perform history lookup first to avoid duplicate findings.
 2. Check: strict TypeScript? Build warnings suppressed? Lockfile committed? Pinned deps?
 3. CI: does it run lint, typecheck, test, build? Any gaps?

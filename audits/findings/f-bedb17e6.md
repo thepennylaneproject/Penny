@@ -1,6 +1,6 @@
 # Finding: f-bedb17e6
 
-> **Status:** open | **Severity:** minor | **Priority:** P3 | **Type:** debt | **Confidence:** evidence
+> **Status:** fixed_verified | **Severity:** minor | **Priority:** P3 | **Type:** debt | **Confidence:** evidence
 
 ## Title
 

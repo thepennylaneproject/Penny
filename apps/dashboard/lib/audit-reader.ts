@@ -113,18 +113,38 @@ export function readRepairRunSummaries(): RepairRunSummary[] {
   }
 }
 
-/** Read all audit run JSON files from audits/runs/. */
+/** Collect *.json under audits/runs (top-level and audits/runs/YYYY-MM-DD/). */
+function listAuditRunJsonPaths(runsDir: string): string[] {
+  const paths: string[] = [];
+  const top = fs.readdirSync(runsDir, { withFileTypes: true });
+  for (const entry of top) {
+    const full = path.join(runsDir, entry.name);
+    if (entry.isFile() && entry.name.endsWith(".json")) {
+      paths.push(full);
+    } else if (entry.isDirectory()) {
+      let nested: fs.Dirent[];
+      try {
+        nested = fs.readdirSync(full, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const f of nested) {
+        if (f.isFile() && f.name.endsWith(".json")) {
+          paths.push(path.join(full, f.name));
+        }
+      }
+    }
+  }
+  return paths.sort().reverse();
+}
+
+/** Read all audit run JSON files from audits/runs/ (including nested date folders). */
 export function readAuditRunFiles(): AuditRun[] {
   const runsDir = path.join(auditDir(), "runs");
   if (!fs.existsSync(runsDir)) return [];
   try {
-    const files = fs
-      .readdirSync(runsDir)
-      .filter((f) => f.endsWith(".json"))
-      .sort()
-      .reverse();
-    return files
-      .map((f) => safeReadJSON<AuditRun>(path.join(runsDir, f), {}))
+    return listAuditRunJsonPaths(runsDir)
+      .map((p) => safeReadJSON<AuditRun>(p, {}))
       .filter((r) => Object.keys(r).length > 0);
   } catch {
     return [];

@@ -434,6 +434,8 @@ export interface Project {
   maintenanceBacklog?: MaintenanceBacklogItem[];
   maintenanceTasks?: MaintenanceTask[];
   clusterSummaries?: Partial<Record<AuditCluster, ClusterSummary>>;
+  /** Raw collector output from POST .../onboarding/cluster (git history, manifests, CSS tokens). */
+  clusterArtifacts?: Partial<Record<AuditCluster, Record<string, unknown>>>;
   metaSummary?: ProjectMetaSummary;
 }
 

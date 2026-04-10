@@ -148,10 +148,12 @@ CREATE INDEX IF NOT EXISTS idx_orchestration_events_job_id ON orchestration_even
 CREATE INDEX IF NOT EXISTS idx_orchestration_events_created_at ON orchestration_events(created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- RLS: 002 already enables RLS and sets repair_jobs policy via findings.
--- Add policies for new access patterns and new tables where 002 had gaps.
+-- RLS: 20260402163740_rls_policies.sql created a single FOR ALL policy named exactly
+-- "Users can access repair jobs for their projects" (human-readable name, not snake_case).
+-- Drop that first, then replace with granular SELECT/INSERT policies. Stuck DBs where an
+-- older revision omitted the quoted drop are reconciled in 20260410141000_drop_legacy_repair_jobs_rls_policy.sql.
 -- ---------------------------------------------------------------------------
--- Extra policies for project_id-scoped access (002 already grants via findings.finding_id)
+DROP POLICY IF EXISTS "Users can access repair jobs for their projects" ON repair_jobs;
 DROP POLICY IF EXISTS "users_can_view_repair_jobs" ON repair_jobs;
 CREATE POLICY "users_can_view_repair_jobs"
   ON repair_jobs
@@ -249,8 +251,10 @@ CREATE POLICY "users_can_insert_orchestration_events"
     )
   );
 
--- Grants (idempotent for repeated runs)
-GRANT SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated;
+-- Grants: authenticated only for repair_jobs (f-58c68aa7). RLS still applies; anon must not hold
+-- table privileges—reduces blast radius if policies regress. service_role bypasses RLS as usual.
+-- Remote schema dumps may re-grant anon; 20260407210000_findings_index_repair_jobs_grants.sql revokes anon on repair_jobs.
+GRANT SELECT, INSERT, UPDATE ON repair_jobs TO authenticated;
 GRANT SELECT ON repair_candidates TO anon, authenticated;
 GRANT SELECT ON repair_costs TO anon, authenticated;
 GRANT SELECT, INSERT ON orchestration_events TO anon, authenticated;

@@ -419,7 +419,7 @@ export function ProjectManagementPanel({
           Danger zone
         </div>
         <p style={{ fontSize: "11px", fontFamily: "var(--font-mono)", color: "var(--ink-text-4)", margin: 0, lineHeight: 1.5 }}>
-          Removes this project and all its findings, onboarding state, and history from penny. You can undo this within 5 seconds.
+          Removes this project and all its findings, onboarding state, and history from Penny. You can undo this within 5 seconds.
         </p>
 
         {!confirmDelete ? (

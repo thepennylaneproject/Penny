@@ -1,0 +1,99 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "security",
+  "run_id": "security-20260410-182313",
+  "run_metadata": {
+    "notes": "Threat model (dashboard + worker): (1) Authenticated users access project data via Next API and Supabase RLS; mis-merged engine/orchestration data is integrity/consistency, not direct auth bypass. (2) Operator CLIs and default DB URLs risk accidental connections to unintended clusters. (3) Broad table GRANTs with RLS remain contingent on policy correctness (tracked in f-58c68aa7). (4) No new auth bypass identified in this pass."
+  },
+  "agent": {
+    "name": "security-and-privacy-auditor",
+    "role": "Identify practical security and privacy risks for worker CLI and dashboard data paths in the 20260410-182313 scope.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "apps/worker/src/scripts/admin.ts",
+      "apps/dashboard/app/api/orchestration/route.ts",
+      "apps/dashboard/app/api/engine/status/route.ts",
+      "supabase/migrations/20260402231116_repair_service.sql"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/worker/src/scripts/admin.ts",
+      "apps/dashboard/app/api/orchestration/route.ts",
+      "supabase/migrations/20260402231116_repair_service.sql"
+    ],
+    "files_skipped": [
+      "apps/dashboard/vercel.json",
+      "netlify.toml"
+    ],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-a6f3878f",
+      "category": "security-cli",
+      "title": "Worker admin CLI embeds default local DATABASE_URL when env unset",
+      "type": "bug",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "open",
+      "description": "Attack / exposure scenario: an operator runs `npx tsx src/scripts/admin.ts` without exporting DATABASE_URL. The script silently connects to the hard-coded postgresql://penny:penny-dev-password@localhost:5432/penny. If a machine has a different service on that port, or the operator assumed the CLI was a no-op dry run, commands could mutate the wrong database or leak that dev password pattern into shared runbooks. Prefer failing fast unless DATABASE_URL is set, or read from a documented local-only dotenv.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Default connection string when process.env.DATABASE_URL falsy",
+          "file": "apps/worker/src/scripts/admin.ts",
+          "start_line": 19,
+          "end_line": 22
+        },
+        {
+          "hook_type": "repro_steps",
+          "summary": "Unset DATABASE_URL, run admin.ts health from worker package; observe connection to localhost default."
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Require explicit DATABASE_URL for non-local subcommands or gate defaults behind NODE_ENV=development.",
+        "steps": [
+          "Remove embedded password default for production paths",
+          "Document penny-dev-password only in .env.example"
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-04-10T18:23:13Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "security-20260410-182313."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "minor": 1 },
+    "by_category": { "security-cli": 1 },
+    "by_type": { "bug": 1 },
+    "by_status": { "open": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "Fail fast or prompt when DATABASE_URL missing; move dev defaults to .env.example only.",
+      "finding_id": "f-a6f3878f",
+      "rationale": "Reduces wrong-cluster operator mistakes."
+    },
+    {
+      "action": "Reconcile f-58c68aa7 (repair_jobs GRANT) with narrowed-GRANT decision and integration tests.",
+      "finding_id": "f-58c68aa7",
+      "rationale": "Accepted finding; blast radius if RLS regresses."
+    },
+    {
+      "action": "After fixing f-af487c6c, confirm no sensitive fields leak via mismatched orchestration vs engine payloads.",
+      "finding_id": "f-af487c6c",
+      "rationale": "Consistency finding may hide future authz assumptions."
+    }
+  ]
+}

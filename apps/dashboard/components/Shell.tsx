@@ -89,7 +89,7 @@ export function Shell({ children, activeView, navHighlightView, onNavigate, onAu
   const NAV_ITEMS: { key: NavView; label: string }[] = [
     { key: "portfolio", label: UI_COPY.navPortfolio },
     { key: "engine",    label: UI_COPY.navRepairLedger },
-    { key: "jobs",      label: "Activity" },
+    { key: "jobs",      label: UI_COPY.navActivity },
   ];
 
   return (

@@ -3,6 +3,8 @@
  * penny Worker Admin CLI
  * Manage jobs, queue repairs, check health, and debug the worker.
  *
+ * Requires DATABASE_URL (no default embedded URL).
+ *
  * Usage:
  *   npx tsx src/scripts/admin.ts health
  *   npx tsx tsx src/scripts/admin.ts queue --project MyApp --type weekly_audit
@@ -16,10 +18,14 @@ import path from "path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Parse environment
-const dbUrl =
-  process.env.DATABASE_URL ||
-  "postgresql://penny:penny-dev-password@localhost:5432/penny";
+// Parse environment (no default URL — avoids accidental writes to the wrong cluster)
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) {
+  console.error(
+    "DATABASE_URL is required. Set it to your Postgres connection string (e.g. local or Supabase).",
+  );
+  process.exit(1);
+}
 
 interface Command {
   name: string;
@@ -29,6 +35,25 @@ interface Command {
 
 // Database connection
 const pool = new Pool({ connectionString: dbUrl });
+
+async function ensurePennyProjectPlaceholder(projectName: string): Promise<void> {
+  const name = projectName.trim();
+  if (!name) return;
+  const now = new Date().toISOString();
+  const projectJson = {
+    name,
+    findings: [],
+    lastUpdated: now,
+    status: "active",
+    sourceType: "orchestration_placeholder",
+  };
+  await pool.query(
+    `INSERT INTO penny_projects (name, repository_url, project_json, updated_at)
+     VALUES ($1, NULL, $2::jsonb, now())
+     ON CONFLICT (name) DO NOTHING`,
+    [name, JSON.stringify(projectJson)]
+  );
+}
 
 function readFlag(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name);
@@ -258,11 +283,12 @@ const commands: Record<string, Command> = {
       const type = args[typeIdx + 1];
 
       try {
+        await ensurePennyProjectPlaceholder(project);
         const result = await pool.query(
           `INSERT INTO penny_audit_jobs (project_name, job_type, status, payload)
            VALUES ($1, $2, 'queued', '{}'::jsonb)
            RETURNING id, project_name, job_type, status, created_at`,
-          [project, type]
+          [project.trim(), type]
         );
 
         const job = result.rows[0];

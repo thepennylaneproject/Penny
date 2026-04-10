@@ -17,18 +17,32 @@ Usage:
   python3 audits/linear_sync.py push              # Push new/changed findings to Linear
   python3 audits/linear_sync.py pull              # Pull status changes from Linear back to findings
   python3 audits/linear_sync.py sync              # Push then pull (full round-trip)
-  python3 audits/linear_sync.py status            # Show sync status
+  python3 audits/linear_sync.py status            # Show sync status + orphan mappings
+  python3 audits/linear_sync.py diff              # Compare open_findings status vs map lyra_status
+  python3 audits/linear_sync.py prune             # Drop map entries for removed findings
   python3 audits/linear_sync.py push --dry-run    # Preview what would be created/updated
+  python3 audits/linear_sync.py prune --dry-run   # Preview prune
 
-Removals: Findings dropped from open_findings.json (after synthesizer merge) no longer appear in the
-push loop. Push closes their Linear issues by treating non-terminal cached lyra_status as
-fixed_verified → Done, and refreshes linear_sync.json so the map matches the repo.
+Push is source of truth for mapped issues: each push fetches the issue from Linear and updates
+workflow state when it does not match open_findings (so the map file matching the JSON is not
+enough — Linear must actually be moved to Done / In Progress, etc.).
+
+Push will not move a Linear issue backward when the issue is already in a state that implies a
+stronger LYRA status than open_findings (e.g. In Review while LYRA still says accepted), unless
+LYRA status regressed since the last sync (so reopening a finding can still move Linear back).
+Run pull to advance open_findings from Linear, or update statuses after verify ingest.
+
+Pull refuses to downgrade LYRA status (e.g. fixed_verified -> open) when Linear is behind;
+run push again to advance the issue, or edit open_findings intentionally to reopen.
+
+Deferred: LYRA "deferred" maps to Linear Backlog; pull maps Backlog -> open, but open ranks below
+deferred so pull will not clobber a locally deferred finding. Run push after session.py skip so
+Linear and linear_sync.json stay aligned.
 """
 
 import json
 import os
 import sys
-from typing import Optional
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone
@@ -74,16 +88,12 @@ SEVERITY_PREFIX = {
 
 # Status mapping: LYRA -> Linear state name (customize to match your Linear workflow)
 # Default Linear states: Backlog, Todo, In Progress, Done, Cancelled
-#
-# IMPORTANT: `fixed_pending_verify` must NOT map to the same Linear state as `in_progress`
-# if that state round-trips to only one LYRA value on pull. Previously both mapped to
-# "In Progress", so pull overwrote fixed_pending_verify -> in_progress (regression).
-# Use "In Review" for verify-pending work when your team has that workflow state; push
-# falls back to "In Progress" if "In Review" is missing.
 LYRA_TO_LINEAR_STATUS = {
     "open": "Backlog",
     "accepted": "Todo",
     "in_progress": "In Progress",
+    # Match LINEAR_TO_LYRA ("In Review" <-> fixed_pending_verify) so push does not yank issues
+    # out of review into In Progress.
     "fixed_pending_verify": "In Review",
     "fixed_verified": "Done",
     "wont_fix": "Cancelled",
@@ -103,47 +113,24 @@ LINEAR_TO_LYRA_STATUS = {
     "Cancelled": "wont_fix",
 }
 
-
-def resolve_linear_state_for_push(lyra_status: str, states: dict) -> tuple[str, str]:
-    """Return (linear_state_name, state_id) for LYRA status, with In Review fallback."""
-    name = LYRA_TO_LINEAR_STATUS.get(lyra_status, "Backlog")
-    state_id = states.get(name, "")
-    if not state_id and lyra_status == "fixed_pending_verify":
-        name = "In Progress"
-        state_id = states.get(name, "")
-    return name, state_id
-
-
-def resolve_lyra_status_for_pull(linear_state: str, old_lyra: str) -> Optional[str]:
-    """
-    Map Linear state to new LYRA status, or None to leave the finding unchanged.
-
-    When Linear is still \"In Progress\" but LYRA was fixed_pending_verify, we cannot
-    distinguish (legacy pushes used In Progress for both). Do not downgrade to in_progress.
-    """
-    mapped = LINEAR_TO_LYRA_STATUS.get(linear_state)
-    if mapped is None:
-        return None
-    if mapped == old_lyra:
-        return None
-    if linear_state == "In Progress" and old_lyra == "fixed_pending_verify":
-        return None
-    return mapped
+# Ordering for pull: never overwrite local with a "weaker" status (prevents Linear drift
+# from undoing synthesizer-verified or pending-verify states when push did not move the issue).
+# deferred > open so Backlog -> open from Linear cannot overwrite a locally deferred finding.
+LYRA_STATUS_RANK = {
+    "open": 0,
+    "deferred": 1,
+    "accepted": 2,
+    "in_progress": 3,
+    "fixed_pending_verify": 4,
+    "fixed_verified": 5,
+    "wont_fix": 5,
+    "duplicate": 5,
+    "converted_to_enhancement": 2,
+}
 
 
-TERMINAL_LYRA_STATUSES = frozenset({"fixed_verified", "wont_fix", "duplicate"})
-
-
-def effective_terminal_lyra_for_removed_finding(cached_lyra: str) -> tuple[str, bool]:
-    """
-    When a finding_id is no longer in open_findings.json, map to a terminal LYRA status for Linear.
-
-    Returns (terminal_status, inferred). If cached_lyra is already terminal, use it. Otherwise
-    assume fixed_verified (normal synthesizer merge removes resolved work from open_findings).
-    """
-    if cached_lyra in TERMINAL_LYRA_STATUSES:
-        return cached_lyra, False
-    return "fixed_verified", True
+def _lyra_rank(status: str) -> int:
+    return LYRA_STATUS_RANK.get(status, 0)
 
 
 # --- GraphQL Helpers ---
@@ -364,49 +351,87 @@ def cmd_push():
     updated = 0
     skipped = 0
 
-    open_ids = {f.get("finding_id") for f in findings if f.get("finding_id")}
-
     for f in findings:
         fid = f.get("finding_id", "")
         status = f.get("status", "open")
 
-        linear_state_name, state_id = resolve_linear_state_for_push(status, states)
+        linear_state_name = LYRA_TO_LINEAR_STATUS.get(status, "Backlog")
+        state_id = states.get(linear_state_name, "")
         title = f"{SEVERITY_PREFIX.get(f.get('severity', ''), '')} {f.get('title', fid)}".strip()
         priority = PRIORITY_MAP.get(f.get("priority", "P3"), 4)
 
         if fid in mappings:
-            # Keep Linear in sync when LYRA status moves (including -> Done / Cancelled).
-            # Also re-push when LYRA status is unchanged but the desired Linear workflow state
-            # drifted (e.g. mapping fixed_pending_verify from In Progress -> In Review).
+            # Keep Linear workflow state aligned with open_findings (source of truth on push).
+            # Also reconcile when linear_sync.json already matches the file but Linear was
+            # never updated (avoids pull downgrading fixed_verified -> open on the next sync).
             existing = mappings[fid]
-            status_changed = existing.get("lyra_status") != status
-            linear_drift = False
-            if not status_changed:
-                if existing.get("last_linear_state") == linear_state_name:
+            if DRY_RUN:
+                if existing.get("lyra_status") != status:
+                    print(f"  Would update: {fid} -> {linear_state_name}")
+                    updated += 1
+                else:
                     skipped += 1
-                    continue
-                issue = get_issue(existing["linear_id"])
-                cur = (issue or {}).get("state", {}).get("name", "")
-                if cur and cur != linear_state_name:
-                    linear_drift = True
-
-            if not status_changed and not linear_drift:
-                skipped += 1
                 continue
 
-            if DRY_RUN:
-                reason = "LYRA status change" if status_changed else "Linear state drift"
-                print(f"  Would update ({reason}): {fid} -> {linear_state_name}")
-                updated += 1
-            elif state_id and update_issue_state(existing["linear_id"], state_id):
-                existing["lyra_status"] = status
-                existing["last_synced"] = NOW
-                existing["last_linear_state"] = linear_state_name
-                why = "status" if status_changed else "state"
-                print(f"  Updated ({why}): {existing.get('identifier', fid)} -> {linear_state_name}")
+            issue = get_issue(existing["linear_id"])
+            current_linear_name = (
+                (issue or {}).get("state") or {}
+            ).get("name", "")
+            map_stale = existing.get("lyra_status") != status
+            linear_out_of_sync = current_linear_name != linear_state_name
+
+            if linear_out_of_sync and state_id:
+                linear_derived = LINEAR_TO_LYRA_STATUS.get(current_linear_name)
+                linear_derived_rank = (
+                    _lyra_rank(linear_derived) if linear_derived is not None else None
+                )
+                finding_rank = _lyra_rank(status)
+                prev_status = existing.get("lyra_status")
+                prev_rank = _lyra_rank(prev_status) if prev_status else None
+                lyra_regressed = (
+                    prev_rank is not None and finding_rank < prev_rank
+                )
+                would_regress_linear = (
+                    linear_derived_rank is not None
+                    and not lyra_regressed
+                    and finding_rank < linear_derived_rank
+                )
+                if would_regress_linear:
+                    implied = linear_derived or "?"
+                    print(
+                        f"  Skipped push (would regress Linear): "
+                        f"{existing.get('identifier', fid)} stays {current_linear_name!r}; "
+                        f"LYRA {status!r} is behind Linear (implies {implied!r}). "
+                        f"Run pull or set LYRA status to match."
+                    )
+                    skipped += 1
+                elif update_issue_state(existing["linear_id"], state_id):
+                    print(
+                        f"  Updated: {existing.get('identifier', fid)} "
+                        f"{current_linear_name!r} -> {linear_state_name} (LYRA {status})"
+                    )
+                    updated += 1
+                else:
+                    print(
+                        f"  WARN: Could not set {existing.get('identifier', fid)} "
+                        f"to {linear_state_name}"
+                    )
+            elif linear_out_of_sync and not state_id:
+                print(
+                    f"  WARN: {fid} should be {linear_state_name!r} in Linear but team has no state "
+                    f"with that name (current: {current_linear_name!r}). Check LYRA_TO_LINEAR_STATUS."
+                )
+            elif map_stale:
+                print(
+                    f"  Synced map: {fid} lyra_status -> {status} "
+                    f"(Linear already {current_linear_name!r})"
+                )
                 updated += 1
             else:
                 skipped += 1
+
+            existing["lyra_status"] = status
+            existing["last_synced"] = NOW
             continue
 
         # New finding: do not open Linear issues for terminal LYRA statuses
@@ -432,39 +457,6 @@ def cmd_push():
                 }
                 print(f"  Created: {issue.get('identifier', '?')} -- {title[:60]}")
                 created += 1
-
-    # Mappings for findings no longer in open_findings.json are skipped by the main loop.
-    # Push terminal Linear state: use cached terminal lyra_status, or infer fixed_verified when the
-    # map was never updated after synthesizer removed the row (previously caused perpetual open issues).
-    for fid, info in mappings.items():
-        if fid in open_ids:
-            continue
-        cached = info.get("lyra_status", "")
-        terminal_lyra, inferred = effective_terminal_lyra_for_removed_finding(cached)
-        linear_state_name, state_id = resolve_linear_state_for_push(terminal_lyra, states)
-        if DRY_RUN:
-            reason = "infer fixed_verified" if inferred else "cached terminal"
-            print(
-                f"  Would update (removed from open_findings; {reason}): {fid} -> {linear_state_name}"
-            )
-            updated += 1
-            continue
-        issue = get_issue(info["linear_id"])
-        cur = (issue or {}).get("state", {}).get("name", "")
-        if cur == linear_state_name:
-            info["lyra_status"] = terminal_lyra
-            info["last_linear_state"] = linear_state_name
-            skipped += 1
-            continue
-        if state_id and update_issue_state(info["linear_id"], state_id):
-            info["lyra_status"] = terminal_lyra
-            info["last_synced"] = NOW
-            info["last_linear_state"] = linear_state_name
-            tag = "inferred Done" if inferred else "removed from open_findings"
-            print(f"  Updated ({tag}): {info.get('identifier', fid)} -> {linear_state_name}")
-            updated += 1
-        else:
-            skipped += 1
 
     if not DRY_RUN:
         save_sync_map(sync_map)
@@ -494,13 +486,23 @@ def cmd_pull():
             continue
 
         linear_state = issue.get("state", {}).get("name", "")
+        lyra_status = LINEAR_TO_LYRA_STATUS.get(linear_state, "")
+
+        if not lyra_status:
+            continue
 
         # Find the finding and update
         for f in findings:
             if f.get("finding_id") == fid:
-                old_status = f.get("status", "")
-                lyra_status = resolve_lyra_status_for_pull(linear_state, old_status)
-                if lyra_status is None:
+                old_status = f.get("status", "open")
+                if old_status == lyra_status:
+                    break
+                if _lyra_rank(lyra_status) < _lyra_rank(old_status):
+                    print(
+                        f"  Skipped pull (would downgrade): {fid} -- keeping {old_status!r}, "
+                        f"Linear {info.get('identifier', '?')} is {linear_state!r} -> would map to {lyra_status!r}. "
+                        f"Run push to update Linear, or move the issue in Linear forward."
+                    )
                     break
                 f["status"] = lyra_status
                 history = f.setdefault("history", [])
@@ -549,13 +551,6 @@ def cmd_status():
         if fid in in_lyra_only and f.get("status") in ("open", "accepted", "in_progress", "fixed_pending_verify"):
             unresolved_lyra_only.add(fid)
 
-    stale_removed = []
-    for fid in in_linear_only:
-        cached = mappings.get(fid, {}).get("lyra_status", "")
-        if cached not in TERMINAL_LYRA_STATUSES:
-            ident = mappings.get(fid, {}).get("identifier", "?")
-            stale_removed.append((fid, ident, cached or "(empty)"))
-
     print("LYRA <-> Linear Sync Status")
     print("=" * 50)
     print(f"Last sync: {sync_map.get('last_sync', 'never')}")
@@ -563,16 +558,95 @@ def cmd_status():
     print(f"In Linear only (finding resolved/removed): {len(in_linear_only)}")
     print(f"Unsynced unresolved findings: {len(unresolved_lyra_only)}")
 
-    if stale_removed:
-        print(f"\nStale mapping — removed from open_findings but map not terminal ({len(stale_removed)}):")
-        print("  (next push will infer fixed_verified → Done and refresh the map)")
-        for fid, ident, cached in sorted(stale_removed, key=lambda x: x[0])[:40]:
-            print(f"  {fid}  {ident}  cached_lyra={cached}")
-        if len(stale_removed) > 40:
-            print(f"  ... and {len(stale_removed) - 40} more")
-
     if unresolved_lyra_only:
-        print(f"\nRun 'python3 audits/linear_sync.py push' to sync {len(unresolved_lyra_only)} findings to Linear.")
+        print(f"\nRun 'python3 linear_sync.py push' to sync {len(unresolved_lyra_only)} findings to Linear.")
+
+    if in_linear_only:
+        print("\nOrphan mappings (in linear_sync.json but not in open_findings):")
+        print("  Run: python3 audits/linear_sync.py prune --dry-run   then   prune")
+        for fid in sorted(in_linear_only):
+            info = mappings.get(fid, {})
+            ident = info.get("identifier", "?")
+            print(f"  {fid}  ({ident})")
+
+
+def cmd_diff():
+    """Print mismatches between open_findings status and sync map lyra_status."""
+    findings, _ = load_findings()
+    sync_map = load_sync_map()
+    mappings = sync_map["mappings"]
+    fid_status = {f.get("finding_id", ""): f.get("status", "open") for f in findings}
+
+    mismatches = []
+    for fid, status in fid_status.items():
+        if not fid or fid not in mappings:
+            continue
+        mapped = mappings[fid].get("lyra_status")
+        if mapped != status:
+            mismatches.append(
+                (fid, status, mapped, mappings[fid].get("identifier", ""))
+            )
+
+    orphans = sorted(set(mappings.keys()) - set(fid_status.keys()))
+
+    print("LYRA status vs linear_sync.json lyra_status")
+    print("=" * 50)
+    if not mismatches and not orphans:
+        print("OK — no mismatches; no orphan mappings.")
+        return
+
+    if mismatches:
+        print("\nMismatches (run push after editing open_findings, or pull after editing Linear):")
+        for fid, local, mapped, ident in sorted(mismatches):
+            print(f"  {fid}  local={local!r}  map={mapped!r}  ({ident})")
+
+    if orphans:
+        print("\nOrphan mappings (finding removed from open_findings):")
+        for fid in orphans:
+            info = mappings[fid]
+            print(
+                f"  {fid}  map_lyra_status={info.get('lyra_status')!r}  "
+                f"({info.get('identifier', '')})"
+            )
+        print("\nRun: python3 audits/linear_sync.py prune")
+
+
+def cmd_prune():
+    """Remove sync map entries for finding IDs not present in open_findings."""
+    findings, _ = load_findings()
+    sync_map = load_sync_map()
+    mappings = sync_map["mappings"]
+    fid_set = {f.get("finding_id", "") for f in findings}
+    fid_set.discard("")
+
+    to_remove = sorted(fid for fid in mappings if fid not in fid_set)
+    if not to_remove:
+        print("Nothing to prune — all mappings have a matching open finding.")
+        return
+
+    if DRY_RUN:
+        print(f"Would remove {len(to_remove)} orphan mapping(s):")
+    else:
+        print(f"Removing {len(to_remove)} orphan mapping(s):")
+
+    for fid in to_remove:
+        info = mappings.get(fid, {})
+        ident = info.get("identifier", "?")
+        url = info.get("url", "")
+        line = f"  {fid}  ({ident})"
+        if url:
+            line += f"\n    {url}"
+        print(line)
+
+    if not DRY_RUN:
+        for fid in to_remove:
+            mappings.pop(fid, None)
+        save_sync_map(sync_map)
+        print("\nClose or merge these issues in Linear if they are still open.")
+
+    print()
+    if DRY_RUN:
+        print("(dry run — no changes made)")
 
 
 # --- Main ---
@@ -592,6 +666,10 @@ def main():
         cmd_sync()
     elif cmd == "status":
         cmd_status()
+    elif cmd == "diff":
+        cmd_diff()
+    elif cmd == "prune":
+        cmd_prune()
     else:
         print(f"Unknown command: {cmd}")
         print("Run 'python3 linear_sync.py help' for usage.")

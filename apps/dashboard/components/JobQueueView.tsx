@@ -6,6 +6,7 @@ import { isStaleRecoveryError } from "@/lib/job-timeouts";
 import type { RepairJob } from "@/lib/types";
 import type { pennyAuditJobRow, pennyAuditRunRow } from "@/lib/orchestration-jobs";
 import { repairProofState } from "@/lib/repair-proof";
+import { UI_COPY } from "@/lib/ui-copy";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -629,19 +630,6 @@ export function JobQueueView() {
         }}
       >
         <div>
-          <div
-            style={{
-              fontSize:      "9px",
-              fontFamily:    "var(--font-mono)",
-              fontWeight:    500,
-              color:         "var(--ink-text-4)",
-              letterSpacing: "0.1em",
-              textTransform: "uppercase",
-              marginBottom:  "0.25rem",
-            }}
-          >
-            Activity
-          </div>
           <h1
             style={{
               fontSize:   "17px",
@@ -650,8 +638,19 @@ export function JobQueueView() {
               color:      "var(--ink-text)",
             }}
           >
-            Job queue
+            {UI_COPY.navActivity}
           </h1>
+          <p
+            style={{
+              margin:     "0.35rem 0 0",
+              fontSize:   "12px",
+              lineHeight: 1.45,
+              color:      "var(--ink-text-3)",
+              maxWidth:   "40rem",
+            }}
+          >
+            {UI_COPY.activityPageSubline}
+          </p>
         </div>
         <button
           type="button"

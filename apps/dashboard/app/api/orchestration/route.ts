@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
-import { getEngineStatus } from "@/lib/audit-reader";
 import { derivePortfolioOrchestration } from "@/lib/orchestration";
+import { resolveEngineStatus } from "@/lib/orchestration-jobs";
 import { apiErrorMessage } from "@/lib/api-error";
 import { getOrSetRuntimeCache } from "@/lib/runtime-cache";
 
@@ -17,7 +17,7 @@ export async function GET() {
         const repo = getRepository();
         const [projects, engineStatus] = await Promise.all([
           repo.list(),
-          Promise.resolve(getEngineStatus()),
+          resolveEngineStatus(),
         ]);
         return derivePortfolioOrchestration(projects, engineStatus);
       }

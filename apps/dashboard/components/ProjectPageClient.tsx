@@ -82,24 +82,24 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     setHostMisconfigured,
     loginHint,
     setLoginHint,
-    fetchProjects,
+    fetchProjectByName,
   } = usePortfolioProjects();
 
   const { queuedFindingIds, fetchQueue } = useEngineQueue();
   const { queueRepair } = useQueueRepair({ fetchQueue });
 
   useEffect(() => {
-    void fetchProjects();
+    void fetchProjectByName(projectName);
     void fetchQueue();
-  }, [fetchProjects, fetchQueue]);
+  }, [fetchProjectByName, fetchQueue, projectName]);
 
   useEffect(() => {
     document.title = `${projectName} — Penny`;
   }, [projectName]);
 
   const onAuditSynced = useCallback(() => {
-    void fetchProjects();
-  }, [fetchProjects]);
+    void fetchProjectByName(projectName);
+  }, [fetchProjectByName, projectName]);
 
   const refetchProject = useCallback(async (): Promise<{
     project: Project | null;
@@ -129,14 +129,14 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
 
   useEffect(() => {
     const handleUndoSuccess = () => {
-      void fetchProjects();
+      void fetchProjectByName(projectName);
       void fetchQueue();
       void refetchProject();
     };
 
     window.addEventListener("penny:undo-success", handleUndoSuccess);
     return () => window.removeEventListener("penny:undo-success", handleUndoSuccess);
-  }, [fetchProjects, fetchQueue, refetchProject]);
+  }, [fetchProjectByName, fetchQueue, projectName, refetchProject]);
 
   const onUpdateFinding = useCallback(
     async (resolvedProjectName: string, findingId: string, status: FindingStatus) => {
@@ -178,7 +178,7 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
         onRetry={() => {
           setHostMisconfigured(null);
           setLoading(true);
-          void fetchProjects();
+          void fetchProjectByName(projectName);
         }}
       />
     );
@@ -191,7 +191,7 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
         onSignIn={() => {
           setLoginHint(null);
           setLoading(true);
-          void fetchProjects();
+          void fetchProjectByName(projectName);
           void fetchQueue();
         }}
       />
@@ -211,10 +211,10 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
       <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
         <RetryableError
           message={projectsError}
-          hint="Failed to load your projects. Please check your connection and try again."
+          hint="Failed to load this project. Please check your connection and try again."
           onRetry={() => {
             setLoading(true);
-            void fetchProjects();
+            void fetchProjectByName(projectName);
           }}
         />
       </DashboardRouteShell>

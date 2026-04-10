@@ -115,6 +115,9 @@ CREATE TABLE orchestration_events (
 );
 
 -- INDEXES for Dashboard Performance
+-- Single-column indexes: status-only filters still use idx_findings_status.
+-- Typical list queries filter project_id + status and order by created_at; see
+-- idx_findings_project_status_created_at in 20260407210000_findings_index_repair_jobs_grants.sql.
 CREATE INDEX idx_findings_project ON findings(project_id);
 CREATE INDEX idx_findings_status ON findings(status);
 CREATE INDEX idx_audit_runs_project ON audit_runs(project_id);
