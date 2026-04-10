@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
 import { apiErrorMessage } from "@/lib/api-error";
-import {
-  collectGitHistory,
-  collectDependencyManifest,
-  generateModuleManifest,
-  generateCssTokenMap,
-} from "@/lib/onboarding";
 import type { AuditCluster } from "@/lib/types";
+
+/** Dynamic import keeps fs-heavy collectors out of the static route → next.config NFT trace (f-203ecae0). */
+async function loadClusterSnapshot() {
+  return import("@/lib/onboarding-cluster-snapshot");
+}
 
 type Params = { params: Promise<{ name: string }> };
 
@@ -31,10 +30,26 @@ export async function POST(request: Request, { params }: Params) {
     if (!repoAccess) {
       return NextResponse.json({ error: "No localPath or repositoryUrl configured" }, { status: 400 });
     }
-    // Very primitive heuristic: if it's not an absolute path, assume it's NOT a local folder.
-    // In a real implementation this would clone the repo if it's remote. For penny's portfolio mode, localPath is usually set.
+    // Collectors need a checkout on disk. Remote URLs alone are not scanned here.
+    // Never fall back to process.cwd() — that would scan the dashboard tree instead of the project (f-1ff003db).
     const isLocal = repoAccess.startsWith("/");
-    const repoPath = isLocal ? repoAccess : process.cwd(); // fallback just so it doesn't crash, but won't be accurate without a clone step
+    if (!isLocal) {
+      return NextResponse.json(
+        {
+          error:
+            "Cluster snapshot requires a local checkout path (absolute localPath). Remote repositoryUrl without a clone is not supported for this endpoint.",
+        },
+        { status: 400 }
+      );
+    }
+    const repoPath = repoAccess;
+
+    const {
+      collectGitHistory,
+      collectDependencyManifest,
+      generateModuleManifest,
+      generateCssTokenMap,
+    } = await loadClusterSnapshot();
 
     let result: Record<string, unknown> = {};
 

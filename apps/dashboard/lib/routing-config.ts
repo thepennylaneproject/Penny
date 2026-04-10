@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { resolveAuditDir } from "./audit-path";
 
 export type RoutingStrategy = "aggressive" | "balanced" | "precision";
 
@@ -53,11 +54,6 @@ export interface RoutingConfig {
   routes: Record<string, RoutingRoute>;
   rules: RoutingRules;
   sources: RoutingSources;
-}
-
-function auditDir(): string {
-  const raw = process.env.penny_AUDIT_DIR || "../audits";
-  return path.resolve(process.cwd(), raw);
 }
 
 function readStringEnv(key: string, fallback: string): string {
@@ -208,13 +204,13 @@ export function buildRoutingConfig(fileConfig?: Partial<RoutingConfig>): Routing
     sources: {
       env: true,
       file: Boolean(fileConfig),
-      file_path: fileConfig ? `${auditDir()}/routing_config.json` : undefined,
+      file_path: fileConfig ? `${resolveAuditDir()}/routing_config.json` : undefined,
     },
   };
 }
 
 export function readFileRoutingConfig(): Partial<RoutingConfig> | null {
-  const configPath = path.join(auditDir(), "routing_config.json");
+  const configPath = path.join(resolveAuditDir(), "routing_config.json");
   if (!fs.existsSync(configPath)) return null;
 
   const raw = fs.readFileSync(configPath, "utf8");

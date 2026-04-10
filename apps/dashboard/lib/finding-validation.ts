@@ -9,6 +9,7 @@ export const VALID_FINDING_TYPES: FindingType[] = ["bug", "enhancement", "debt",
 export const VALID_STATUSES: FindingStatus[] = [
   "open",
   "accepted",
+  "assigned",
   "in_progress",
   "fixed_pending_verify",
   "fixed_verified",

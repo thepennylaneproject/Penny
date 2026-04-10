@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "ux",
+  "run_id": "ux-20260407-214300",
+  "agent": {
+    "name": "ux-flow-auditor",
+    "role": "Re-audit scoped UX/branding after fixed_pending_verify for Penny vs penny (f-122e7405).",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "apps/dashboard/app/layout.tsx",
+      "apps/dashboard/app/page.tsx",
+      "README.md"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/app/layout.tsx",
+      "apps/dashboard/app/page.tsx",
+      "README.md"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-122e7405",
+      "category": "inconsistent-label",
+      "title": "Product name casing is inconsistent (Penny vs penny)",
+      "type": "question",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "fixed_verified",
+      "description": "README and dashboard metadata now use title-case \"Penny\" consistently for user-facing strings (layout default/title template, document.title, footer). Internal storage keys and DOM ids remain lowercase \"penny_*\" which is appropriate for technical identifiers.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "apps/dashboard/app/layout.tsx metadata.title default \"Penny\" and template \"%s — Penny\""
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "apps/dashboard/app/page.tsx document.title \"Portfolio — Penny\"; visible footer \"Penny v3.0\""
+        },
+        {
+          "hook_type": "command",
+          "summary": "README.md H1 \"Penny v3.0\" aligns with dashboard branding."
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-07T21:43:00Z",
+          "actor": "ux-flow-auditor",
+          "event": "note_added",
+          "notes": "Re-audit: scoped files show Penny casing aligned with documented decision."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "minor": 1 },
+    "by_category": { "inconsistent-label": 1 },
+    "by_type": { "question": 1 },
+    "by_status": { "fixed_verified": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "None for f-122e7405; close in synthesizer and remove from open_findings.",
+      "finding_id": "f-122e7405",
+      "rationale": "User-visible copy and metadata consistently use Penny."
+    }
+  ]
+}

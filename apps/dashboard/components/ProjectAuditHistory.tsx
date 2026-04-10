@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { apiFetchWithEnqueueSecret } from "@/lib/api-fetch";
-import { penny_ENQUEUE_SECRET_STORAGE_KEY } from "@/lib/auth-constants";
+import { readEnqueueSecret, writeEnqueueSecret } from "@/lib/enqueue-secret-store";
 import type { AuditKind, ProjectManifest, RepairJob, ScopeType } from "@/lib/types";
 import type {
   pennyAuditJobRow,
@@ -69,23 +69,13 @@ export function ProjectAuditHistory({ projectName, projectStatus }: ProjectAudit
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
 
   useEffect(() => {
-    try {
-      const storedSecret = sessionStorage.getItem(penny_ENQUEUE_SECRET_STORAGE_KEY);
-      if (storedSecret) setEnqueueSecret(storedSecret);
-    } catch {
-      /* ignore */
-    }
+    const stored = readEnqueueSecret();
+    if (stored) setEnqueueSecret(stored);
   }, []);
 
   const persistSecret = (secretValue: string) => {
     setEnqueueSecret(secretValue);
-    try {
-      if (secretValue.trim())
-        sessionStorage.setItem(penny_ENQUEUE_SECRET_STORAGE_KEY, secretValue.trim());
-      else sessionStorage.removeItem(penny_ENQUEUE_SECRET_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    writeEnqueueSecret(secretValue.trim() ? secretValue : null);
   };
 
   const load = useCallback(async () => {

@@ -4,41 +4,45 @@
       "linear_id": "c3ab5068-6175-4fa8-ae9d-70f2dbd1482f",
       "identifier": "PLP-574",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-574/blocker-github-webhook-accepts-any-signature-header-without-hmac",
-      "lyra_status": "fixed_pending_verify",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-b73a32d8": {
       "linear_id": "dbf10ebc-2de2-4c39-9a91-899abd55dfa4",
       "identifier": "PLP-575",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-575/blocker-worker-throws-on-startup-of-every-audit-job-core-system",
-      "lyra_status": "fixed_pending_verify",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-90f28fa8": {
       "linear_id": "d74f2dc9-7a12-43ed-b6cb-dea00d5be292",
       "identifier": "PLP-576",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-576/major-root-global-error-ui-has-no-path-back-to-portfolio-unlike",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-122e7405": {
       "linear_id": "46f8c0c4-f928-468c-bb95-8e74d8de4d6a",
       "identifier": "PLP-577",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-577/minor-product-name-casing-is-inconsistent-penny-vs-penny",
-      "lyra_status": "open",
+      "lyra_status": "accepted",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-09T03:59:03Z"
     },
     "f-ea12bf0f": {
       "linear_id": "bbef27df-ab33-4d92-8400-7453023be813",
       "identifier": "PLP-578",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-578/minor-portfolio-project-card-overlay-buttons-rely-on-title-only",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-23e02a8c": {
       "linear_id": "eff671d1-3457-4341-92cf-c56cc8c19526",
@@ -52,49 +56,55 @@
       "linear_id": "5af92617-c804-468e-8bd9-afd85af462d9",
       "identifier": "PLP-580",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-580/nit-browser-tab-title-only-updated-on-home-and-project-pages",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-8603ee3b": {
       "linear_id": "6599714c-2370-4f31-9da0-beb539533b2b",
       "identifier": "PLP-581",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-581/minor-orchestration-enqueue-secret-can-be-read-from-sessionstorage-by",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-893aa236": {
       "linear_id": "fe838720-e88e-43fd-944e-c585a8bc9e08",
       "identifier": "PLP-582",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-582/major-supabase-helpers-use-select-with-no-row-limits",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-203ecae0": {
       "linear_id": "0ff4d96e-7ffd-466e-a80d-91867d8290ba",
       "identifier": "PLP-583",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-583/major-nextjs-nft-tracing-warns-that-the-whole-monorepo-may-be-pulled",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-cacebef8": {
       "linear_id": "60e9d59d-83d4-4f89-8fd5-29f219d371b2",
       "identifier": "PLP-584",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-584/major-nextfont-google-fonts-requires-network-at-build-time",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-5f0d56e9": {
       "linear_id": "49e5ef74-9e67-427a-8aa7-e471ee3a257b",
       "identifier": "PLP-585",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-585/minor-portfolio-audit-jobs-process-projects-sequentially",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-a1c6d05d": {
       "linear_id": "cf240d2d-1d80-47f2-b5de-bd69e112d55b",
@@ -108,57 +118,62 @@
       "linear_id": "85cf2ee5-5626-46c8-9402-838bbdcce01e",
       "identifier": "PLP-587",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-587/minor-auditwithllm-sets-maxtokens-to-12288-for-every-audit-call",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-ed623fc2": {
       "linear_id": "a671a1dc-99b0-4057-bd7c-63ad44e16df7",
       "identifier": "PLP-588",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-588/minor-should-findings-have-a-composite-index-on-project-id-status",
-      "lyra_status": "open",
+      "lyra_status": "accepted",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-09T03:59:03Z"
     },
     "f-f0fc96a0": {
       "linear_id": "5c988f61-08ba-4ef0-855e-a4f743f51d13",
       "identifier": "PLP-589",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-589/major-pnpm-test-fails-duplicate-run-passed-to-vitest",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-65774139": {
       "linear_id": "ba1f0330-b72d-4470-a844-88b8e7eadace",
       "identifier": "PLP-590",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-590/major-dashboard-eslint-fails-missing-eslinteslintrc-dependency",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-2eb9f62b": {
       "linear_id": "f3af2f3b-5c03-48b9-bd32-3bc122e5895e",
       "identifier": "PLP-591",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-591/minor-penny-worker-omitted-from-turbo-typecheck-task",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-749bab79": {
       "linear_id": "043c476b-7c26-4549-b840-4bdd9c992df1",
       "identifier": "PLP-592",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-592/major-repository-has-no-cicd-pipeline",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-e114710d": {
       "linear_id": "e0814513-0f45-4d1e-98fd-e6989694f4f9",
       "identifier": "PLP-593",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-593/minor-deployment-target-ambiguity-netlify-config-coexists-with-vercel",
-      "lyra_status": "open",
+      "lyra_status": "accepted",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-09T03:59:03Z"
     },
     "f-5386c5e8": {
       "linear_id": "a743c766-bac0-4a4f-9a76-32d73f26ccec",
@@ -172,17 +187,19 @@
       "linear_id": "e41ffa50-434e-4e5f-bde2-cdb4aab970b5",
       "identifier": "PLP-595",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-595/minor-verceljson-install-command-does-not-match-pnpm-monorepo",
-      "lyra_status": "open",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
     },
     "f-9ef3f9e1": {
       "linear_id": "5db9f636-d82b-4ba4-8a4d-6db2c35e8178",
       "identifier": "PLP-596",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-596/major-dashboard-penny-tables-have-no-rls-in-migrations",
-      "lyra_status": "accepted",
+      "lyra_status": "fixed_verified",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T17:22:47Z"
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
     },
     "f-2c1c5aa4": {
       "linear_id": "a8a79e3f-c1ee-449f-9401-624ba18f94b7",
@@ -212,9 +229,9 @@
       "linear_id": "eff70623-eeb9-4ea2-b748-cefa1f33d9fd",
       "identifier": "PLP-600",
       "url": "https://linear.app/the-penny-lane-project/issue/PLP-600/minor-broad-grant-on-repair-jobs-to-anon-and-authenticated",
-      "lyra_status": "open",
+      "lyra_status": "accepted",
       "created_at": "2026-04-07T16:03:25Z",
-      "last_synced": "2026-04-07T16:03:25Z"
+      "last_synced": "2026-04-09T03:59:03Z"
     },
     "f-7dc35572": {
       "linear_id": "456f9d90-5201-46e0-94e3-2e77cd0e84ec",
@@ -223,7 +240,51 @@
       "lyra_status": "accepted",
       "created_at": "2026-04-07T16:03:25Z",
       "last_synced": "2026-04-07T17:22:47Z"
+    },
+    "f-1ff003db": {
+      "linear_id": "16f65e08-3c0c-4088-b830-2747783ccb4c",
+      "identifier": "PLP-627",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-627/major-onboarding-cluster-post-uses-processcwd-when-repo-path-is-not",
+      "lyra_status": "fixed_verified",
+      "created_at": "2026-04-10T00:49:42Z",
+      "last_synced": "2026-04-10T16:50:09Z",
+      "last_linear_state": "Done"
+    },
+    "f-bedb17e6": {
+      "linear_id": "c4c33d2e-d547-43e4-b87a-234f2c41f3cc",
+      "identifier": "PLP-628",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-628/minor-readauditrunfiles-ignores-nested-auditsrunsdatejson-layout",
+      "lyra_status": "open",
+      "created_at": "2026-04-10T00:49:42Z",
+      "last_synced": "2026-04-10T00:49:42Z"
+    },
+    "f-f19d1573": {
+      "linear_id": "8c985201-be39-4162-aebe-c6a81c8f0274",
+      "identifier": "PLP-629",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-629/minor-eslint-fails-reactno-unescaped-entities-in-lanepanel",
+      "lyra_status": "fixed_verified",
+      "created_at": "2026-04-10T00:49:42Z",
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
+    },
+    "f-d8739e99": {
+      "linear_id": "251ed52a-b4cb-40d2-b119-15a57c621f88",
+      "identifier": "PLP-630",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-630/major-vitest-fails-resolvenextaction-test-expects-backlog-over-active",
+      "lyra_status": "fixed_verified",
+      "created_at": "2026-04-10T00:49:42Z",
+      "last_synced": "2026-04-10T01:23:38Z",
+      "last_linear_state": "Done"
+    },
+    "f-23063538": {
+      "linear_id": "fdcc7330-831a-4228-81c4-578a7904574e",
+      "identifier": "PLP-631",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-631/minor-confirm-penny-tables-rls-migration-is-applied-on-the-live",
+      "lyra_status": "accepted",
+      "created_at": "2026-04-10T00:49:42Z",
+      "last_synced": "2026-04-10T03:16:08Z",
+      "last_linear_state": "Todo"
     }
   },
-  "last_sync": "2026-04-07T17:22:47Z"
+  "last_sync": "2026-04-10T16:50:09Z"
 }

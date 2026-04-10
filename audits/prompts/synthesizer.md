@@ -8,6 +8,8 @@ You are the `synthesizer` in LYRA v1.1. You are the ONLY writer of canonical aud
 
 Ingest all agent JSON outputs from this run. Normalize, validate, deduplicate, diff against prior state, and produce a ranked action plan.
 
+**Re-audit runs:** Treat this merge as **fix verification and regression detection**, not a passive archive. Use preflight artifacts and agent findings vs prior `open_findings.json`: advance `fixed_pending_verify` → `fixed_verified` when the original issue is no longer substantiated; surface new or recurring items as regressions; leave `fixed_pending_verify` when verification is still inconclusive (e.g. external deploy not confirmed).
+
 ## Inputs
 
 - Agent JSON files from this run (kind: `agent_output`)

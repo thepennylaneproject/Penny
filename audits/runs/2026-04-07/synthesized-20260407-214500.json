@@ -1,0 +1,95 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "synthesizer_output",
+  "suite": "synthesized",
+  "run_id": "synthesized-20260407-214500",
+  "agent": {
+    "name": "synthesizer",
+    "role": "Merge, deduplicate, normalize, rank, and plan across all agent outputs."
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/app/layout.tsx",
+      "apps/dashboard/app/page.tsx",
+      "README.md",
+      "netlify.toml",
+      "supabase/migrations/20260407210000_findings_index_repair_jobs_grants.sql",
+      "supabase/migrations/20260402231116_repair_service.sql",
+      "supabase/migrations/20260402163739_lyra_schema.sql"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [],
+  "rollups": {
+    "by_severity": {
+      "blocker": 0,
+      "major": 0,
+      "minor": 0,
+      "nit": 0
+    },
+    "by_category": {},
+    "by_type": {},
+    "by_status": {}
+  },
+  "next_actions": [
+    {
+      "action": "Push Linear issues PLP-577, PLP-588, PLP-593, PLP-600 to Done after sync if desired.",
+      "finding_ids": [
+        "f-122e7405",
+        "f-ed623fc2",
+        "f-e114710d",
+        "f-58c68aa7"
+      ],
+      "rationale": "All four re-audited items verified; removed from open_findings."
+    }
+  ],
+  "diff_summary": {
+    "compared_against": "synthesized-20260407-203000",
+    "new_findings": [],
+    "resolved_findings": [
+      "f-122e7405",
+      "f-ed623fc2",
+      "f-e114710d",
+      "f-58c68aa7"
+    ],
+    "changed_severity": [],
+    "changed_status": [
+      {
+        "finding_id": "f-122e7405",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      },
+      {
+        "finding_id": "f-ed623fc2",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      },
+      {
+        "finding_id": "f-e114710d",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      },
+      {
+        "finding_id": "f-58c68aa7",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified"
+      }
+    ],
+    "converted_type": [],
+    "merged_findings": [],
+    "not_rereported": []
+  },
+  "ranked_plan": {
+    "top_fixes": [],
+    "commit_plan": [],
+    "regression_checklist": [
+      "Dashboard metadata title shows Penny in browser tab",
+      "supabase db push applies idx_findings_project_status_created_at",
+      "psql \\dp repair_jobs confirms anon has no table GRANT on repair_jobs",
+      "Netlify build still uses netlify.toml Next plugin"
+    ],
+    "reaudit_plan": []
+  }
+}

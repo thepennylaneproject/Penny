@@ -10,6 +10,7 @@
 
 import fs from "fs";
 import path from "path";
+import { resolveAuditDir } from "./audit-path";
 import type { Finding, RepairJob } from "./types";
 
 export interface AuditRun {
@@ -46,8 +47,7 @@ export interface EngineStatus {
 }
 
 function auditDir(): string {
-  const raw = process.env.penny_AUDIT_DIR || "../audits";
-  return path.resolve(process.cwd(), raw);
+  return resolveAuditDir();
 }
 
 function safeReadJSON<T>(filePath: string, fallback: T): T {

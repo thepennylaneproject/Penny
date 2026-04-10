@@ -25,7 +25,7 @@ export const SEVERITY_COLORS: Record<
 };
 
 export const STATUS_GROUPS: Record<string, FindingStatus[]> = {
-  active: ["open", "accepted", "in_progress"],
+  active: ["open", "accepted", "assigned", "in_progress"],
   pending: ["fixed_pending_verify"],
   resolved: [
     "fixed_verified",

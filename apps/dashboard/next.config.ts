@@ -1,45 +1,20 @@
 import type { NextConfig } from "next";
-import fs from "fs";
 import path from "path";
 import { withSentryConfig } from "@sentry/nextjs";
 
 /**
- * Next only auto-loads `.env*` from the dashboard directory. Many monorepo setups
- * keep secrets in the repo root — merge those first so LINEAR_* / DATABASE_URL work.
+ * Monorepo env merge runs via `node -r ./scripts/register-monorepo-env.cjs` in npm
+ * scripts so this file stays free of `fs` (avoids Turbopack “whole repo” NFT hints).
+ * Symlinking `apps/dashboard/.env.local` → `../../.env.local` also works without the preload.
  */
-function mergeEnvLocal(filePath: string, overrideDefinedKeys: boolean) {
-  if (!fs.existsSync(filePath)) return;
-  const text = fs.readFileSync(filePath, "utf8");
-  for (const rawLine of text.split("\n")) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    const eq = line.indexOf("=");
-    if (eq <= 0) continue;
-    const key = line.slice(0, eq).trim();
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
-    let val = line.slice(eq + 1).trim();
-    if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
-    ) {
-      val = val.slice(1, -1);
-    }
-    if (overrideDefinedKeys) {
-      process.env[key] = val;
-    } else if (process.env[key] === undefined || process.env[key] === "") {
-      process.env[key] = val;
-    }
-  }
-}
 
-const repoRoot = path.join(__dirname, "../..");
-mergeEnvLocal(path.join(repoRoot, ".env.local"), false);
-mergeEnvLocal(path.join(__dirname, ".env.local"), true);
+/** Monorepo root; `turbopackIgnore` on `process.cwd()` per Next NFT guidance (f-203ecae0). */
+const monorepoRoot = path.join(/* turbopackIgnore: true */ process.cwd(), "..", "..");
 
 const nextConfig: NextConfig = {
-  outputFileTracingRoot: path.join(__dirname, "../.."),
+  outputFileTracingRoot: monorepoRoot,
   turbopack: {
-    root: path.join(__dirname, "../.."),
+    root: monorepoRoot,
   },
 };
 

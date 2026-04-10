@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "performance",
+  "run_id": "perf-20260410-021430",
+  "agent": {
+    "name": "performance-cost-auditor",
+    "role": "Re-audit f-203ecae0: Turbopack NFT / server trace after onboarding and next.config changes.",
+    "inputs_used": [
+      "audits/artifacts/_run_/build.txt",
+      "audits/open_findings.json",
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/lib/onboarding.ts",
+      "apps/dashboard/lib/onboarding-cluster-snapshot.ts",
+      "apps/dashboard/lib/onboarding-update.ts",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/lib/onboarding.ts",
+      "apps/dashboard/lib/onboarding-cluster-snapshot.ts",
+      "apps/dashboard/lib/onboarding-update.ts",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-203ecae0",
+      "category": "bundle",
+      "title": "Next.js NFT tracing warns that the whole monorepo may be pulled into the server trace",
+      "type": "debt",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "fixed_verified",
+      "description": "Prior issue: Turbopack logged 'Encountered unexpected file in NFT list' with traces through next.config, onboarding fs helpers, and API routes. Re-audit after fix: dashboard preflight build output contains no NFT-list warnings; monorepo tracing root uses turbopackIgnore on process.cwd(); repo scan paths use joinUnderRepo (turbopackIgnore on base); snapshot module is not re-exported from onboarding.ts; PATCH onboarding uses onboarding-update.ts without pulling the full scanner graph.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/artifacts/_run_/build.txt — grep finds no 'Encountered unexpected file in NFT list' or 'Turbopack build encountered' warnings after preflight (perf-20260410-021430).",
+          "file": "audits/artifacts/_run_/build.txt"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "next.config.ts: monorepoRoot via path.join(/* turbopackIgnore: true */ process.cwd(), '..', '..') with matching outputFileTracingRoot and turbopack.root.",
+          "file": "apps/dashboard/next.config.ts"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "onboarding.ts: joinUnderRepo wraps path joins for scanned repo paths with turbopackIgnore.",
+          "file": "apps/dashboard/lib/onboarding.ts"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T02:14:30.000Z",
+          "actor": "performance-cost-auditor",
+          "event": "note_added",
+          "notes": "Re-audit (f-203ecae0): preflight build clean of NFT warnings; code matches intended trace-narrowing pattern."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "major": 1 },
+    "by_category": { "bundle": 1 },
+    "by_type": { "debt": 1 },
+    "by_status": { "fixed_verified": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "None for f-203ecae0 — synthesizer should remove from open_findings.",
+      "finding_id": "f-203ecae0",
+      "rationale": "Verification complete against preflight build.txt."
+    }
+  ]
+}

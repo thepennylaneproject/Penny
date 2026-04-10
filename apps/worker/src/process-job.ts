@@ -287,6 +287,64 @@ function resolvePassConcurrency(): number {
   return Math.min(parsed, 10);
 }
 
+const DEFAULT_PORTFOLIO_PROJECT_CONCURRENCY = 1;
+
+/** When a job audits multiple projects, run up to N in parallel (bounded LLM/IO). Default 1 preserves prior ordering and global metrics. */
+function resolvePortfolioProjectConcurrency(): number {
+  const raw = process.env.penny_PORTFOLIO_PROJECT_CONCURRENCY?.trim();
+  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PORTFOLIO_PROJECT_CONCURRENCY;
+  return Math.min(parsed, 8);
+}
+
+type PortfolioProjectJobMetricsSlice = {
+  total_llm_cost_usd: number;
+  total_llm_input_tokens: number;
+  total_llm_output_tokens: number;
+  llm_cache_hits: number;
+  llm_fallback_calls: number;
+  llm_attempts: number;
+  manifest_reuse_count: number;
+  manifest_rebuild_count: number;
+  prompt_context_chars: number;
+  prompt_scope_file_count: number;
+  pass_count: number;
+};
+
+type PortfolioProjectAuditOutcome = {
+  added: number;
+  summary: string;
+  projectDetail: Record<string, unknown> | null;
+  manifestRevision: string | null;
+  checklistId: string | null;
+  auditModel: string;
+  coverageComplete: boolean;
+  confidence: string;
+  metrics: PortfolioProjectJobMetricsSlice;
+};
+
+function mergeJobConfidence(current: string | null, passConfidence: string): string | null {
+  if (current === "low" || passConfidence === "low") return "low";
+  if (current === "medium" || passConfidence === "medium") return "medium";
+  return "high";
+}
+
+function emptyPortfolioMetricsSlice(): PortfolioProjectJobMetricsSlice {
+  return {
+    total_llm_cost_usd: 0,
+    total_llm_input_tokens: 0,
+    total_llm_output_tokens: 0,
+    llm_cache_hits: 0,
+    llm_fallback_calls: 0,
+    llm_attempts: 0,
+    manifest_reuse_count: 0,
+    manifest_rebuild_count: 0,
+    prompt_context_chars: 0,
+    prompt_scope_file_count: 0,
+    pass_count: 0,
+  };
+}
+
 function resolveMaxProjectLlmCostUsd(): number {
   const raw = process.env.penny_MAX_PROJECT_LLM_COST_USD?.trim();
   const parsed = raw ? Number.parseFloat(raw) : NaN;
@@ -1115,7 +1173,9 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
     };
     const projects = await resolveProjectsForJob(pool, job.project_name);
 
-    for (const project of projects) {
+    const auditOnePortfolioProject = async (
+      project: StoredProject
+    ): Promise<PortfolioProjectAuditOutcome> => {
       const projectStatus = project.status ?? "active";
       // Allow auditing of both active and draft projects
       if (!["active", "draft"].includes(projectStatus)) {
@@ -1125,13 +1185,13 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         throw new Error("Lane must be configured to run Penny audits.");
       }
       const execution = await executeProjectAudit(project, payload, pool);
+      const pm = emptyPortfolioMetricsSlice();
+      let projAuditModel = "unknown";
       try {
-        jobManifestRevision = execution.manifestRevision;
-        jobChecklistId = execution.checklistId;
         if (execution.manifestReused) {
-          jobMetrics.manifest_reuse_count += 1;
+          pm.manifest_reuse_count += 1;
         } else {
-          jobMetrics.manifest_rebuild_count += 1;
+          pm.manifest_rebuild_count += 1;
         }
         const expectations = readProjectExpectations(project, execution.repoRoot);
         const prev = await loadProject(pool, project.name);
@@ -1171,14 +1231,14 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
               repositoryUrl: project.repositoryUrl,
             }
           );
-          jobMetrics.total_llm_cost_usd += llm.costUsd ?? 0;
-          jobMetrics.total_llm_input_tokens += llm.inputTokens ?? 0;
-          jobMetrics.total_llm_output_tokens += llm.outputTokens ?? 0;
-          jobMetrics.llm_cache_hits += llm.cacheHit ? 1 : 0;
-          jobMetrics.llm_fallback_calls += llm.fallbackCount ?? 0;
-          jobMetrics.llm_attempts += llm.attemptCount ?? 0;
-          jobMetrics.prompt_context_chars += intelligenceContext.length;
-          auditModel = llm.model || auditModel;
+          pm.total_llm_cost_usd += llm.costUsd ?? 0;
+          pm.total_llm_input_tokens += llm.inputTokens ?? 0;
+          pm.total_llm_output_tokens += llm.outputTokens ?? 0;
+          pm.llm_cache_hits += llm.cacheHit ? 1 : 0;
+          pm.llm_fallback_calls += llm.fallbackCount ?? 0;
+          pm.llm_attempts += llm.attemptCount ?? 0;
+          pm.prompt_context_chars += intelligenceContext.length;
+          projAuditModel = llm.model || projAuditModel;
 
           // Log intelligence extraction for observability
           PennyObservability.logExecution({
@@ -1215,7 +1275,6 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             repair_policy: inferRepairPolicy(f as unknown as Record<string, unknown>),
           })) as Array<Record<string, unknown>>;
           const { merged, added } = mergeFindings2(existing, mappedFindings, execution.manifestRevision);
-          totalAdded += added;
           await saveProject(pool, {
             ...(prev ?? {}),
             name: project.name,
@@ -1227,14 +1286,23 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
                   timestamp: new Date().toISOString(),
                   actor: "worker",
                   event_type: "intelligence_extracted",
-                  model: auditModel,
+                  model: projAuditModel,
                   after: { findings: merged.length },
                 }]
               : [],
             lastUpdated: new Date().toISOString(),
           });
-          summaries.push(`${project.name}: intelligence extraction complete (+${added} findings)`);
-          continue; // skip domain-pass loop for this project
+          return {
+            added,
+            summary: `${project.name}: intelligence extraction complete (+${added} findings)`,
+            projectDetail: null,
+            manifestRevision: execution.manifestRevision,
+            checklistId: execution.checklistId,
+            auditModel: projAuditModel,
+            coverageComplete: true,
+            confidence: "high",
+            metrics: pm,
+          };
         }
         // ──────────────────────────────────────────────────────────────────
 
@@ -1256,6 +1324,8 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           codeContextChars: number;
         }> = [];
         let auditAbortReason: string | null = null;
+        let passSpendUsd = 0;
+        let passFallbackCalls = 0;
 
         for (let start = 0; start < passes.length; start += PASS_CONCURRENCY) {
           const batch = passes.slice(start, start + PASS_CONCURRENCY);
@@ -1300,16 +1370,18 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
 
           for (const { llm, pass, codeContextChars } of batchResults) {
             passTaskResults.push({ llm, pass, codeContextChars });
-          jobMetrics.pass_count += 1;
-          jobMetrics.total_llm_cost_usd += llm.costUsd ?? 0;
-          jobMetrics.total_llm_input_tokens += llm.inputTokens ?? 0;
-          jobMetrics.total_llm_output_tokens += llm.outputTokens ?? 0;
-          jobMetrics.llm_cache_hits += llm.cacheHit ? 1 : 0;
-          jobMetrics.llm_fallback_calls += llm.fallbackCount ?? 0;
-          jobMetrics.llm_attempts += llm.attemptCount ?? 0;
-          jobMetrics.prompt_context_chars += codeContextChars;
-          jobMetrics.prompt_scope_file_count += pass.files.length;
-          auditModel = llm.model || auditModel;
+            passSpendUsd += llm.costUsd ?? 0;
+            passFallbackCalls += llm.fallbackCount ?? 0;
+            pm.pass_count += 1;
+            pm.total_llm_cost_usd += llm.costUsd ?? 0;
+            pm.total_llm_input_tokens += llm.inputTokens ?? 0;
+            pm.total_llm_output_tokens += llm.outputTokens ?? 0;
+            pm.llm_cache_hits += llm.cacheHit ? 1 : 0;
+            pm.llm_fallback_calls += llm.fallbackCount ?? 0;
+            pm.llm_attempts += llm.attemptCount ?? 0;
+            pm.prompt_context_chars += codeContextChars;
+            pm.prompt_scope_file_count += pass.files.length;
+            projAuditModel = llm.model || projAuditModel;
 
           // Log audit execution for observability (Sentry + Datadog)
           PennyObservability.logExecution({
@@ -1378,8 +1450,8 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
             projectName: project.name,
             completedPasses: passTaskResults.length,
             totalPasses: passes.length,
-            totalLlmCostUsd: jobMetrics.total_llm_cost_usd,
-            totalFallbackCalls: jobMetrics.llm_fallback_calls,
+            totalLlmCostUsd: passSpendUsd,
+            totalFallbackCalls: passFallbackCalls,
           });
           if (abortReason) {
             auditAbortReason = abortReason;
@@ -1388,20 +1460,12 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         }
 
         const { merged, added } = mergeFindings2(existing, findings, execution.manifestRevision);
-        totalAdded += added;
         const reviewedFiles = [...new Set(passResults.flatMap((result) => result.coverage.files_reviewed))];
         const coverageComplete = passResults.every((result) => result.coverage.coverage_complete);
         const confidence =
           passResults.some((result) => result.coverage.confidence === "low")
             ? "low"
             : passResults.some((result) => result.coverage.confidence === "medium")
-              ? "medium"
-              : "high";
-        jobCoverageComplete = jobCoverageComplete && coverageComplete;
-        jobConfidence =
-          jobConfidence === "low" || confidence === "low"
-            ? "low"
-            : jobConfidence === "medium" || confidence === "medium"
               ? "medium"
               : "high";
         const coverageDomains = summarizeCoverageFromManifest(
@@ -1422,7 +1486,7 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           audit_kind: String(payload.audit_kind ?? (visualOnly ? "visual" : "full")),
           scope_type: String(execution.scope.scopeType ?? "project"),
           scope_paths: execution.scope.scopePaths ?? [],
-          model: auditModel,
+          model: projAuditModel,
           before: { findings: existing.length },
           after: {
             findings: merged.length,
@@ -1487,56 +1551,91 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           }
         }
 
-        summaries.push(
-          `${project.name}: +${added} findings, ${coverageComplete ? "coverage complete" : "coverage partial"}${
-            auditAbortReason ? " (stopped early)" : ""
-          }`
-        );
-        projectAuditDetails.push({
-          project: project.name,
-          scope_type: execution.scope.scopeType ?? "project",
-          scope_paths: execution.scope.scopePaths ?? [],
-          scan_roots: scanRoots,
-          findings_returned: findings.length,
-          findings_added: added,
-          manifest_revision: execution.manifestRevision,
-          checklist_id: execution.checklistId,
-          coverage_complete: coverageComplete,
-          completion_confidence: confidence,
-          known_finding_ids: knownFindingIds(existing),
-          metrics: {
-            manifest_reused: execution.manifestReused,
-            llm_cost_usd: passTaskResults.reduce((sum, result) => sum + (result.llm.costUsd ?? 0), 0),
-            llm_input_tokens: passTaskResults.reduce((sum, result) => sum + (result.llm.inputTokens ?? 0), 0),
-            llm_output_tokens: passTaskResults.reduce((sum, result) => sum + (result.llm.outputTokens ?? 0), 0),
-            llm_cache_hits: passTaskResults.filter((result) => result.llm.cacheHit).length,
-            llm_fallback_calls: passTaskResults.reduce((sum, result) => sum + (result.llm.fallbackCount ?? 0), 0),
-            llm_attempts: passTaskResults.reduce((sum, result) => sum + (result.llm.attemptCount ?? 0), 0),
-            pass_count: passTaskResults.length,
-            prompt_context_chars: passTaskResults.reduce((sum, result) => sum + result.codeContextChars, 0),
-          },
-          files_in_scope: normalizeScopePaths(
-            execution.repoRoot,
-            scanRoots,
-            execution.scope,
-            execution.manifest
-          ),
-          files_reviewed: reviewedFiles,
-          known_findings_referenced: [
-            ...new Set(
-              passResults.flatMap((result) => result.coverage.known_findings_referenced)
-            ),
-          ],
-          raw_llm_output: passResults.map((result) => result.raw_response).join("\n\n"),
-          repo_root: execution.repoRoot,
-          exhaustiveness: execution.manifest.exhaustiveness,
-        });
         if (auditAbortReason) {
           throw new Error(auditAbortReason);
         }
+
+        return {
+          added,
+          summary: `${project.name}: +${added} findings, ${coverageComplete ? "coverage complete" : "coverage partial"}`,
+          projectDetail: {
+            project: project.name,
+            scope_type: execution.scope.scopeType ?? "project",
+            scope_paths: execution.scope.scopePaths ?? [],
+            scan_roots: scanRoots,
+            findings_returned: findings.length,
+            findings_added: added,
+            manifest_revision: execution.manifestRevision,
+            checklist_id: execution.checklistId,
+            coverage_complete: coverageComplete,
+            completion_confidence: confidence,
+            known_finding_ids: knownFindingIds(existing),
+            metrics: {
+              manifest_reused: execution.manifestReused,
+              llm_cost_usd: passTaskResults.reduce((sum, result) => sum + (result.llm.costUsd ?? 0), 0),
+              llm_input_tokens: passTaskResults.reduce((sum, result) => sum + (result.llm.inputTokens ?? 0), 0),
+              llm_output_tokens: passTaskResults.reduce((sum, result) => sum + (result.llm.outputTokens ?? 0), 0),
+              llm_cache_hits: passTaskResults.filter((result) => result.llm.cacheHit).length,
+              llm_fallback_calls: passTaskResults.reduce((sum, result) => sum + (result.llm.fallbackCount ?? 0), 0),
+              llm_attempts: passTaskResults.reduce((sum, result) => sum + (result.llm.attemptCount ?? 0), 0),
+              pass_count: passTaskResults.length,
+              prompt_context_chars: passTaskResults.reduce((sum, result) => sum + result.codeContextChars, 0),
+            },
+            files_in_scope: normalizeScopePaths(
+              execution.repoRoot,
+              scanRoots,
+              execution.scope,
+              execution.manifest
+            ),
+            files_reviewed: reviewedFiles,
+            known_findings_referenced: [
+              ...new Set(
+                passResults.flatMap((result) => result.coverage.known_findings_referenced)
+              ),
+            ],
+            raw_llm_output: passResults.map((result) => result.raw_response).join("\n\n"),
+            repo_root: execution.repoRoot,
+            exhaustiveness: execution.manifest.exhaustiveness,
+          },
+          manifestRevision: execution.manifestRevision,
+          checklistId: execution.checklistId,
+          auditModel: projAuditModel,
+          coverageComplete,
+          confidence,
+          metrics: pm,
+        };
       } finally {
         execution.cleanup?.();
       }
+    };
+
+    const portfolioOutcomes = await runWithConcurrency(
+      projects.map((project) => () => auditOnePortfolioProject(project)),
+      resolvePortfolioProjectConcurrency()
+    );
+
+    for (const o of portfolioOutcomes) {
+      totalAdded += o.added;
+      summaries.push(o.summary);
+      if (o.projectDetail) {
+        projectAuditDetails.push(o.projectDetail);
+      }
+      auditModel = o.auditModel || auditModel;
+      jobManifestRevision = o.manifestRevision;
+      jobChecklistId = o.checklistId;
+      jobCoverageComplete = jobCoverageComplete && o.coverageComplete;
+      jobConfidence = mergeJobConfidence(jobConfidence, o.confidence);
+      jobMetrics.total_llm_cost_usd += o.metrics.total_llm_cost_usd;
+      jobMetrics.total_llm_input_tokens += o.metrics.total_llm_input_tokens;
+      jobMetrics.total_llm_output_tokens += o.metrics.total_llm_output_tokens;
+      jobMetrics.llm_cache_hits += o.metrics.llm_cache_hits;
+      jobMetrics.llm_fallback_calls += o.metrics.llm_fallback_calls;
+      jobMetrics.llm_attempts += o.metrics.llm_attempts;
+      jobMetrics.manifest_reuse_count += o.metrics.manifest_reuse_count;
+      jobMetrics.manifest_rebuild_count += o.metrics.manifest_rebuild_count;
+      jobMetrics.prompt_context_chars += o.metrics.prompt_context_chars;
+      jobMetrics.prompt_scope_file_count += o.metrics.prompt_scope_file_count;
+      jobMetrics.pass_count += o.metrics.pass_count;
     }
 
     const jobExhaustiveness = projectAuditDetails.some(

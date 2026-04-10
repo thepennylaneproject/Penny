@@ -11,6 +11,7 @@ describe("Linear Status Mapping", () => {
       const pennyStatuses: FindingStatus[] = [
         "open",
         "accepted",
+        "assigned",
         "in_progress",
         "fixed_pending_verify",
         "fixed_verified",
@@ -32,6 +33,10 @@ describe("Linear Status Mapping", () => {
 
     it("should map accepted to Todo", () => {
       expect(penny_TO_LINEAR_STATUS["accepted"]).toBe("Todo");
+    });
+
+    it("should map assigned to Todo", () => {
+      expect(penny_TO_LINEAR_STATUS["assigned"]).toBe("Todo");
     });
 
     it("should map in_progress to In Progress", () => {

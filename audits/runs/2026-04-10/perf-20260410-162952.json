@@ -1,0 +1,152 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "performance",
+  "run_id": "perf-20260410-162952",
+  "agent": {
+    "name": "performance-cost-auditor",
+    "role": "Audit cost, concurrency, and data-shape patterns against open findings and worker implementation.",
+    "inputs_used": [
+      "audits/artifacts/_run_/build.txt",
+      "audits/artifacts/_run_/typecheck.txt",
+      "audits/open_findings.json",
+      "apps/worker/src/process-job.ts",
+      "apps/worker/src/llm.ts",
+      "apps/dashboard/lib/audit-reader.ts",
+      "apps/dashboard/next.config.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/worker/src/process-job.ts",
+      "apps/worker/src/llm.ts",
+      "apps/dashboard/lib/audit-reader.ts",
+      "audits/artifacts/_run_/build.txt"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-5f0d56e9",
+      "category": "cost",
+      "title": "Portfolio audit jobs process projects sequentially",
+      "type": "enhancement",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "large",
+      "status": "fixed_verified",
+      "description": "Re-audit: portfolio project audits use runWithConcurrency around auditOnePortfolioProject; limit from resolvePortfolioProjectConcurrency (env penny_PORTFOLIO_PROJECT_CONCURRENCY, default 1, max 8). Default remains sequential; operators can raise concurrency for throughput without code changes.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "runWithConcurrency(projects.map(...), resolvePortfolioProjectConcurrency())",
+          "file": "apps/worker/src/process-job.ts",
+          "start_line": 1612,
+          "end_line": 1615
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "resolvePortfolioProjectConcurrency reads penny_PORTFOLIO_PROJECT_CONCURRENCY; default 1",
+          "file": "apps/worker/src/process-job.ts",
+          "start_line": 290,
+          "end_line": 297
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T16:29:52.000Z",
+          "actor": "performance-cost-auditor",
+          "event": "note_added",
+          "notes": "Re-audit (perf-20260410-162952): bounded parallel hook verified; default 1 preserves prior wall-clock unless env set."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-27aab98a",
+      "category": "llm",
+      "title": "auditWithLlm sets maxTokens to 12288 for every audit call",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "fixed_verified",
+      "description": "Re-audit: maxTokens uses resolveAuditMaxOutputTokens(auditKind) — default 8192 for most kinds, 12288 for kinds in AUDIT_KIND_HIGH_MAX_TOKENS, optional override via penny_AUDIT_MAX_OUTPUT_TOKENS (256–128000).",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "maxTokens: resolveAuditMaxOutputTokens(auditKind)",
+          "file": "apps/worker/src/llm.ts",
+          "start_line": 456,
+          "end_line": 459
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "AUDIT_DEFAULT_MAX_OUTPUT_TOKENS 8192; high kinds use AUDIT_HIGH_MAX_OUTPUT_TOKENS 12288",
+          "file": "apps/worker/src/llm.ts",
+          "start_line": 238,
+          "end_line": 254
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T16:29:52.000Z",
+          "actor": "performance-cost-auditor",
+          "event": "note_added",
+          "notes": "Re-audit: flat 12288 ceiling removed for domain passes; synthesis/intelligence keep higher cap."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-bedb17e6",
+      "category": "schema-mismatch",
+      "title": "readAuditRunFiles ignores nested audits/runs/<date>/*.json layout",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "open",
+      "description": "Still open: readAuditRunFiles only lists *.json at audits/runs root; dated subfolders are skipped so engine status may omit nested agent outputs.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "readdirSync(runsDir).filter(f => f.endsWith('.json')) — no recursion",
+          "file": "apps/dashboard/lib/audit-reader.ts",
+          "start_line": 116,
+          "end_line": 128
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T16:29:52.000Z",
+          "actor": "performance-cost-auditor",
+          "event": "note_added",
+          "notes": "Confirmed unchanged vs WORKFLOW nested layout."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "minor": 3 },
+    "by_category": { "cost": 1, "llm": 1, "schema-mismatch": 1 },
+    "by_type": { "enhancement": 1, "debt": 2 },
+    "by_status": { "fixed_verified": 2, "open": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "Implement recursive or index-driven run discovery for f-bedb17e6.",
+      "finding_id": "f-bedb17e6",
+      "rationale": "Only remaining perf-scoped open item re-checked this run."
+    },
+    {
+      "action": "Run session.py verify f-5f0d56e9 and f-27aab98a after synthesizer merge.",
+      "finding_id": "f-5f0d56e9",
+      "rationale": "Promote fixed_pending_verify in canonical JSON."
+    }
+  ]
+}

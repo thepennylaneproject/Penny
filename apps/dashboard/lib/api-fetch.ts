@@ -1,17 +1,11 @@
-import { penny_ENQUEUE_SECRET_STORAGE_KEY } from "@/lib/auth-constants";
+import { readEnqueueSecret } from "@/lib/enqueue-secret-store";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 
-function mergeEnqueueSecretFromStorage(headers: Headers): void {
+function mergeEnqueueSecret(headers: Headers): void {
   if (typeof window === "undefined") return;
-  try {
-    const secret = sessionStorage
-      .getItem(penny_ENQUEUE_SECRET_STORAGE_KEY)
-      ?.trim();
-    if (secret && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${secret}`);
-    }
-  } catch {
-    /* private mode / disabled storage */
+  const secret = readEnqueueSecret();
+  if (secret && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${secret}`);
   }
 }
 
@@ -54,15 +48,16 @@ export function apiFetch(
 
 /**
  * Same as {@link apiFetch} but also sends `Authorization: Bearer <secret>` when the user
- * has stored an enqueue/orchestration secret in session storage. Use for orchestration
- * and job endpoints that may require the shared secret alongside or instead of cookie auth.
+ * has set an enqueue/orchestration secret in this tab. The secret is read from the in-memory
+ * store (`readEnqueueSecret`), not from Web Storage, except a one-time legacy migration
+ * that clears any previous sessionStorage copy (f-8603ee3b).
  */
 export function apiFetchWithEnqueueSecret(
   input: RequestInfo | URL,
   init?: RequestInit
 ): Promise<Response> {
   const headers = new Headers(init?.headers);
-  mergeEnqueueSecretFromStorage(headers);
+  mergeEnqueueSecret(headers);
   return mergeSupabaseToken(headers).then(() =>
     fetch(input, {
       ...init,

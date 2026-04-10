@@ -1,6 +1,6 @@
 # Finding: f-cacebef8
 
-> **Status:** open | **Severity:** major | **Priority:** P1 | **Type:** debt | **Confidence:** evidence
+> **Status:** fixed_verified | **Severity:** major | **Priority:** P1 | **Type:** debt | **Confidence:** evidence
 
 ## Title
 
@@ -20,7 +20,9 @@ layout.tsx uses next/font/google for Inter, JetBrains Mono, and DM Serif Display
 ## History
 
 - 2026-04-07T18:45:00.000Z — **synthesizer** — note_added: Normalized finding_id from perf agent id field; merged history.
+- 2026-04-10 — **synthesizer** — verified: `layout.tsx` no longer imports `next/font/google`; preflight build succeeds. Removed from `open_findings.json` (`synthesized-20260410-201500`).
 
 ## Sources
 
 - `perf-20260407-121845`
+- `synthesized-20260410-201500`

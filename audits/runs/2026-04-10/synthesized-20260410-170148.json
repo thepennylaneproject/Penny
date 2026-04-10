@@ -1,0 +1,134 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "synthesizer_output",
+  "suite": "synthesized",
+  "run_id": "synthesized-20260410-170148",
+  "agent": {
+    "name": "synthesizer",
+    "role": "Merge, deduplicate, normalize, rank, and plan across all agent outputs."
+  },
+  "coverage": {
+    "files_examined": [
+      "audits/runs/2026-04-10/logic-20260410-170148.json",
+      "audits/runs/2026-04-10/data-20260410-170148.json",
+      "audits/runs/2026-04-10/perf-20260410-170148.json",
+      "audits/runs/2026-04-10/deploy-20260410-170148.json",
+      "audits/open_findings.json",
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/build.txt"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [],
+  "rollups": {
+    "by_severity": {},
+    "by_category": {},
+    "by_type": {},
+    "by_status": {}
+  },
+  "next_actions": [
+    {
+      "action": "Persist or explicitly document client-only cluster artifacts (f-0d9b4509).",
+      "finding_id": "f-0d9b4509",
+      "rationale": "New question from logic agent re-audit."
+    },
+    {
+      "action": "Fix readAuditRunFiles nested directory walk (f-bedb17e6).",
+      "finding_id": "f-bedb17e6",
+      "rationale": "Still highest-impact open debt for engine status accuracy."
+    }
+  ],
+  "diff_summary": {
+    "compared_against": "synthesized-20260410-162952",
+    "new_findings": ["f-0d9b4509"],
+    "resolved_findings": [],
+    "changed_severity": [],
+    "changed_status": [
+      {
+        "finding_id": "f-2c1c5aa4",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified",
+        "reason": "apps/dashboard/lib/types.ts FindingStatus and finding route VALID_STATUSES include assigned; aligns with penny_finding_status enum."
+      },
+      {
+        "finding_id": "f-9e051198",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified",
+        "reason": "supabase/migrations/20260410120000_model_usage_rls_policies.sql adds users_can_view_model_usage SELECT policy; GRANT SELECT documented."
+      },
+      {
+        "finding_id": "f-5386c5e8",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified",
+        "reason": "apps/worker/package.json defines lint script; root turbo run lint includes worker; CI runs pnpm lint."
+      }
+    ],
+    "merged_findings": [],
+    "converted_type": [],
+    "not_rereported": [
+      "f-23e02a8c",
+      "f-a1c6d05d",
+      "f-5386c5e8",
+      "f-2c1c5aa4",
+      "f-9e051198",
+      "f-6af2fc10",
+      "f-7dc35572",
+      "f-122e7405",
+      "f-58c68aa7",
+      "f-e114710d",
+      "f-ed623fc2",
+      "f-bedb17e6",
+      "f-23063538"
+    ]
+  },
+  "ranked_plan": {
+    "top_fixes": [
+      {
+        "rank": 1,
+        "finding_id": "f-bedb17e6",
+        "title": "readAuditRunFiles ignores nested audits/runs/<date>/*.json layout",
+        "priority": "P3",
+        "severity": "minor"
+      },
+      {
+        "rank": 2,
+        "finding_id": "f-0d9b4509",
+        "title": "Onboarding cluster POST returns artifacts but does not persist them on the server",
+        "priority": "P2",
+        "severity": "minor"
+      },
+      {
+        "rank": 3,
+        "finding_id": "f-a1c6d05d",
+        "title": "Project page loads the full portfolio via /api/projects",
+        "priority": "P2",
+        "severity": "minor"
+      },
+      {
+        "rank": 4,
+        "finding_id": "f-23e02a8c",
+        "title": "Nav label \"Activity\" vs page headline \"Job queue\"",
+        "priority": "P3",
+        "severity": "minor"
+      }
+    ],
+    "commit_plan": [],
+    "regression_checklist": [
+      "python3 audits/session.py preflight",
+      "pnpm lint (includes penny-worker)",
+      "After Supabase migrate: confirm model_usage policies with SQL policy list"
+    ],
+    "reaudit_plan": {
+      "agents": [],
+      "files": [],
+      "notes": "logic+data+perf+deploy batch complete; three fixed_pending_verify items promoted to fixed_verified in merge review."
+    }
+  },
+  "closure_notes": {
+    "f-2c1c5aa4": "TypeScript FindingStatus and PATCH validator include assigned; matches DB enum usage in API.",
+    "f-9e051198": "model_usage RLS policy migration added in repo; apply to remote DB for runtime effect.",
+    "f-5386c5e8": "Worker eslint lint script wired; monorepo lint covers apps/worker."
+  }
+}

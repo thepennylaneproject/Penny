@@ -1,0 +1,103 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "synthesizer_output",
+  "suite": "synthesized",
+  "run_id": "synthesized-20260410-201500",
+  "agent": {
+    "name": "synthesizer",
+    "role": "Merge, deduplicate, normalize, rank, and plan across all agent outputs."
+  },
+  "coverage": {
+    "files_examined": [
+      "audits/runs/2026-04-10/logic-20260410-001929.json",
+      "audits/runs/2026-04-10/data-20260410-001929.json",
+      "audits/runs/2026-04-10/perf-20260410-001929.json",
+      "audits/runs/2026-04-10/deploy-20260410-001929.json",
+      "audits/open_findings.json",
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/tests.txt",
+      "apps/dashboard/lib/supabase.ts",
+      "apps/dashboard/app/layout.tsx",
+      "apps/dashboard/lib/__tests__/resolve-next-action.test.ts",
+      "apps/dashboard/components/LanePanel.tsx",
+      "supabase/migrations/20260408120000_penny_tables_rls.sql"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [],
+  "rollups": {
+    "by_severity": {},
+    "by_category": {},
+    "by_type": {},
+    "by_status": {}
+  },
+  "next_actions": [
+    {
+      "action": "Reduce Turbopack NFT trace for onboarding cluster / snapshot imports.",
+      "finding_id": "f-203ecae0",
+      "rationale": "Preflight build still emits NFT warnings; finding remains in_progress."
+    },
+    {
+      "action": "Confirm remote Supabase has applied 20260408120000_penny_tables_rls.sql.",
+      "finding_id": "f-23063538",
+      "rationale": "RLS is verified in-repo (f-9ef3f9e1 closed); hosted project may differ."
+    }
+  ],
+  "diff_summary": {
+    "compared_against": "synthesized-20260410-001929",
+    "new_findings": [],
+    "resolved_findings": [
+      "f-893aa236",
+      "f-cacebef8",
+      "f-f0fc96a0",
+      "f-65774139",
+      "f-9ef3f9e1",
+      "f-f19d1573",
+      "f-d8739e99"
+    ],
+    "changed_severity": [],
+    "changed_status": [],
+    "merged_findings": [],
+    "not_rereported": []
+  },
+  "ranked_plan": {
+    "top_fixes": [
+      {
+        "rank": 1,
+        "finding_id": "f-203ecae0",
+        "title": "Turbopack NFT / onboarding-cluster trace",
+        "priority": "P1",
+        "severity": "major"
+      },
+      {
+        "rank": 2,
+        "finding_id": "f-23063538",
+        "title": "Verify penny RLS migration on remote Supabase",
+        "priority": "P2",
+        "severity": "minor"
+      }
+    ],
+    "commit_plan": [],
+    "regression_checklist": [
+      "pnpm run test (dashboard) — green",
+      "pnpm run lint — 0 errors",
+      "python3 audits/session.py preflight"
+    ],
+    "reaudit_plan": {
+      "agents": ["performance", "deploy"],
+      "files": ["apps/dashboard/lib/onboarding-cluster-snapshot.ts", "apps/dashboard/next.config.ts"],
+      "notes": "f-203ecae0 remains open until trace warnings addressed or accepted."
+    }
+  },
+  "closure_notes": {
+    "f-893aa236": "Explicit FINDING_LIST_COLUMNS / limits in supabase.ts.",
+    "f-cacebef8": "layout.tsx no next/font/google.",
+    "f-f0fc96a0": "Root test script is turbo run test (no duplicate --run).",
+    "f-65774139": "@eslint/eslintrc in dashboard package.json.",
+    "f-9ef3f9e1": "Migration 20260408120000_penny_tables_rls.sql adds RLS; remote deploy tracked under f-23063538.",
+    "f-f19d1573": "LanePanel &apos; escape; eslint 0 errors.",
+    "f-d8739e99": "Tests aligned with resolveNextAction priority rules; vitest green."
+  }
+}

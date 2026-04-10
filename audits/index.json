@@ -2,6 +2,216 @@
   "schema_version": "1.1.0",
   "runs": [
     {
+      "run_id": "synthesized-20260410-170148",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T17:11:13.000Z",
+      "source_run_ids": [
+        "logic-20260410-170148",
+        "data-20260410-170148",
+        "perf-20260410-170148",
+        "deploy-20260410-170148"
+      ],
+      "finding_count_total": 1,
+      "open_count": 11,
+      "duplicate_count": 0,
+      "notes": "Re-audit batch 170148Z: f-5386c5e8, f-2c1c5aa4, f-9e051198 \u2192 fixed_verified (removed from open_findings); f-0d9b4509 added (cluster snapshot persistence question)."
+    },
+    {
+      "run_id": "synthesized-20260410-162952",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T16:30:00.000Z",
+      "source_run_ids": [
+        "logic-20260410-162952",
+        "perf-20260410-162952",
+        "deploy-20260410-162952"
+      ],
+      "finding_count_total": 4,
+      "open_count": 13,
+      "duplicate_count": 0,
+      "notes": "LATEST batch 162952Z: f-5f0d56e9, f-27aab98a, f-2eb9f62b, f-1780c7cf \u2192 fixed_verified; f-bedb17e6 re-confirmed open."
+    },
+    {
+      "run_id": "deploy-20260410-162952",
+      "kind": "agent_output",
+      "suite": "deploy",
+      "timestamp": "2026-04-10T16:29:52.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 2,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "Worker typecheck + vercel.json absence."
+    },
+    {
+      "run_id": "perf-20260410-162952",
+      "kind": "agent_output",
+      "suite": "performance",
+      "timestamp": "2026-04-10T16:29:52.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 3,
+      "open_count": 1,
+      "duplicate_count": 0,
+      "notes": "Portfolio concurrency + tiered maxTokens verified; audit-reader nested runs still open."
+    },
+    {
+      "run_id": "logic-20260410-162952",
+      "kind": "agent_output",
+      "suite": "logic",
+      "timestamp": "2026-04-10T16:29:52.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 0,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "Scoped spot-check; no new logic findings."
+    },
+    {
+      "run_id": "synthesized-20260410-030202",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T03:05:00.000Z",
+      "source_run_ids": [
+        "logic-20260410-030202",
+        "ux-20260410-030202",
+        "perf-20260410-030202",
+        "deploy-20260410-030202"
+      ],
+      "finding_count_total": 20,
+      "open_count": 17,
+      "duplicate_count": 0,
+      "notes": "WIP batch re-audit: f-1ff003db, f-8603ee3b, f-ea12bf0f \u2192 fixed_verified; preflight green."
+    },
+    {
+      "run_id": "deploy-20260410-030202",
+      "kind": "agent_output",
+      "suite": "deploy",
+      "timestamp": "2026-04-10T03:02:02.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 0,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "CI workflow + root pnpm \u2014 no new deploy findings."
+    },
+    {
+      "run_id": "perf-20260410-030202",
+      "kind": "agent_output",
+      "suite": "performance",
+      "timestamp": "2026-04-10T03:02:02.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 0,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "Preflight build clean; no new perf regressions in scope."
+    },
+    {
+      "run_id": "ux-20260410-030202",
+      "kind": "agent_output",
+      "suite": "ux",
+      "timestamp": "2026-04-10T03:02:02.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 1,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "f-ea12bf0f verified fixed (portfolio overlay a11y)."
+    },
+    {
+      "run_id": "logic-20260410-030202",
+      "kind": "agent_output",
+      "suite": "logic",
+      "timestamp": "2026-04-10T03:02:02.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 2,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "f-1ff003db + f-8603ee3b verified fixed."
+    },
+    {
+      "run_id": "synthesized-20260410-021500",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T02:15:00.000Z",
+      "source_run_ids": [
+        "perf-20260410-021430"
+      ],
+      "finding_count_total": 20,
+      "open_count": 20,
+      "duplicate_count": 0,
+      "notes": "Perf re-audit only: f-203ecae0 promoted to fixed_verified; removed from open_findings (NFT warnings absent in preflight build.txt)."
+    },
+    {
+      "run_id": "perf-20260410-021430",
+      "kind": "agent_output",
+      "suite": "performance",
+      "timestamp": "2026-04-10T02:14:30.000Z",
+      "source_run_ids": [],
+      "finding_count_total": 1,
+      "open_count": 0,
+      "duplicate_count": 0,
+      "notes": "Re-audit f-203ecae0 after NFT trace fix."
+    },
+    {
+      "run_id": "synthesized-20260410-201500",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T01:15:15.000Z",
+      "source_run_ids": [
+        "logic-20260410-001929",
+        "data-20260410-001929",
+        "perf-20260410-001929",
+        "deploy-20260410-001929"
+      ],
+      "finding_count_total": 21,
+      "open_count": 21,
+      "duplicate_count": 0,
+      "notes": "Closed 7 findings as fixed_verified after re-audit verification + code fixes (tests, LanePanel, preflight green)."
+    },
+    {
+      "run_id": "synthesized-20260410-001929",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-10T00:19:29.000Z",
+      "source_run_ids": [
+        "logic-20260410-001929",
+        "data-20260410-001929",
+        "perf-20260410-001929",
+        "deploy-20260410-001929"
+      ],
+      "finding_count_total": 28,
+      "open_count": 28,
+      "duplicate_count": 0
+    },
+    {
+      "run_id": "synthesized-20260409-221506",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-09T22:15:06.000Z",
+      "source_run_ids": [
+        "logic-20260409-221500",
+        "data-20260409-221501",
+        "ux-20260409-221502",
+        "perf-20260409-221503",
+        "security-20260409-221504",
+        "deploy-20260409-221505"
+      ],
+      "finding_count_total": 27,
+      "open_count": 27,
+      "duplicate_count": 0
+    },
+    {
+      "run_id": "synthesized-20260407-214500",
+      "kind": "synthesizer_output",
+      "suite": "synthesized",
+      "timestamp": "2026-04-07T21:45:00.000Z",
+      "source_run_ids": [
+        "logic-20260407-214200",
+        "perf-20260407-214230",
+        "ux-20260407-214300"
+      ],
+      "finding_count_total": 22,
+      "open_count": 22,
+      "duplicate_count": 0
+    },
+    {
       "run_id": "synthesized-20260407-203000",
       "kind": "synthesizer_output",
       "suite": "synthesized",

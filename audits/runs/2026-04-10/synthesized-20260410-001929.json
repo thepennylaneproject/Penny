@@ -1,0 +1,270 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "synthesizer_output",
+  "suite": "synthesized",
+  "run_id": "synthesized-20260410-001929",
+  "agent": {
+    "name": "synthesizer",
+    "role": "Merge, deduplicate, normalize, rank, and plan across all agent outputs."
+  },
+  "coverage": {
+    "files_examined": [
+      "audits/runs/2026-04-10/logic-20260410-001929.json",
+      "audits/runs/2026-04-10/data-20260410-001929.json",
+      "audits/runs/2026-04-10/perf-20260410-001929.json",
+      "audits/runs/2026-04-10/deploy-20260410-001929.json",
+      "audits/open_findings.json"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-d8739e99",
+      "category": "test-contract",
+      "title": "Vitest fails: resolveNextAction test expects backlog over active findings; code prefers higher-priority finding",
+      "type": "bug",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "open",
+      "description": "See logic agent output; blocks green pnpm test.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/artifacts/_run_/tests.txt — resolve-next-action failure"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Imported from logic-20260410-001929."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-23063538",
+      "category": "migration-verify",
+      "title": "Confirm penny_tables RLS migration is applied on the live Supabase project",
+      "type": "question",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "estimated_effort": "small",
+      "status": "open",
+      "description": "See data agent output.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "supabase/migrations/20260408120000_penny_tables_rls.sql",
+          "file": "supabase/migrations/20260408120000_penny_tables_rls.sql"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Imported from data-20260410-001929."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-203ecae0",
+      "category": "bundle",
+      "title": "Turbopack NFT warnings for onboarding cluster / snapshot trace",
+      "type": "debt",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "in_progress",
+      "description": "Reconfirmed in perf agent output from build.txt.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/artifacts/_run_/build.txt"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Merged with prior open_findings entry; history appended in agent JSON."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-2a073225",
+      "category": "ci_cd",
+      "title": "GitHub Actions workflow present for core checks",
+      "type": "enhancement",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "status": "fixed_verified",
+      "description": "CI file exists; supersedes concern that no workflows existed.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": ".github/workflows/ci.yml",
+          "file": ".github/workflows/ci.yml"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Relates to prior f-749bab79 — recommend marking f-749bab79 fixed_verified in canonical open_findings."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-f19d1573",
+      "category": "ci-gap",
+      "title": "ESLint fails: react/no-unescaped-entities in LanePanel",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "status": "open",
+      "description": "Lint gate red; CI lint step fails.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Unchanged from open_findings.json; reconfirmed."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "major": 2, "minor": 3 },
+    "by_category": {
+      "test-contract": 1,
+      "migration-verify": 1,
+      "bundle": 1,
+      "ci_cd": 1,
+      "ci-gap": 1
+    },
+    "by_type": { "bug": 1, "question": 1, "debt": 2, "enhancement": 1 },
+    "by_status": { "open": 3, "in_progress": 1, "fixed_verified": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "Resolve f-d8739e99 (test vs resolveNextAction contract) so test suite passes.",
+      "finding_id": "f-d8739e99",
+      "rationale": "Single failing test in preflight."
+    },
+    {
+      "action": "Fix LanePanel apostrophe for f-f19d1573 to unblock lint and CI.",
+      "finding_id": "f-f19d1573",
+      "rationale": "Only eslint error in lint.txt."
+    },
+    {
+      "action": "Continue NFT / tracing work for f-203ecae0.",
+      "finding_id": "f-203ecae0",
+      "rationale": "Major debt; affects server trace size."
+    }
+  ],
+  "diff_summary": {
+    "compared_against": "synthesized-20260409-221506",
+    "new_findings": ["f-d8739e99", "f-23063538", "f-2a073225"],
+    "resolved_findings": [],
+    "changed_severity": [],
+    "changed_status": [
+      {
+        "finding_id": "f-749bab79",
+        "from": "fixed_pending_verify",
+        "to": "fixed_verified",
+        "reason": "inference",
+        "notes": ".github/workflows/ci.yml now exists; confirm in canonical open_findings and Linear."
+      }
+    ],
+    "converted_type": [],
+    "merged_findings": [],
+    "not_rereported": []
+  },
+  "ranked_plan": {
+    "top_fixes": [
+      {
+        "rank": 1,
+        "finding_id": "f-d8739e99",
+        "title": "Align resolveNextAction tests and implementation",
+        "priority": "P1",
+        "severity": "major"
+      },
+      {
+        "rank": 2,
+        "finding_id": "f-f19d1573",
+        "title": "Fix LanePanel eslint error",
+        "priority": "P2",
+        "severity": "minor"
+      },
+      {
+        "rank": 3,
+        "finding_id": "f-203ecae0",
+        "title": "Reduce Turbopack NFT / onboarding trace",
+        "priority": "P1",
+        "severity": "major"
+      },
+      {
+        "rank": 4,
+        "finding_id": "f-23063538",
+        "title": "Verify penny RLS migration deployed",
+        "priority": "P2",
+        "severity": "minor"
+      }
+    ],
+    "commit_plan": [
+      {
+        "title": "Tests: backlog vs finding policy",
+        "finding_ids": ["f-d8739e99"],
+        "steps": [
+          "Document intended rule in resolve-next-action.ts header.",
+          "Update resolve-next-action.test.ts or adjust comparison so pnpm test passes."
+        ],
+        "affected_files": [
+          "apps/dashboard/lib/resolve-next-action.ts",
+          "apps/dashboard/lib/__tests__/resolve-next-action.test.ts"
+        ],
+        "tests_or_checks": ["pnpm --filter penny-dashboard test"]
+      },
+      {
+        "title": "Lint: LanePanel quote",
+        "finding_ids": ["f-f19d1573"],
+        "steps": ["Escape JSX apostrophe per react/no-unescaped-entities."],
+        "affected_files": ["apps/dashboard/components/LanePanel.tsx"],
+        "tests_or_checks": ["pnpm --filter penny-dashboard lint"]
+      }
+    ],
+    "regression_checklist": [
+      "pnpm test (dashboard): all resolveNextAction cases",
+      "pnpm lint: zero errors",
+      "pnpm build: confirm NFT warnings trend down or unchanged"
+    ],
+    "reaudit_plan": {
+      "agents": ["logic", "deploy"],
+      "files": [
+        "apps/dashboard/lib/resolve-next-action.ts",
+        "apps/dashboard/components/LanePanel.tsx"
+      ],
+      "notes": "Re-run after test and lint fixes; perf agent if onboarding-cluster-snapshot changes."
+    }
+  }
+}

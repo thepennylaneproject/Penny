@@ -1,1 +1,76 @@
-Preflight skipped by environment; no build output captured.
+
+> penny-dashboard@0.1.0 build /Users/sarahsahl/Desktop/penny/apps/dashboard
+> node ./scripts/next-with-env.cjs build
+
+▲ Next.js 16.2.2 (Turbopack)
+- Experiments (use with caution):
+  · clientTraceMetadata
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 6.5s
+  Running next.config.js provided runAfterProductionCompile ...
+✓ Completed runAfterProductionCompile in 772ms
+  Running TypeScript ...
+  Finished TypeScript in 4.8s ...
+  Collecting page data using 7 workers ...
+  Generating static pages using 7 workers (0/35) ...
+  Generating static pages using 7 workers (8/35) 
+  Generating static pages using 7 workers (17/35) 
+  Generating static pages using 7 workers (26/35) 
+✓ Generating static pages using 7 workers (35/35) in 236ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /activity
+├ ƒ /api/auth/login
+├ ƒ /api/auth/logout
+├ ƒ /api/bulk-operations/clear-jobs
+├ ƒ /api/bulk-operations/clear-runs
+├ ƒ /api/bulk-operations/linear-sync
+├ ƒ /api/bulk-operations/linear-sync-all
+├ ƒ /api/bulk-operations/repair-queue
+├ ƒ /api/durable-state
+├ ƒ /api/engine/complete
+├ ƒ /api/engine/dequeue
+├ ƒ /api/engine/queue
+├ ƒ /api/engine/routing
+├ ƒ /api/engine/status
+├ ƒ /api/findings/lifecycle
+├ ƒ /api/health
+├ ƒ /api/import
+├ ƒ /api/lane/audit
+├ ƒ /api/lane/generate-patch
+├ ƒ /api/onboarding
+├ ƒ /api/orchestration
+├ ƒ /api/orchestration/jobs
+├ ƒ /api/orchestration/queue/clear
+├ ƒ /api/orchestration/runs
+├ ƒ /api/projects
+├ ƒ /api/projects/[name]
+├ ƒ /api/projects/[name]/export-findings
+├ ƒ /api/projects/[name]/findings
+├ ƒ /api/projects/[name]/findings/[findingId]
+├ ƒ /api/projects/[name]/maintenance
+├ ƒ /api/projects/[name]/manifest
+├ ƒ /api/projects/[name]/onboarding
+├ ƒ /api/projects/[name]/onboarding/cluster
+├ ƒ /api/projects/[name]/repair-costs
+├ ƒ /api/repair-jobs
+├ ƒ /api/repair-jobs/[jobId]
+├ ƒ /api/repair-jobs/[jobId]/candidates
+├ ƒ /api/repair-jobs/[jobId]/events
+├ ƒ /api/sync/audit
+├ ƒ /api/sync/linear/pull
+├ ƒ /api/sync/linear/push
+├ ƒ /api/sync/linear/status
+├ ƒ /projects/[name]
+└ ○ /repairs
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

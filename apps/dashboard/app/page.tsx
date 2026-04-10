@@ -606,17 +606,35 @@ export default function Home() {
               project={project}
               onClick={() => router.push(`/projects/${encodeURIComponent(project.name)}`)}
             />
-            <div style={{ position: "absolute", top: "0.5rem", right: "0.5rem", display: "flex", gap: "0.25rem", opacity: 0.4 }}>
+            <div
+              style={{
+                position: "absolute",
+                top: "0.5rem",
+                right: "0.5rem",
+                display: "flex",
+                gap: "0.25rem",
+                opacity: 0.72,
+              }}
+            >
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation();
                   handleExport(project);
                 }}
-                title="Export"
-                style={{ fontSize: "9px", padding: "1px 5px", fontFamily: "var(--font-mono)", background: "var(--ink-bg)" }}
+                aria-label={`Export open findings for ${project.name}`}
+                style={{
+                  fontSize: "9px",
+                  padding: "1px 5px",
+                  fontFamily: "var(--font-mono)",
+                  background: "var(--ink-bg)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "3px",
+                }}
               >
-                ↓
+                <span aria-hidden="true">↓</span>
+                <span>Export</span>
               </button>
               <button
                 type="button"
@@ -624,10 +642,19 @@ export default function Home() {
                   event.stopPropagation();
                   setPendingRemoveName(project.name);
                 }}
-                title="Remove"
-                style={{ fontSize: "9px", padding: "1px 5px", fontFamily: "var(--font-mono)", background: "var(--ink-bg)" }}
+                aria-label={`Remove ${project.name} from portfolio`}
+                style={{
+                  fontSize: "9px",
+                  padding: "1px 5px",
+                  fontFamily: "var(--font-mono)",
+                  background: "var(--ink-bg)",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "3px",
+                }}
               >
-                ×
+                <span aria-hidden="true">×</span>
+                <span>Remove</span>
               </button>
             </div>
           </div>

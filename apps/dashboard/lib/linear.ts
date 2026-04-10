@@ -9,6 +9,7 @@ const LINEAR_API = "https://api.linear.app/graphql";
 export const penny_TO_LINEAR_STATUS: Record<FindingStatus, string> = {
   open: "Backlog",
   accepted: "Todo",
+  assigned: "Todo",
   in_progress: "In Progress",
   fixed_pending_verify: "In Progress",
   fixed_verified: "Done",

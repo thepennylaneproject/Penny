@@ -71,7 +71,7 @@ export function LanePanel({
             Lane
           </div>
           <div style={{ fontSize: "12px", color: "var(--ink-text-3)", lineHeight: 1.5 }}>
-            Run Lane directly from Penny and keep the findings in Penny's operator UI.
+            Run Lane directly from Penny and keep the findings in Penny&apos;s operator UI.
           </div>
           {!laneBaseUrl ? (
             <div style={{ fontSize: "10px", color: "var(--ink-amber)", lineHeight: 1.5 }}>

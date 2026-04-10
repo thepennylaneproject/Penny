@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "logic",
+  "run_id": "logic-20260409-221500",
+  "agent": {
+    "name": "runtime-bug-hunter",
+    "role": "Re-audit runtime and control-flow on scoped dashboard and API routes after onboarding and error-boundary fixes.",
+    "inputs_used": [
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/typecheck.txt",
+      "audits/open_findings.json",
+      "apps/dashboard/app/error.tsx",
+      "apps/dashboard/app/global-error.tsx",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/app/api/projects/[name]/findings/[findingId]/route.ts",
+      "apps/dashboard/lib/onboarding.ts",
+      "apps/dashboard/lib/supabase.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/app/error.tsx",
+      "apps/dashboard/app/global-error.tsx",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/app/api/projects/[name]/findings/[findingId]/route.ts",
+      "apps/dashboard/lib/onboarding.ts",
+      "apps/dashboard/lib/supabase.ts"
+    ],
+    "files_skipped": [
+      "apps/dashboard/tsconfig.tsbuildinfo",
+      "pnpm-lock.yaml"
+    ],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-90f28fa8",
+      "category": "missing-boundary",
+      "title": "Root global-error UI has no path back to portfolio (unlike app/error.tsx)",
+      "type": "enhancement",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "status": "fixed_verified",
+      "description": "global-error.tsx now mirrors segment error.tsx: Try again plus a Link to / labeled Portfolio, with production-safe copy. Re-audit confirms parity with app/error.tsx.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "apps/dashboard/app/global-error.tsx:47-58 — flex row with Try again button and Link href=\"/\" children \"Portfolio\".",
+          "file": "apps/dashboard/app/global-error.tsx"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-09T22:15:00Z",
+          "actor": "runtime-bug-hunter",
+          "event": "note_added",
+          "notes": "Re-audit on scoped paths: recovery affordance present; matches segment error boundary."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-1ff003db",
+      "category": "error-handling",
+      "title": "Onboarding cluster POST uses process.cwd() when repo path is not local",
+      "type": "bug",
+      "severity": "major",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "open",
+      "description": "When repoAccess is a remote URL (does not start with \"/\"), isLocal is false and repoPath becomes process.cwd(). collectGitHistory and other collectors then read the dashboard working tree, not the target repository, producing misleading or empty artifacts without failing loudly.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "const repoPath = isLocal ? repoAccess : process.cwd() // fallback when remote",
+          "file": "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts"
+        },
+        {
+          "hook_type": "repro_steps",
+          "summary": "POST cluster with repositoryUrl only (no localPath): server uses cwd, not cloned repo."
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-09T22:15:00Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Identified during re-audit of onboarding cluster route."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "major": 2 },
+    "by_category": { "missing-boundary": 1, "error-handling": 1 },
+    "by_type": { "enhancement": 1, "bug": 1 },
+    "by_status": { "fixed_verified": 1, "open": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "Replace cwd fallback with explicit clone or 400 when remote URL has no local checkout.",
+      "finding_id": "f-1ff003db",
+      "rationale": "Prevents silent wrong data in cluster onboarding artifacts."
+    },
+    {
+      "action": "Mark Linear PLP-576 verified if tied to f-90f28fa8.",
+      "finding_id": "f-90f28fa8",
+      "rationale": "Global error UX fix is complete in repo."
+    }
+  ]
+}

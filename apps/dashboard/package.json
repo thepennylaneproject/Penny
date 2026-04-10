@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node ./scripts/next-with-env.cjs dev",
+    "build": "node ./scripts/next-with-env.cjs build",
+    "start": "node ./scripts/next-with-env.cjs start",
     "lint": "eslint app components lib hooks --ext .ts,.tsx",
     "typecheck": "tsc --noEmit",
-    "test": "vitest --run",
+    "test": "vitest --watch=false",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
@@ -17,8 +17,8 @@
     "setup": "npm run migrate && npm run build"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.49.1",
     "@sentry/nextjs": "^10.44.0",
+    "@supabase/supabase-js": "^2.49.1",
     "bullmq": "^5.71.0",
     "next": "^16.1.7",
     "pg": "^8.20.0",
@@ -27,6 +27,7 @@
     "redis": "^5.11.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@netlify/functions": "^5.1.3",
     "@tailwindcss/postcss": "^4.2.1",
     "@types/node": "^22.0.0",

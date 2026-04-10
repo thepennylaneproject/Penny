@@ -1,10 +1,10 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, extname, join } from "node:path";
+import { basename, extname, join as pathJoin } from "node:path";
 import { execFileSync } from "node:child_process";
+import { makeDecisionEvent } from "./decision-events";
 import type {
-  AuditKind,
   DecisionEvent,
   OnboardingState,
   Project,
@@ -13,6 +13,11 @@ import type {
   ProjectProfileSummary,
   ProjectSourceType,
 } from "./types";
+
+/** Avoids Turbopack/NFT treating scanned repo paths as whole-project traces (f-203ecae0). */
+function joinUnderRepo(base: string, ...rest: string[]) {
+  return pathJoin(/* turbopackIgnore: true */ base, ...rest);
+}
 
 const TEXT_EXTENSIONS = new Set([
   ".ts",
@@ -195,22 +200,6 @@ function makeArtifact(
   return status === "active" ? { active: version } : { draft: version };
 }
 
-export function makeDecisionEvent(
-  actor: string,
-  eventType: string,
-  targetType: DecisionEvent["target_type"],
-  extras: Partial<DecisionEvent> = {}
-): DecisionEvent {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    timestamp: new Date().toISOString(),
-    actor,
-    event_type: eventType,
-    target_type: targetType,
-    ...extras,
-  };
-}
-
 function resolveRepoAccess(input: OnboardRepositoryInput): RepoAccess {
   const repoUrl = input.repository_url?.trim();
   if (!repoUrl) {
@@ -224,7 +213,7 @@ function resolveRepoAccess(input: OnboardRepositoryInput): RepoAccess {
   }
   cloneArgs.push(repoUrl);
 
-  const target = mkdtempSync(join(tmpdir(), "penny-onboard-"));
+  const target = mkdtempSync(joinUnderRepo(tmpdir(), "penny-onboard-"));
   cloneArgs.push(target);
   try {
     // Full clone — no depth limit so commit history, count, and dates are accurate.
@@ -258,14 +247,16 @@ function collectRepoSnapshot(access: RepoAccess, defaultBranch?: string, provide
   const root = access.path;
   const files = listFiles(root);
   // In monorepos the root has no package.json — find the sub-package with the most deps
-  const pkg = readJsonIfExists(join(root, "package.json")) ?? findMonorepoPackageJson(root, files);
-  const pyproject = readTextIfExists(join(root, "pyproject.toml"));
+  const pkg =
+    readJsonIfExists(joinUnderRepo(root, "package.json")) ??
+    findMonorepoPackageJson(root, files);
+  const pyproject = readTextIfExists(joinUnderRepo(root, "pyproject.toml"));
   // requirements.txt may live in a sub-package (e.g. repair_engine/)
   const requirements =
-    readTextIfExists(join(root, "requirements.txt")) ||
+    readTextIfExists(joinUnderRepo(root, "requirements.txt")) ||
     files
       .filter((f) => /^[^/]+\/requirements\.txt$/.test(f))
-      .map((f) => readTextIfExists(join(root, f)))
+      .map((f) => readTextIfExists(joinUnderRepo(root, f)))
       .find((t) => Boolean(t.trim())) ||
     "";
   const readmePath = findReadme(root);
@@ -1118,7 +1109,7 @@ The project has Storybook configured. New shared UI components should ship with 
   }
   if (snapshot.testFiles.length > 0) {
     oosItems.push(
-      "- Test files (`*.test.*`, `*.spec.*`, `__tests__/`) — penny does not audit test logic unless the audit scope is `testing`."
+      "- Test files (`*.test.*`, `*.spec.*`, `__tests__/`) — Penny does not audit test logic unless the audit scope is `testing`."
     );
   }
   if (hasStorybook) {
@@ -1172,7 +1163,7 @@ function listFiles(root: string): string[] {
     }
     for (const name of entries) {
       if (SKIP_DIRS.has(name)) continue;
-      const full = join(dir, name);
+      const full = joinUnderRepo(dir, name);
       let st;
       try {
         st = statSync(full);
@@ -1263,7 +1254,7 @@ function findMonorepoPackageJson(root: string, files: string[]): Record<string, 
   let best: Record<string, unknown> | null = null;
   let bestScore = 0;
   for (const f of candidates) {
-    const p = readJsonIfExists(join(root, f));
+    const p = readJsonIfExists(joinUnderRepo(root, f));
     if (!p) continue;
     const score =
       Object.keys((p.dependencies as object) ?? {}).length +
@@ -1287,7 +1278,7 @@ function readTextIfExists(filePath: string): string {
 
 function findReadme(root: string): string | null {
   for (const candidate of ["README.md", "readme.md", "README", "Readme.md"]) {
-    const full = join(root, candidate);
+    const full = joinUnderRepo(root, candidate);
     if (existsSync(full)) return full;
   }
   return null;
@@ -1344,7 +1335,7 @@ function sampleFiles(files: string[], root: string): Array<{ path: string; excer
   const picked = sorted.slice(0, MAX_SAMPLE_FILES);
 
   return picked.map((file) => {
-    const text = readTextIfExists(join(root, file));
+    const text = readTextIfExists(joinUnderRepo(root, file));
     const limit = isKeyFile(file) ? MAX_KEY_FILE_SIZE : MAX_FILE_PREVIEW;
     return {
       path: file,
@@ -1468,7 +1459,7 @@ function extractEnvVars(files: string[], root: string): string[] {
   for (const file of files) {
     const ext = extname(file).toLowerCase();
     if (!TEXT_EXTENSIONS.has(ext)) continue;
-    const text = readTextIfExists(join(root, file));
+    const text = readTextIfExists(joinUnderRepo(root, file));
     // Pattern 1: process.env.VAR_NAME or os.environ["VAR_NAME"] / getenv("VAR_NAME")
     for (const match of text.matchAll(/\b(?:process\.env|os\.environ(?:\.get)?|getenv|Deno\.env\.get)\s*(?:\.\s*|\[\s*['"`]|get\s*\(\s*['"`])([A-Z][A-Z0-9_]+)/g)) {
       if (match[1]) vars.add(match[1]);
@@ -1488,7 +1479,9 @@ function detectDeploymentSignals(files: string[], root: string): string[] {
   if (files.some((file) => /Dockerfile|docker-compose/i.test(file))) out.push("Docker config detected");
   if (files.some((file) => file.startsWith(".github/workflows/"))) out.push("GitHub Actions detected");
   if (files.some((file) => /render\.yaml|fly\.toml/i.test(file))) out.push("Additional deploy config detected");
-  const envExample = ["README.md", "README"].map((name) => join(root, name)).find((file) => existsSync(file));
+  const envExample = ["README.md", "README"]
+    .map((name) => joinUnderRepo(root, name))
+    .find((file) => existsSync(file));
   if (envExample && readTextIfExists(envExample).match(/https?:\/\//)) out.push("README references external URLs");
   return out;
 }
@@ -1534,7 +1527,7 @@ function isPlaceholderUrl(url: string): boolean {
 function extractUrls(files: string[], root: string): string[] {
   const urls = new Set<string>();
   for (const file of files.slice(0, 100)) {
-    const text = readTextIfExists(join(root, file));
+    const text = readTextIfExists(joinUnderRepo(root, file));
     for (const match of text.matchAll(/https?:\/\/[^\s'")<>]+/g)) {
       const url = match[0].replace(/[.,;]+$/, ""); // strip trailing punctuation
       if (!isServiceUrl(url) && !isPlaceholderUrl(url)) urls.add(url);
@@ -2297,224 +2290,7 @@ function formatCommands(commands: RepoSnapshot["commands"]): string {
   return lines.join("\n");
 }
 
-export function updateOnboardingArtifacts(
-  project: Project,
-  input: {
-    actor?: string;
-    profileContent?: string;
-    expectationsContent?: string;
-    approveProfile?: boolean;
-    approveExpectations?: boolean;
-    activate?: boolean;
-    notes?: string;
-  }
-): Project {
-  const actor = input.actor?.trim() || "dashboard";
-  const now = new Date().toISOString();
-  const decisionHistory = [...(project.decisionHistory ?? [])];
-  const onboardingEvents = [...(project.onboardingState?.events ?? [])];
-  let nextProfile = project.profile ?? {};
-  let nextExpectations = project.expectations ?? {};
-  let nextStatus = project.status ?? "draft";
-  const onboardingState: OnboardingState = {
-    stage: project.onboardingState?.stage ?? "operator_review",
-    reviewRequired: true,
-    updatedAt: now,
-    ...project.onboardingState,
-  };
+export { makeDecisionEvent, summarizeAuditDecision } from "./decision-events";
 
-  if (typeof input.profileContent === "string") {
-    const previous = nextProfile.draft ?? nextProfile.active;
-    nextProfile = {
-      ...nextProfile,
-      draft: {
-        version: (previous?.version ?? 0) + 1,
-        status: "draft",
-        content: input.profileContent,
-        generatedAt: now,
-        source: "manual",
-      },
-    };
-    const draftVersion = nextProfile.draft?.version ?? previous?.version ?? 1;
-    const event = makeDecisionEvent(actor, "profile_edited", "profile", {
-      notes: input.notes,
-      before: { version: previous?.version },
-      after: { version: draftVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (typeof input.expectationsContent === "string") {
-    const previous = nextExpectations.draft ?? nextExpectations.active;
-    nextExpectations = {
-      ...nextExpectations,
-      draft: {
-        version: (previous?.version ?? 0) + 1,
-        status: "draft",
-        content: input.expectationsContent,
-        generatedAt: now,
-        source: "manual",
-      },
-    };
-    const draftVersion = nextExpectations.draft?.version ?? previous?.version ?? 1;
-    const event = makeDecisionEvent(actor, "expectations_edited", "expectations", {
-      notes: input.notes,
-      before: { version: previous?.version },
-      after: { version: draftVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.approveProfile && nextProfile.draft) {
-    const approvedDraft = nextProfile.draft;
-    nextProfile = {
-      ...nextProfile,
-      active: { ...approvedDraft, status: "active" },
-    };
-    onboardingState.profileApprovedAt = now;
-    const activeVersion = nextProfile.active?.version ?? approvedDraft.version;
-    const event = makeDecisionEvent(actor, "profile_approved", "profile", {
-      notes: input.notes,
-      after: { version: activeVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.approveExpectations && nextExpectations.draft) {
-    const approvedDraft = nextExpectations.draft;
-    nextExpectations = {
-      ...nextExpectations,
-      active: { ...approvedDraft, status: "active" },
-    };
-    onboardingState.expectationsApprovedAt = now;
-    const activeVersion =
-      nextExpectations.active?.version ?? approvedDraft.version;
-    const event = makeDecisionEvent(actor, "expectations_approved", "expectations", {
-      notes: input.notes,
-      after: { version: activeVersion },
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  }
-
-  if (input.activate) {
-    if (!nextProfile.active || !nextExpectations.active) {
-      throw new Error("Profile and expectations must both be approved before activation");
-    }
-    nextStatus = "active";
-    onboardingState.stage = "completed";
-    onboardingState.reviewRequired = false;
-    onboardingState.activatedAt = now;
-    const event = makeDecisionEvent(actor, "project_activated", "project", {
-      notes: input.notes,
-    });
-    decisionHistory.push(event);
-    onboardingEvents.push(event);
-  } else {
-    onboardingState.stage = "operator_review";
-    onboardingState.reviewRequired = true;
-  }
-
-  onboardingState.updatedAt = now;
-  onboardingState.events = onboardingEvents;
-
-  return {
-    ...project,
-    profile: nextProfile,
-    expectations: nextExpectations,
-    status: nextStatus,
-    onboardingState,
-    decisionHistory,
-    lastUpdated: now,
-  };
-}
-
-export function summarizeAuditDecision(
-  actor: string,
-  eventType: string,
-  targetType: DecisionEvent["target_type"],
-  args: {
-    auditKind?: AuditKind;
-    scopeType?: DecisionEvent["scope_type"];
-    scopePaths?: string[];
-    notes?: string;
-    before?: Record<string, unknown>;
-    after?: Record<string, unknown>;
-  }
-): DecisionEvent {
-  return makeDecisionEvent(actor, eventType, targetType, {
-    notes: args.notes,
-    audit_kind: args.auditKind,
-    scope_type: args.scopeType,
-    scope_paths: args.scopePaths,
-    before: args.before,
-    after: args.after,
-  });
-}
-
-// ── Cluster-Aware Onboarding Utilities ─────────────────────────────────────────
-
-export async function collectGitHistory(repoPath: string): Promise<string> {
-  try {
-    const log = execFileSync("git", ["-C", repoPath, "log", "-n", "100", "--oneline", "--stat"], {
-      encoding: "utf8",
-      stdio: "pipe",
-    });
-    return log.slice(0, 15000);
-  } catch (e) {
-    return "Git history unavailable: " + (e instanceof Error ? e.message : String(e));
-  }
-}
-
-export async function collectDependencyManifest(repoPath: string): Promise<string> {
-  const pkgPath = join(repoPath, "package.json");
-  if (!existsSync(pkgPath)) return "No package.json found.";
-  try {
-    const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
-    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-    return JSON.stringify(deps, null, 2);
-  } catch (e) {
-    return "Failed to parse dependencies.";
-  }
-}
-
-export async function generateModuleManifest(repoPath: string): Promise<Record<string, unknown>> {
-  const tree = describeTopLevel(repoPath);
-  return {
-    revision: "v1-onboarding",
-    generated_at: new Date().toISOString(),
-    source_root: repoPath,
-    exhaustiveness: "exhaustive",
-    modules: tree.map((t) => ({
-      name: t.path,
-      path: t.path,
-      description: t.note,
-      complexity: "medium",
-      dependencies: [],
-    })),
-    domains: [],
-  };
-}
-
-export async function generateCssTokenMap(repoPath: string): Promise<string> {
-  const out = [];
-  const candidates = [
-    "tailwind.config.js",
-    "tailwind.config.ts",
-    "globals.css",
-    "src/globals.css",
-    "src/index.css",
-    "styles/globals.css",
-    "src/styles/globals.css" // Added based on penny project structure
-  ];
-  for (const f of candidates) {
-    const p = join(repoPath, f);
-    if (existsSync(p)) {
-      out.push(`--- ${f} ---\n` + readFileSync(p, "utf8").slice(0, 3000));
-    }
-  }
-  return out.length > 0 ? out.join("\n\n") : "No standard CSS token maps found.";
-}
+// Do not re-export onboarding-cluster-snapshot here: it uses fs/git and would be
+// pulled into every bundle that imports @/lib/onboarding (e.g. /api/onboarding NFT trace; f-203ecae0).

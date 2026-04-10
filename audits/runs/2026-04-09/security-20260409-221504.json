@@ -1,0 +1,38 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "security",
+  "run_id": "security-20260409-221504",
+  "agent": {
+    "name": "security-auditor",
+    "role": "Re-check RLS alignment, server keys, and API exposure for scoped migrations and routes.",
+    "inputs_used": [
+      "supabase/migrations/20260403102352_penny_projects.sql",
+      "supabase/migrations/20260408120000_penny_tables_rls.sql",
+      "apps/dashboard/lib/supabase.ts",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/findings/[findingId]/route.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "supabase/migrations/20260403102352_penny_projects.sql",
+      "supabase/migrations/20260408120000_penny_tables_rls.sql",
+      "apps/dashboard/lib/supabase.ts",
+      "apps/dashboard/app/api/onboarding/route.ts",
+      "apps/dashboard/app/api/projects/[name]/findings/[findingId]/route.ts"
+    ],
+    "files_skipped": [],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [],
+  "rollups": {
+    "by_severity": {},
+    "by_category": {},
+    "by_type": {},
+    "by_status": {}
+  },
+  "next_actions": []
+}

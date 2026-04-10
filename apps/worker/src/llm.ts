@@ -224,6 +224,36 @@ function dedupe(arr: string[]): string[] {
   return arr.filter((x) => { if (seen.has(x)) return false; seen.add(x); return true; });
 }
 
+/** Kinds that often return very large JSON (synthesis, wide intelligence). */
+const AUDIT_KIND_HIGH_MAX_TOKENS = new Set([
+  "intelligence",
+  "synthesize",
+  "visual_synthesize",
+  "cluster_synthesize",
+  "meta_synthesize",
+  "portfolio_synthesize",
+  "synthesize_project",
+]);
+
+const AUDIT_DEFAULT_MAX_OUTPUT_TOKENS = 8192;
+const AUDIT_HIGH_MAX_OUTPUT_TOKENS = 12288;
+
+/**
+ * Cap generated tokens per audit call. Override with penny_AUDIT_MAX_OUTPUT_TOKENS (256–128000).
+ * High-output kinds (synthesis, intelligence, etc.) keep a larger ceiling; domain passes use less.
+ */
+export function resolveAuditMaxOutputTokens(auditKind?: string): number {
+  const raw = process.env.penny_AUDIT_MAX_OUTPUT_TOKENS?.trim();
+  if (raw) {
+    const n = Number.parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 256 && n <= 128_000) return n;
+  }
+  if (auditKind && AUDIT_KIND_HIGH_MAX_TOKENS.has(auditKind)) {
+    return AUDIT_HIGH_MAX_OUTPUT_TOKENS;
+  }
+  return AUDIT_DEFAULT_MAX_OUTPUT_TOKENS;
+}
+
 function formatBoundedList(
   items: string[],
   limit: number,
@@ -425,7 +455,7 @@ Return JSON: { "coverage": { ... }, "findings": [ ... ] } per audit-agent output
       userPrompt: user,
       responseFormat: "json_object",
       temperature: 0.2,
-      maxTokens: 12288,
+      maxTokens: resolveAuditMaxOutputTokens(auditKind),
     }, resolveRoutingPolicy({
       contextLabel: auditKind ?? "full-audit",
       allowPremium: false,

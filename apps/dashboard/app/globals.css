@@ -4,6 +4,10 @@
 
 /* ─── Design Tokens ─────────────────────────────────────── */
 :root {
+  --font-inter:        "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-jetbrains-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+  --font-dm-serif:     "DM Serif Display", "Times New Roman", serif;
+
   /* Surface */
   --ink-bg:            #F7F5F0;
   --ink-bg-raised:     #EFEDE6;

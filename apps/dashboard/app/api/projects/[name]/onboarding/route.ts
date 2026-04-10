@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
 import { apiErrorMessage } from "@/lib/api-error";
-import { updateOnboardingArtifacts } from "@/lib/onboarding";
 
 type Params = { params: Promise<{ name: string }> };
 
@@ -28,6 +27,7 @@ export async function GET(_request: Request, { params }: Params) {
 
 export async function PATCH(request: Request, { params }: Params) {
   try {
+    const { updateOnboardingArtifacts } = await import("@/lib/onboarding-update");
     const { name } = await params;
     const body = (await request.json()) as {
       profileContent?: string;

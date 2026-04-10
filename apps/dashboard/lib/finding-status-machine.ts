@@ -14,13 +14,16 @@ import type { FindingStatus } from "@/lib/types";
  */
 export const STATUS_TRANSITIONS: Record<FindingStatus, FindingStatus[]> = {
   // New finding: can be accepted, deferred, won't fix, or marked duplicate
-  open: ["accepted", "wont_fix", "deferred", "duplicate"],
+  open: ["accepted", "assigned", "wont_fix", "deferred", "duplicate"],
 
-  // Acknowledged: can start work, defer, or mark duplicate
-  accepted: ["in_progress", "wont_fix", "deferred", "duplicate"],
+  // Acknowledged: can assign, start work, defer, or mark duplicate
+  accepted: ["assigned", "in_progress", "wont_fix", "deferred", "duplicate"],
+
+  // Assigned: handoff before active implementation
+  assigned: ["in_progress", "accepted", "wont_fix", "deferred", "duplicate"],
 
   // Working: can mark as fixed, or revert to accepted if hitting issues
-  in_progress: ["fixed_pending_verify", "accepted", "wont_fix", "deferred"],
+  in_progress: ["fixed_pending_verify", "assigned", "accepted", "wont_fix", "deferred"],
 
   // Fixed but unverified: can verify, revert to accepted if issues found, or defer
   fixed_pending_verify: ["fixed_verified", "accepted", "in_progress"],
@@ -59,7 +62,7 @@ export function getNextStatuses(status: FindingStatus): FindingStatus[] {
  * Categorize statuses for UI grouping and styling.
  */
 export const STATUS_CATEGORIES = {
-  active: new Set<FindingStatus>(["open", "accepted", "in_progress"]),
+  active: new Set<FindingStatus>(["open", "accepted", "assigned", "in_progress"]),
   pending: new Set<FindingStatus>(["fixed_pending_verify"]),
   resolved: new Set<FindingStatus>([
     "fixed_verified",
@@ -87,6 +90,7 @@ export function getStatusCategory(
 export const TRANSITION_LABELS: Record<FindingStatus, string> = {
   open: "New",
   accepted: "Accepted",
+  assigned: "Assigned",
   in_progress: "In Progress",
   fixed_pending_verify: "Fixed (Verify)",
   fixed_verified: "Fixed",
@@ -107,6 +111,10 @@ export const STATUS_GUIDANCE: Record<FindingStatus, { title: string; description
   accepted: {
     title: "Acknowledged",
     description: "You've acknowledged this finding. Next, you can start work, decide not to fix it, or defer it.",
+  },
+  assigned: {
+    title: "Assigned",
+    description: "This finding is assigned. Start implementation when ready, or move back to acknowledged if ownership changes.",
   },
   in_progress: {
     title: "In Progress",

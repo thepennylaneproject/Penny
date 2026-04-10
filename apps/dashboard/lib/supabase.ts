@@ -94,6 +94,35 @@ export function getSupabaseBrowserClient(): SupabaseClient | null {
  * Type-safe query builder helpers
  */
 
+/** Default cap for unbounded list queries (findings scale with audit volume). */
+const DEFAULT_LIST_LIMIT = 500;
+
+const PROJECT_COLUMNS =
+  'id, name, repository_url, branch, stack_info, expectations_content, last_audit_at, created_at, updated_at, owner_id, github_repo_url, github_app_installation_id, default_llm_tier';
+
+const AUDIT_RUN_COLUMNS =
+  'id, project_id, kind, status, trigger_type, trigger_payload, summary_stats, started_at, completed_at, total_cost_usd, created_at';
+
+/** List rows: omits heavy JSON blobs used for detail/history views. */
+const FINDING_LIST_COLUMNS =
+  'id, project_id, run_id, agent_name, severity, priority, type, status, confidence, title, description, file_path, line_range, created_at, updated_at';
+
+const FINDING_FULL_COLUMNS = `${FINDING_LIST_COLUMNS}, proof_hooks, suggested_fix, history, metadata`;
+
+const MODEL_USAGE_COLUMNS =
+  'id, run_id, agent_name, model_name, input_tokens, output_tokens, cost_usd, latency_ms, timestamp';
+
+const AUDIT_SUITE_CONFIG_COLUMNS =
+  'id, project_id, suite_id, enabled, llm_tier, agent_overrides, created_at, updated_at';
+
+const WEBHOOK_COLUMNS =
+  'id, project_id, github_repo_url, secret_token, events, active, created_at, updated_at';
+
+const SCHEDULE_COLUMNS =
+  'id, project_id, cron_expression, audit_kind, llm_tier, enabled, last_run_at, next_run_at, created_at, updated_at';
+
+export type FindingsSelectMode = 'list' | 'full';
+
 /**
  * Query projects table
  */
@@ -102,7 +131,9 @@ export async function getProjects(client: SupabaseClient | null) {
 
   const { data, error } = await client
     .from('projects')
-    .select('*');
+    .select(PROJECT_COLUMNS)
+    .order('name', { ascending: true })
+    .limit(2_000);
 
   if (error) {
     console.error('Error fetching projects:', error);
@@ -120,9 +151,10 @@ export async function getAuditRuns(client: SupabaseClient | null, projectId: str
 
   const { data, error } = await client
     .from('audit_runs')
-    .select('*')
+    .select(AUDIT_RUN_COLUMNS)
     .eq('project_id', projectId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(1_000);
 
   if (error) {
     console.error('Error fetching audit runs:', error);
@@ -135,14 +167,22 @@ export async function getAuditRuns(client: SupabaseClient | null, projectId: str
 /**
  * Query findings for a project
  */
-export async function getFindings(client: SupabaseClient | null, projectId: string) {
+export async function getFindings(
+  client: SupabaseClient | null,
+  projectId: string,
+  options?: { limit?: number; select?: FindingsSelectMode }
+) {
   if (!client) return null;
+
+  const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+  const cols = options?.select === 'full' ? FINDING_FULL_COLUMNS : FINDING_LIST_COLUMNS;
 
   const { data, error } = await client
     .from('findings')
-    .select('*')
+    .select(cols)
     .eq('project_id', projectId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
   if (error) {
     console.error('Error fetching findings:', error);
@@ -158,16 +198,21 @@ export async function getFindings(client: SupabaseClient | null, projectId: stri
 export async function getFindingsByStatus(
   client: SupabaseClient | null,
   projectId: string,
-  status: string
+  status: string,
+  options?: { limit?: number; select?: FindingsSelectMode }
 ) {
   if (!client) return null;
 
+  const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+  const cols = options?.select === 'full' ? FINDING_FULL_COLUMNS : FINDING_LIST_COLUMNS;
+
   const { data, error } = await client
     .from('findings')
-    .select('*')
+    .select(cols)
     .eq('project_id', projectId)
     .eq('status', status)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
   if (error) {
     console.error('Error fetching findings by status:', error);
@@ -242,8 +287,9 @@ export async function getModelUsage(client: SupabaseClient | null, runId: string
 
   const { data, error } = await client
     .from('model_usage')
-    .select('*')
-    .eq('run_id', runId);
+    .select(MODEL_USAGE_COLUMNS)
+    .eq('run_id', runId)
+    .limit(10_000);
 
   if (error) {
     console.error('Error fetching model usage:', error);
@@ -264,7 +310,7 @@ export async function getAuditSuiteConfigs(
 
   const { data, error } = await client
     .from('audit_suite_configs')
-    .select('*')
+    .select(AUDIT_SUITE_CONFIG_COLUMNS)
     .eq('project_id', projectId);
 
   if (error) {
@@ -313,7 +359,7 @@ export async function getWebhooks(client: SupabaseClient | null, projectId: stri
 
   const { data, error } = await client
     .from('webhooks')
-    .select('*')
+    .select(WEBHOOK_COLUMNS)
     .eq('project_id', projectId);
 
   if (error) {
@@ -332,7 +378,7 @@ export async function getSchedules(client: SupabaseClient | null, projectId: str
 
   const { data, error } = await client
     .from('schedules')
-    .select('*')
+    .select(SCHEDULE_COLUMNS)
     .eq('project_id', projectId);
 
   if (error) {

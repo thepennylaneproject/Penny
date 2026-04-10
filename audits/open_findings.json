@@ -1,35 +1,34 @@
 {
   "schema_version": "1.1.0",
-  "last_updated": "2026-04-07T17:50:27Z",
-  "run_id": "synthesized-20260407-203000",
+  "last_updated": "2026-04-10T17:10:48Z",
+  "run_id": "synthesized-20260410-170148",
   "synthesized_from": [
-    "logic-20260407-201500",
-    "security-20260407-201400"
+    "logic-20260410-170148",
+    "data-20260410-170148",
+    "perf-20260410-170148",
+    "deploy-20260410-170148",
+    "synthesized-20260410-170148"
   ],
   "open_findings": [
     {
-      "finding_id": "f-90f28fa8",
-      "category": "missing-boundary",
-      "title": "Root global-error UI has no path back to portfolio (unlike app/error.tsx)",
-      "type": "enhancement",
-      "severity": "major",
-      "priority": "P1",
+      "finding_id": "f-23e02a8c",
+      "category": "copy-mismatch",
+      "title": "Nav label \u201cActivity\u201d vs page headline \u201cJob queue\u201d",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P3",
       "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "accepted",
-      "description": "Segment-level error.tsx offers Try again plus a Link to /. global-error.tsx only renders a heading, raw message, and Try again with no link to / or full layout. After a root layout failure, users lack the same recovery affordance as nested route errors.",
+      "estimated_effort": "trivial",
+      "status": "open",
+      "description": "Sidebar nav shows \u201cActivity\u201d (Shell.tsx NAV_ITEMS) while the page eyebrow also says Activity but the H1 reads \u201cJob queue\u201d. Not wrong, but users may wonder if they are the same section; consider aligning headline with nav or adding a short subline.",
       "proof_hooks": [
         {
           "hook_type": "code_ref",
-          "summary": "apps/dashboard/app/global-error.tsx: return body has h1, p with error.message, button reset only \u2014 no Link href=\"/\"."
+          "summary": "apps/dashboard/components/Shell.tsx:89-93 \u2014 nav label \"Activity\" for jobs view."
         },
         {
           "hook_type": "code_ref",
-          "summary": "apps/dashboard/app/error.tsx:38-49 \u2014 Try again plus Link href=\"/\" labeled Portfolio for comparison."
-        },
-        {
-          "hook_type": "ui_path",
-          "summary": "Global root error surface (any fault that triggers global-error boundary)."
+          "summary": "apps/dashboard/components/JobQueueView.tsx:643-653 \u2014 eyebrow \"Activity\", h1 \"Job queue\"."
         }
       ],
       "history": [
@@ -37,23 +36,144 @@
           "timestamp": "2026-04-07T05:55:03.000Z",
           "actor": "ux-flow-auditor",
           "event": "created",
-          "notes": "Compared global-error vs segment error components."
+          "notes": "Terminology drift within single view."
         },
         {
           "timestamp": "2026-04-07T18:45:00.000Z",
           "actor": "synthesizer",
           "event": "merged",
           "notes": "Normalized proof_hooks from agent hooks[] field."
+        }
+      ],
+      "sources": [
+        "ux-20260407-055503"
+      ]
+    },
+    {
+      "finding_id": "f-a1c6d05d",
+      "category": "api",
+      "title": "Project page loads the full portfolio via /api/projects",
+      "type": "enhancement",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "estimated_effort": "medium",
+      "status": "open",
+      "description": "ProjectPageClient uses usePortfolioProjects, which always GETs /api/projects and filters client-side to the current project. For users with many projects this duplicates work and payload size versus a single-project GET.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "fetchProjects on mount",
+          "file": "apps/dashboard/components/ProjectPageClient.tsx",
+          "value": "useEffect(() => { void fetchProjects(); void fetchQueue(); }, ...)",
+          "start_line": 91
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Portfolio hook hits list endpoint",
+          "file": "apps/dashboard/hooks/use-portfolio-projects.ts",
+          "value": "const res = await apiFetch(\"/api/projects\");",
+          "start_line": 20
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Add GET /api/projects/[name] as the primary load for the project route (or hydrate from server component) and keep list fetch for the portfolio index only.",
+        "steps": [
+          "Compare existing /api/projects/[name] behavior with ProjectPageClient data needs.",
+          "Reduce redundant refetches after navigation between projects."
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-04-07T18:45:00.000Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized finding_id from perf agent id field; merged history."
+        }
+      ],
+      "sources": [
+        "perf-20260407-121845"
+      ]
+    },
+    {
+      "finding_id": "f-6af2fc10",
+      "category": "migration_hygiene",
+      "title": "repair_service migration DROP POLICY names may not match earlier migration",
+      "type": "debt",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "inference",
+      "estimated_effort": "trivial",
+      "status": "open",
+      "description": "20260402231116_repair_service.sql drops policies named users_can_view_repair_jobs, etc. The earlier 20260402163740_rls_policies.sql creates policies named \"Users can access repair jobs for their projects\". IF EXISTS avoids errors, but the older FOR ALL policy may remain alongside newer SELECT/INSERT policies, producing redundant or confusing policy sets until manually reconciled.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "DROP uses different names than CREATE in 002",
+          "file": "supabase/migrations/20260402231116_repair_service.sql",
+          "value": "DROP POLICY IF EXISTS \"users_can_view_repair_jobs\" vs CREATE POLICY \"Users can access repair jobs for their projects\"",
+          "start_line": 155
+        }
+      ],
+      "suggested_fix": {
+        "approach": "In a follow-up migration, list policies on repair_jobs in production and drop obsolete ones explicitly.",
+        "steps": [
+          "SELECT polname FROM pg_policy JOIN pg_class ... WHERE relname = 'repair_jobs';",
+          "DROP redundant policies; document intended final set."
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-04-07T18:45:00.000Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Normalized finding_id from data id field."
+        }
+      ],
+      "sources": [
+        "data-20260407-052750"
+      ]
+    },
+    {
+      "finding_id": "f-7dc35572",
+      "category": "referential_integrity",
+      "title": "FKs removed from penny_audit_* and related tables for async sync",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "accepted",
+      "description": "20260403110028_fix_audit_table_schemas.sql drops foreign keys from penny_audit_jobs, penny_audit_runs, penny_orchestration_events, and penny_project_snapshots to penny_projects so jobs can exist before the project row. This trades referential integrity for pipeline flexibility; orphan rows and typos in project_name are possible.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "DROP CONSTRAINT",
+          "file": "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
+          "value": "DROP CONSTRAINT IF EXISTS penny_audit_jobs_project_name_fkey",
+          "start_line": 20
+        }
+      ],
+      "suggested_fix": {
+        "approach": "Periodic cleanup job or CHECK using validated project_name from application layer; optional deferred FK via materialized project registry.",
+        "steps": []
+      },
+      "history": [
+        {
+          "timestamp": "2026-04-07T18:45:00.000Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Normalized finding_id from data id field."
         },
         {
           "timestamp": "2026-04-07T17:22:47Z",
           "actor": "linear-sync",
           "event": "note_added",
-          "notes": "Status synced from Linear (PLP-576): Todo -> accepted"
+          "notes": "Status synced from Linear (PLP-601): Todo -> accepted"
         }
       ],
       "sources": [
-        "ux-20260407-055503"
+        "data-20260407-052750"
       ]
     },
     {
@@ -106,449 +226,96 @@
       ]
     },
     {
-      "finding_id": "f-ea12bf0f",
-      "category": "a11y-gap",
-      "title": "Portfolio project card overlay buttons rely on title= only (export/remove)",
-      "type": "enhancement",
+      "finding_id": "f-58c68aa7",
+      "category": "security",
+      "title": "Broad GRANT on repair_jobs to anon and authenticated",
+      "type": "question",
       "severity": "minor",
       "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "open",
-      "description": "Export (\u2193) and remove (\u00d7) controls use title attributes for tooltips but omit aria-label. Screen reader users get unclear accessible names compared to visible icon-only affordances elsewhere that use aria-label (e.g. dismiss buttons on the same page).",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/app/page.tsx:610-630 \u2014 buttons with title=\"Export\" and title=\"Remove\" only."
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T05:55:03.000Z",
-          "actor": "ux-flow-auditor",
-          "event": "created",
-          "notes": "Compared with other buttons on page using aria-label."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from agent hooks[] field."
-        }
-      ],
-      "sources": [
-        "ux-20260407-055503"
-      ]
-    },
-    {
-      "finding_id": "f-23e02a8c",
-      "category": "copy-mismatch",
-      "title": "Nav label \u201cActivity\u201d vs page headline \u201cJob queue\u201d",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P3",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "open",
-      "description": "Sidebar nav shows \u201cActivity\u201d (Shell.tsx NAV_ITEMS) while the page eyebrow also says Activity but the H1 reads \u201cJob queue\u201d. Not wrong, but users may wonder if they are the same section; consider aligning headline with nav or adding a short subline.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/components/Shell.tsx:89-93 \u2014 nav label \"Activity\" for jobs view."
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/components/JobQueueView.tsx:643-653 \u2014 eyebrow \"Activity\", h1 \"Job queue\"."
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T05:55:03.000Z",
-          "actor": "ux-flow-auditor",
-          "event": "created",
-          "notes": "Terminology drift within single view."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from agent hooks[] field."
-        }
-      ],
-      "sources": [
-        "ux-20260407-055503"
-      ]
-    },
-    {
-      "finding_id": "f-4607195c",
-      "category": "inconsistent-label",
-      "title": "Browser tab title only updated on home and project pages",
-      "type": "enhancement",
-      "severity": "nit",
-      "priority": "P3",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "open",
-      "description": "document.title is set in app/page.tsx and ProjectPageClient for portfolio and project contexts. /activity and /repairs leave the default metadata title (\u201cpenny\u201d), so multi-tab users cannot distinguish Activity vs Repairs from the tab alone.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/app/page.tsx:101-103 \u2014 useEffect sets document.title for portfolio only."
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/components/ProjectPageClient.tsx:96-98 \u2014 project tab title."
-        },
-        {
-          "hook_type": "ui_path",
-          "summary": "/activity and /repairs \u2014 no matching document.title updates found in JobQueueView or EngineView."
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T05:55:03.000Z",
-          "actor": "ux-flow-auditor",
-          "event": "created",
-          "notes": "grep apps/dashboard for document.title shows only two call sites."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from agent hooks[] field."
-        }
-      ],
-      "sources": [
-        "ux-20260407-055503"
-      ]
-    },
-    {
-      "finding_id": "f-8603ee3b",
-      "category": "client-storage",
-      "title": "Orchestration enqueue secret can be read from sessionStorage by page scripts",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "medium",
-      "status": "open",
-      "description": "apiFetchWithEnqueueSecret merges a user-supplied enqueue secret from sessionStorage into Authorization headers. Any XSS in the dashboard origin can read sessionStorage and exfiltrate the secret.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "Session storage value is attached as Bearer token when present.",
-          "file": "apps/dashboard/lib/api-fetch.ts",
-          "symbol": "mergeEnqueueSecretFromStorage",
-          "start_line": 4,
-          "end_line": 16
-        }
-      ],
-      "impact": "A successful XSS can steal the shared enqueue secret and replay API calls until rotation.",
-      "suggested_fix": {
-        "approach": "Prefer httpOnly cookie-only auth for orchestration; if a second factor is required, use short-lived CSRF-protected forms or subresource isolation. Minimize secret lifetime in sessionStorage.",
-        "affected_files": [
-          "apps/dashboard/lib/api-fetch.ts",
-          "apps/dashboard/components/OrchestrationPanel.tsx"
-        ],
-        "estimated_effort": "medium",
-        "risk_notes": "Changing auth UX may affect operators who paste secrets into the UI."
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T12:05:30.000Z",
-          "actor": "security-and-privacy-auditor",
-          "event": "created",
-          "notes": ""
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": ""
-        }
-      ],
-      "sources": [
-        "security-20260407-120530"
-      ]
-    },
-    {
-      "finding_id": "f-893aa236",
-      "category": "api_payload",
-      "title": "Supabase helpers use select('*') with no row limits",
-      "type": "debt",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "medium",
-      "status": "accepted",
-      "description": "Dashboard helpers fetch entire rows for projects, audit_runs, findings, model_usage, webhooks, and schedules. Large JSON columns (metadata, proof_hooks, history) inflate payloads and memory on the server and client. getFindings has no default LIMIT, so projects with many findings pay full-table transfer per call.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "select('*') on findings",
-          "file": "apps/dashboard/lib/supabase.ts",
-          "value": ".from('findings').select('*').eq('project_id', projectId)",
-          "start_line": 138
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "select('*') on projects list",
-          "file": "apps/dashboard/lib/supabase.ts",
-          "value": ".from('projects').select('*')",
-          "start_line": 100
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Replace select('*') with explicit column lists for list views; add optional limit/range parameters to getFindings and callers; consider server-side pagination for the dashboard.",
-        "steps": [
-          "Identify columns required by each UI surface.",
-          "Add .select('id, title, ...') and .range() or .limit() where appropriate."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-582): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "perf-20260407-121845"
-      ]
-    },
-    {
-      "finding_id": "f-203ecae0",
-      "category": "bundle",
-      "title": "Next.js NFT tracing warns that the whole monorepo may be pulled into the server trace",
-      "type": "debt",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "medium",
-      "status": "accepted",
-      "description": "Production build logs report an unexpected file in the NFT list, linking next.config.ts to dynamic filesystem usage (mergeEnvLocal) and API routes importing onboarding helpers. That pattern can enlarge traced server bundles and slow cold starts on Netlify/Vercel-style deploys.",
-      "proof_hooks": [
-        {
-          "hook_type": "artifact_ref",
-          "summary": "Turbopack NFT warning",
-          "file": "audits/artifacts/_run_/build.txt",
-          "value": "Encountered unexpected file in NFT list \u2014 import trace: next.config.ts \u2192 lib/onboarding.ts \u2192 app/api/projects/[name]/onboarding/cluster/route.ts",
-          "start_line": 65
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "fs.readFileSync in next config",
-          "file": "apps/dashboard/next.config.ts",
-          "value": "mergeEnvLocal reads repo root .env.local at config load",
-          "start_line": 10
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Scope filesystem reads to build-time only or move env merging to runtime bootstrap; narrow onboarding imports so API routes do not drag unrelated files into the trace.",
-        "steps": [
-          "Review Next 16 docs on outputFileTracingRoot and turbopackIgnore hints from the build log.",
-          "Split onboarding cluster logic so the route imports a minimal module."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-583): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "perf-20260407-121845"
-      ]
-    },
-    {
-      "finding_id": "f-cacebef8",
-      "category": "build",
-      "title": "next/font Google Fonts requires network at build time",
-      "type": "debt",
-      "severity": "major",
-      "priority": "P1",
       "confidence": "evidence",
       "estimated_effort": "small",
       "status": "accepted",
-      "description": "layout.tsx uses next/font/google for Inter, JetBrains Mono, and DM Serif Display. The preflight build failed because Google Fonts could not be fetched (sandboxed/offline build). CI and locked-down environments need self-hosted or committed font files to avoid flaky builds and external dependency on fonts.googleapis.com during `next build`.",
+      "description": "Migration grants SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated. RLS still applies, but widening table privileges increases blast radius if policies are misconfigured or bypassed. Confirm this matches intended Supabase API surface.",
       "proof_hooks": [
         {
-          "hook_type": "artifact_ref",
-          "summary": "Build failed fetching fonts",
-          "file": "audits/artifacts/_run_/build.txt",
-          "value": "Failed to fetch Inter / JetBrains Mono / DM Serif Display from Google Fonts",
-          "start_line": 86
-        },
-        {
           "hook_type": "code_ref",
-          "summary": "next/font/google imports",
-          "file": "apps/dashboard/app/layout.tsx",
-          "value": "import { DM_Serif_Display, Inter, JetBrains_Mono } from \"next/font/google\"",
-          "start_line": 2
+          "summary": "GRANT lines",
+          "file": "supabase/migrations/20260402231116_repair_service.sql",
+          "value": "GRANT SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated;",
+          "start_line": 253
         }
       ],
       "suggested_fix": {
-        "approach": "Switch to next/font/local with files in apps/dashboard/public/fonts or use a build-time font pipeline that does not require live HTTPS to Google.",
+        "approach": "If only Edge Functions and server should mutate repair_jobs, prefer narrower GRANTs plus strict RLS tests.",
         "steps": [
-          "Vendor font files and reference via localFont.",
-          "Document network requirements for CI if keeping next/font/google."
+          "Review product requirement for client-side repair job creation.",
+          "Add automated policy tests or integration tests for anon/authenticated."
         ]
       },
       "history": [
         {
           "timestamp": "2026-04-07T18:45:00.000Z",
           "actor": "synthesizer",
-          "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
+          "event": "merged",
+          "notes": "Normalized finding_id from data id field."
         },
         {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
+          "timestamp": "2026-04-07T17:50:27Z",
+          "actor": "solo-dev",
           "event": "note_added",
-          "notes": "Status synced from Linear (PLP-584): Todo -> accepted"
+          "notes": "Decision: Narrow GRANTs"
         }
       ],
       "sources": [
-        "perf-20260407-121845"
+        "data-20260407-052750"
       ]
     },
     {
-      "finding_id": "f-5f0d56e9",
-      "category": "cost",
-      "title": "Portfolio audit jobs process projects sequentially",
-      "type": "enhancement",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "large",
-      "status": "open",
-      "description": "After resolveProjectsForJob, the worker loops `for (const project of projects)` and runs executeProjectAudit and LLM work per project. Wall-clock time and queue depth scale linearly with portfolio size; cost scales with the number of projects \u00d7 audits. Parallelism exists inside passes (PASS_CONCURRENCY) but not across projects in this loop.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "Sequential project loop",
-          "file": "apps/worker/src/process-job.ts",
-          "value": "for (const project of projects) { ... await executeProjectAudit(project, payload, pool);",
-          "start_line": 1105
-        }
-      ],
-      "suggested_fix": {
-        "approach": "If product allows, enqueue one BullMQ child job per project or cap concurrency with a semaphore to improve throughput without exceeding provider rate limits.",
-        "steps": [
-          "Define max concurrent projects per portfolio job from env.",
-          "Measure Redis/Postgres load before raising concurrency."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
-        }
-      ],
-      "sources": [
-        "perf-20260407-121845"
-      ]
-    },
-    {
-      "finding_id": "f-a1c6d05d",
-      "category": "api",
-      "title": "Project page loads the full portfolio via /api/projects",
-      "type": "enhancement",
+      "finding_id": "f-e114710d",
+      "category": "hosting",
+      "title": "Deployment target ambiguity: Netlify config coexists with Vercel project file",
+      "type": "question",
       "severity": "minor",
       "priority": "P2",
       "confidence": "inference",
-      "estimated_effort": "medium",
-      "status": "open",
-      "description": "ProjectPageClient uses usePortfolioProjects, which always GETs /api/projects and filters client-side to the current project. For users with many projects this duplicates work and payload size versus a single-project GET.",
+      "estimated_effort": "small",
+      "status": "accepted",
+      "description": "`netlify.toml` defines the dashboard build (`turbo run build --filter penny-dashboard`) and Next plugin, while `apps/dashboard/vercel.json` specifies framework, output directory, and npm-based install/build. It is unclear which platform is authoritative for production, which affects env var naming, build commands, and review of deployment safety.",
       "proof_hooks": [
         {
-          "hook_type": "code_ref",
-          "summary": "fetchProjects on mount",
-          "file": "apps/dashboard/components/ProjectPageClient.tsx",
-          "value": "useEffect(() => { void fetchProjects(); void fetchQueue(); }, ...)",
-          "start_line": 91
+          "hook_type": "config_key",
+          "summary": "Netlify",
+          "value": "[build] command = turbo run build --filter penny-dashboard"
         },
         {
-          "hook_type": "code_ref",
-          "summary": "Portfolio hook hits list endpoint",
-          "file": "apps/dashboard/hooks/use-portfolio-projects.ts",
-          "value": "const res = await apiFetch(\"/api/projects\");",
-          "start_line": 20
+          "hook_type": "config_key",
+          "summary": "Vercel",
+          "value": "apps/dashboard/vercel.json \u2014 buildCommand, installCommand npm"
         }
       ],
       "suggested_fix": {
-        "approach": "Add GET /api/projects/[name] as the primary load for the project route (or hydrate from server component) and keep list fetch for the portfolio index only.",
+        "approach": "Document the single source of truth for dashboard hosting; remove or archive the unused platform file to avoid drift.",
         "steps": [
-          "Compare existing /api/projects/[name] behavior with ProjectPageClient data needs.",
-          "Reduce redundant refetches after navigation between projects."
+          "Decide Netlify vs Vercel for dashboard",
+          "Align lockfile/install commands with pnpm workspace"
         ]
       },
       "history": [
         {
           "timestamp": "2026-04-07T18:45:00.000Z",
           "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Normalized finding_id from deploy id field."
+        },
+        {
+          "timestamp": "2026-04-07T17:50:15Z",
+          "actor": "solo-dev",
           "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
+          "notes": "Decision: Netlify is where Penny will be deployed"
         }
       ],
       "sources": [
-        "perf-20260407-121845"
-      ]
-    },
-    {
-      "finding_id": "f-27aab98a",
-      "category": "llm",
-      "title": "auditWithLlm sets maxTokens to 12288 for every audit call",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "open",
-      "description": "The worker requests up to 12k output tokens per audit call. That raises worst-case cost per call for providers that bill by generated tokens, even when findings JSON is small. Tiered limits by audit_kind or response-size heuristics would reduce tail spend.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "maxTokens 12288",
-          "file": "apps/worker/src/llm.ts",
-          "value": "maxTokens: 12288",
-          "start_line": 423
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Lower default maxTokens for narrow agents; keep a higher cap only for synthesis or intelligence passes; validate with token usage metrics from model_usage.",
-        "steps": [
-          "Histogram completion sizes by agent from model_usage.",
-          "Set per-audit_kind limits in routing config."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "note_added",
-          "notes": "Normalized finding_id from perf agent id field; merged history."
-        }
-      ],
-      "sources": [
-        "perf-20260407-121845"
+        "deploy-20260407-003250"
       ]
     },
     {
@@ -602,574 +369,147 @@
       ]
     },
     {
-      "finding_id": "f-f0fc96a0",
-      "category": "tooling",
-      "title": "pnpm test fails: duplicate --run passed to Vitest",
-      "type": "bug",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "accepted",
-      "description": "Root script pnpm test runs turbo with extra --run; penny-dashboard already uses vitest --run in its test script. Vitest exits with 'Expected a single value for option \"--run\", received [true, true]'.",
-      "proof_hooks": [
-        {
-          "hook_type": "error_text",
-          "summary": "audits/artifacts/_run_/tests.txt: Vitest cac error duplicate --run."
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/package.json \"test\": \"vitest --run\" combined with root `pnpm test -- --run`."
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T00:38:28.000Z",
-          "actor": "runtime-bug-hunter",
-          "event": "created",
-          "notes": "Reproduced via preflight test run."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from hooks[]."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-589): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "logic-20260407-003828"
-      ]
-    },
-    {
-      "finding_id": "f-65774139",
-      "category": "tooling",
-      "title": "Dashboard ESLint fails: missing @eslint/eslintrc dependency",
-      "type": "bug",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "accepted",
-      "description": "eslint.config.mjs imports FlatCompat from @eslint/eslintrc; Node resolves ERR_MODULE_NOT_FOUND. Lint pipeline is broken until the package is added or the flat config is refactored.",
-      "proof_hooks": [
-        {
-          "hook_type": "error_text",
-          "summary": "audits/artifacts/_run_/lint.txt: Cannot find package '@eslint/eslintrc' imported from eslint.config.mjs"
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/dashboard/eslint.config.mjs line 1: import { FlatCompat } from \"@eslint/eslintrc\""
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T00:38:28.000Z",
-          "actor": "runtime-bug-hunter",
-          "event": "created",
-          "notes": "Captured from turbo lint artifact."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from hooks[]."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-590): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "logic-20260407-003828"
-      ]
-    },
-    {
-      "finding_id": "f-2eb9f62b",
-      "category": "quality",
-      "title": "penny-worker omitted from turbo typecheck task",
+      "finding_id": "f-bedb17e6",
+      "category": "schema-mismatch",
+      "title": "readAuditRunFiles ignores nested audits/runs/<date>/*.json layout",
       "type": "debt",
       "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "open",
-      "description": "pnpm run typecheck only executed @penny/shared-types and penny-dashboard (turbo output). apps/worker has no typecheck script; TypeScript is enforced via build tsc only. Risk: type errors could be missed if someone runs typecheck without build.",
-      "proof_hooks": [
-        {
-          "hook_type": "artifact_ref",
-          "summary": "audits/artifacts/_run_/typecheck.txt shows Tasks: 2 successful \u2014 shared-types and dashboard only."
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "apps/worker/package.json scripts list build but no typecheck entry."
-        }
-      ],
-      "history": [
-        {
-          "timestamp": "2026-04-07T00:38:28.000Z",
-          "actor": "runtime-bug-hunter",
-          "event": "created",
-          "notes": "Compared turbo typecheck scope to workspace packages."
-        },
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized proof_hooks from hooks[]."
-        }
-      ],
-      "sources": [
-        "logic-20260407-003828"
-      ]
-    },
-    {
-      "finding_id": "f-749bab79",
-      "category": "ci_cd",
-      "title": "Repository has no CI/CD pipeline",
-      "type": "enhancement",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "accepted",
-      "description": "There is no `.github/workflows/` directory and no automated jobs to run lint, typecheck, tests, or build on push/PR. Root `package.json` defines `lint`, `typecheck`, `test`, and `build` via Turbo, but nothing enforces them before merge or deploy.",
-      "proof_hooks": [
-        {
-          "hook_type": "artifact_ref",
-          "summary": "No workflow directory",
-          "value": "Glob of `.github/workflows` returns 0 files."
-        },
-        {
-          "hook_type": "config_key",
-          "summary": "Scripts exist but unrunnable in CI",
-          "value": "pnpm run lint | typecheck | test | build \u2014 no matching automation."
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Add a GitHub Actions workflow (or other hosted CI) that installs pnpm, caches store, and runs turbo lint, typecheck, test, and build on pull_request and main.",
-        "steps": [
-          "pnpm install --frozen-lockfile",
-          "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build"
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from deploy id field."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-592): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "deploy-20260407-003250"
-      ]
-    },
-    {
-      "finding_id": "f-e114710d",
-      "category": "hosting",
-      "title": "Deployment target ambiguity: Netlify config coexists with Vercel project file",
-      "type": "question",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "inference",
-      "estimated_effort": "small",
-      "status": "accepted",
-      "description": "`netlify.toml` defines the dashboard build (`turbo run build --filter penny-dashboard`) and Next plugin, while `apps/dashboard/vercel.json` specifies framework, output directory, and npm-based install/build. It is unclear which platform is authoritative for production, which affects env var naming, build commands, and review of deployment safety.",
-      "proof_hooks": [
-        {
-          "hook_type": "config_key",
-          "summary": "Netlify",
-          "value": "[build] command = turbo run build --filter penny-dashboard"
-        },
-        {
-          "hook_type": "config_key",
-          "summary": "Vercel",
-          "value": "apps/dashboard/vercel.json \u2014 buildCommand, installCommand npm"
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Document the single source of truth for dashboard hosting; remove or archive the unused platform file to avoid drift.",
-        "steps": [
-          "Decide Netlify vs Vercel for dashboard",
-          "Align lockfile/install commands with pnpm workspace"
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from deploy id field."
-        },
-        {
-          "timestamp": "2026-04-07T17:50:15Z",
-          "actor": "solo-dev",
-          "event": "note_added",
-          "notes": "Decision: Netlify is where Penny will be deployed"
-        }
-      ],
-      "sources": [
-        "deploy-20260407-003250"
-      ]
-    },
-    {
-      "finding_id": "f-5386c5e8",
-      "category": "tooling",
-      "title": "Turbo lint does not cover worker TypeScript",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "open",
-      "description": "`apps/worker/package.json` has no `lint` script. Turbo runs `lint` only in workspaces that define it, so `pnpm run lint` exercises the dashboard only, not `apps/worker/src`.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "Worker scripts omit lint",
-          "file": "apps/worker/package.json",
-          "value": "scripts: start, dev, build, admin \u2014 no lint",
-          "start_line": 6
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Add eslint (or biome) for `apps/worker` and a `lint` script; register in turbo.json inputs if needed.",
-        "steps": [
-          "Add devDependencies and eslint.config",
-          "\"lint\": \"eslint src\""
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from deploy id field."
-        }
-      ],
-      "sources": [
-        "deploy-20260407-003250"
-      ]
-    },
-    {
-      "finding_id": "f-1780c7cf",
-      "category": "hosting",
-      "title": "vercel.json install command does not match pnpm monorepo",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "trivial",
-      "status": "open",
-      "description": "`apps/dashboard/vercel.json` sets `installCommand` to `npm install` while the repository uses `pnpm` and commits `pnpm-lock.yaml`. A Vercel project using this file may install inconsistent dependency trees and miss workspace hoisting.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "npm install",
-          "file": "apps/dashboard/vercel.json",
-          "value": "\"installCommand\": \"npm install\"",
-          "start_line": 5
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Use `pnpm install --frozen-lockfile` from repo root or rely on Vercel\u2019s pnpm detection; align with packageManager in root package.json.",
-        "steps": [
-          "Set installCommand to pnpm",
-          "Document monorepo root for Vercel project settings"
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from deploy id field."
-        }
-      ],
-      "sources": [
-        "deploy-20260407-003250"
-      ]
-    },
-    {
-      "finding_id": "f-9ef3f9e1",
-      "category": "rls",
-      "title": "Dashboard penny_* tables have no RLS in migrations",
-      "type": "debt",
-      "severity": "major",
-      "priority": "P1",
-      "confidence": "evidence",
-      "estimated_effort": "medium",
-      "status": "accepted",
-      "description": "Migrations create penny_projects, penny_audit_jobs, penny_audit_runs, penny_repair_jobs, penny_maintenance_*, penny_project_manifests, penny_linear_sync, etc., without ENABLE ROW LEVEL SECURITY or policies. The auth-scoped LYRA tables (projects, findings, \u2026) use owner_id and policies; the dashboard document store does not mirror that model. If these tables are exposed via PostgREST with default grants, tenant isolation relies entirely on application code and connection string secrecy, not database enforcement.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "penny_projects DDL has no RLS",
-          "file": "supabase/migrations/20260403102352_penny_projects.sql",
-          "value": "CREATE TABLE IF NOT EXISTS penny_projects ( ... ) \u2014 no subsequent ALTER ENABLE ROW LEVEL SECURITY in repo migrations reviewed.",
-          "start_line": 9
-        },
-        {
-          "hook_type": "data_shape",
-          "summary": "Contrast with LYRA tables",
-          "value": "projects table uses owner_id + policies in 20260402163740_rls_policies.sql; penny_* family has no matching pattern."
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Enable RLS on each penny_* table and define policies tied to auth.uid() (or a project membership table), or REVOKE default API role access and restrict to service_role / server-only roles.",
-        "steps": [
-          "Confirm PostgREST exposure and current GRANTs in the live Supabase project.",
-          "Add migrations: ENABLE ROW LEVEL SECURITY + policies, or REVOKE FROM anon/authenticated as appropriate."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from data id field."
-        },
-        {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-596): Todo -> accepted"
-        }
-      ],
-      "sources": [
-        "data-20260407-052750"
-      ]
-    },
-    {
-      "finding_id": "f-2c1c5aa4",
-      "category": "schema_drift",
-      "title": "penny_finding_status enum includes value not present in TS FindingStatus",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "open",
-      "description": "PostgreSQL enum penny_finding_status includes 'assigned' (20260402163739_lyra_schema.sql). apps/dashboard/lib/types.ts FindingStatus union does not include 'assigned', so rows or API payloads using that value will not type-check in client code and may break narrowing or switches.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "DB enum values",
-          "file": "supabase/migrations/20260402163739_lyra_schema.sql",
-          "value": "'open', 'accepted', 'assigned', 'in_progress', ...",
-          "start_line": 8
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "TS union omits assigned",
-          "file": "apps/dashboard/lib/types.ts",
-          "value": "FindingStatus = \"open\" | \"accepted\" | \"in_progress\" | ...",
-          "start_line": 63
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Add 'assigned' to FindingStatus or migrate DB to drop/rename the enum value to align with the canonical contract in audits/agent expectations.",
-        "steps": [
-          "Regenerate or hand-sync shared types from Supabase schema.",
-          "Run a one-time UPDATE if the value is unused."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from data id field."
-        }
-      ],
-      "sources": [
-        "data-20260407-052750"
-      ]
-    },
-    {
-      "finding_id": "f-9e051198",
-      "category": "rls",
-      "title": "model_usage has RLS enabled but no policy definitions in migrations",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "open",
-      "description": "20260402163740_rls_policies.sql enables ROW LEVEL SECURITY on model_usage but does not add any CREATE POLICY. Rows are therefore denied for roles subject to RLS without a bypass. Server code using SUPABASE_SERVICE_ROLE_KEY bypasses RLS (see apps/dashboard/lib/supabase.ts), so ingestion may work, but authenticated or anon clients cannot read model_usage without additional policies\u2014by design or oversight.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "RLS on without policy",
-          "file": "supabase/migrations/20260402163740_rls_policies.sql",
-          "value": "ALTER TABLE model_usage ENABLE ROW LEVEL SECURITY; \u2014 file ends without model_usage policies.",
-          "start_line": 13
-        },
-        {
-          "hook_type": "code_ref",
-          "summary": "Helper expects service client",
-          "file": "apps/dashboard/lib/supabase.ts",
-          "value": "getModelUsage(client) uses .from('model_usage')",
-          "start_line": 240
-        }
-      ],
-      "suggested_fix": {
-        "approach": "If user-scoped dashboards need cost data under JWT, add SELECT policies joining audit_runs \u2192 projects. If only service_role reads this table, document and optionally REVOKE direct API access.",
-        "steps": [
-          "Decide access model for model_usage.",
-          "Add policies or document service-only access."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from data id field."
-        }
-      ],
-      "sources": [
-        "data-20260407-052750"
-      ]
-    },
-    {
-      "finding_id": "f-6af2fc10",
-      "category": "migration_hygiene",
-      "title": "repair_service migration DROP POLICY names may not match earlier migration",
-      "type": "debt",
-      "severity": "nit",
       "priority": "P3",
-      "confidence": "inference",
-      "estimated_effort": "trivial",
+      "confidence": "evidence",
+      "estimated_effort": "small",
       "status": "open",
-      "description": "20260402231116_repair_service.sql drops policies named users_can_view_repair_jobs, etc. The earlier 20260402163740_rls_policies.sql creates policies named \"Users can access repair jobs for their projects\". IF EXISTS avoids errors, but the older FOR ALL policy may remain alongside newer SELECT/INSERT policies, producing redundant or confusing policy sets until manually reconciled.",
+      "description": "WORKFLOW stores agent outputs under audits/runs/YYYY-MM-DD/<run_id>.json. readAuditRunFiles only readdirSync files ending in .json at the top level of audits/runs, so nested run files are never loaded into getEngineStatus / last_audit_date aggregation.",
       "proof_hooks": [
         {
           "hook_type": "code_ref",
-          "summary": "DROP uses different names than CREATE in 002",
-          "file": "supabase/migrations/20260402231116_repair_service.sql",
-          "value": "DROP POLICY IF EXISTS \"users_can_view_repair_jobs\" vs CREATE POLICY \"Users can access repair jobs for their projects\"",
-          "start_line": 155
+          "summary": "readdirSync(runsDir).filter(f => f.endsWith('.json')) \u2014 skips subdirectories",
+          "file": "apps/dashboard/lib/audit-reader.ts"
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/runs/2026-04-07/*.json exist only under date folders, not at runs root."
         }
       ],
       "suggested_fix": {
-        "approach": "In a follow-up migration, list policies on repair_jobs in production and drop obsolete ones explicitly.",
-        "steps": [
-          "SELECT polname FROM pg_policy JOIN pg_class ... WHERE relname = 'repair_jobs';",
-          "DROP redundant policies; document intended final set."
-        ]
+        "approach": "Recursively walk audits/runs or rely on audits/index.json for run metadata only.",
+        "affected_files": [
+          "apps/dashboard/lib/audit-reader.ts"
+        ],
+        "estimated_effort": "small"
       },
       "history": [
         {
-          "timestamp": "2026-04-07T18:45:00.000Z",
+          "timestamp": "2026-04-09T22:15:06Z",
           "actor": "synthesizer",
           "event": "merged",
-          "notes": "Normalized finding_id from data id field."
+          "notes": "Promoted from data-20260409-221501."
         }
       ],
       "sources": [
-        "data-20260407-052750"
+        "data-20260409-221501",
+        "synthesized-20260409-221506"
       ]
     },
     {
-      "finding_id": "f-58c68aa7",
-      "category": "security",
-      "title": "Broad GRANT on repair_jobs to anon and authenticated",
+      "finding_id": "f-23063538",
+      "category": "migration-verify",
+      "title": "Confirm penny_tables RLS migration is applied on the live Supabase project",
+      "type": "question",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "estimated_effort": "small",
+      "status": "accepted",
+      "description": "Repository includes 20260408120000_penny_tables_rls.sql (RLS on penny_* tables). f-9ef3f9e1 is closed as fixed_verified in-repo. Confirm this migration has been applied to production/staging Supabase and that clients use the intended role (service vs authenticated).",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "RLS enabled on penny_projects, penny_audit_runs, and related tables",
+          "file": "supabase/migrations/20260408120000_penny_tables_rls.sql",
+          "start_line": 1,
+          "end_line": 29
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "f-9ef3f9e1 closed in repo (synthesized-20260410-201500); remote deploy unconfirmed here."
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "schema-auditor",
+          "event": "created",
+          "notes": "Duplicate-aware: relates to f-9ef3f9e1; f-bedb17e6 (audit-reader nested runs) unchanged."
+        },
+        {
+          "timestamp": "2026-04-10T00:25:00Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Merged into open_findings from synthesized-20260410-001929."
+        },
+        {
+          "timestamp": "2026-04-10T01:17:17Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "synthesized-20260410-201500: clarified scope to hosted Supabase only."
+        },
+        {
+          "timestamp": "2026-04-10T02:27:04Z",
+          "actor": "solo-dev",
+          "event": "note_added",
+          "notes": "Decision: confirmed"
+        }
+      ],
+      "sources": [
+        "data-20260410-001929",
+        "synthesized-20260410-001929",
+        "synthesized-20260410-201500"
+      ]
+    },
+    {
+      "finding_id": "f-0d9b4509",
+      "category": "missing-state",
+      "title": "Onboarding cluster POST returns artifacts but does not persist them on the server",
       "type": "question",
       "severity": "minor",
       "priority": "P2",
       "confidence": "evidence",
-      "estimated_effort": "small",
-      "status": "accepted",
-      "description": "Migration grants SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated. RLS still applies, but widening table privileges increases blast radius if policies are misconfigured or bypassed. Confirm this matches intended Supabase API surface.",
-      "proof_hooks": [
-        {
-          "hook_type": "code_ref",
-          "summary": "GRANT lines",
-          "file": "supabase/migrations/20260402231116_repair_service.sql",
-          "value": "GRANT SELECT, INSERT, UPDATE ON repair_jobs TO anon, authenticated;",
-          "start_line": 253
-        }
-      ],
-      "suggested_fix": {
-        "approach": "If only Edge Functions and server should mutate repair_jobs, prefer narrower GRANTs plus strict RLS tests.",
-        "steps": [
-          "Review product requirement for client-side repair job creation.",
-          "Add automated policy tests or integration tests for anon/authenticated."
-        ]
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from data id field."
-        },
-        {
-          "timestamp": "2026-04-07T17:50:27Z",
-          "actor": "solo-dev",
-          "event": "note_added",
-          "notes": "Decision: Narrow GRANTs"
-        }
-      ],
-      "sources": [
-        "data-20260407-052750"
-      ]
-    },
-    {
-      "finding_id": "f-7dc35572",
-      "category": "referential_integrity",
-      "title": "FKs removed from penny_audit_* and related tables for async sync",
-      "type": "debt",
-      "severity": "minor",
-      "priority": "P2",
-      "confidence": "evidence",
       "estimated_effort": "medium",
-      "status": "accepted",
-      "description": "20260403110028_fix_audit_table_schemas.sql drops foreign keys from penny_audit_jobs, penny_audit_runs, penny_orchestration_events, and penny_project_snapshots to penny_projects so jobs can exist before the project row. This trades referential integrity for pipeline flexibility; orphan rows and typos in project_name are possible.",
+      "status": "open",
+      "description": "POST /api/projects/[name]/onboarding/cluster collects cluster-specific artifacts (git history, manifests, CSS tokens) and returns them in JSON. The handler documents that a full implementation would save into the Project model; without that, only the client retains the payload across navigation unless it re-fetches or stores locally.",
       "proof_hooks": [
         {
           "hook_type": "code_ref",
-          "summary": "DROP CONSTRAINT",
-          "file": "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
-          "value": "DROP CONSTRAINT IF EXISTS penny_audit_jobs_project_name_fkey",
-          "start_line": 20
-        }
-      ],
-      "suggested_fix": {
-        "approach": "Periodic cleanup job or CHECK using validated project_name from application layer; optional deferred FK via materialized project registry.",
-        "steps": []
-      },
-      "history": [
-        {
-          "timestamp": "2026-04-07T18:45:00.000Z",
-          "actor": "synthesizer",
-          "event": "merged",
-          "notes": "Normalized finding_id from data id field."
+          "summary": "Handler comment: save to project.clusterArtifacts deferred; response-only today",
+          "file": "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+          "start_line": 77,
+          "end_line": 81
         },
         {
-          "timestamp": "2026-04-07T17:22:47Z",
-          "actor": "linear-sync",
-          "event": "note_added",
-          "notes": "Status synced from Linear (PLP-601): Todo -> accepted"
+          "hook_type": "code_ref",
+          "summary": "Success response returns artifacts without repo.update persistence",
+          "file": "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+          "start_line": 81,
+          "end_line": 81
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T17:01:48Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Re-audit batch logic-20260410-170148; scope from LATEST.md focus paths."
+        },
+        {
+          "timestamp": "2026-04-10T17:10:48Z",
+          "actor": "synthesizer",
+          "event": "merged",
+          "notes": "Merged into open_findings from synthesized-20260410-170148."
         }
       ],
       "sources": [
-        "data-20260407-052750"
+        "logic-20260410-170148",
+        "synthesized-20260410-170148"
       ]
     }
   ]

@@ -1,14 +1,12 @@
 import { NextResponse } from "next/server";
 import { getRepository } from "@/lib/repository-instance";
 import { apiErrorMessage } from "@/lib/api-error";
-import {
-  createDraftProjectFromRepository,
-  deriveProjectName,
-  type OnboardRepositoryInput,
-} from "@/lib/onboarding";
+import type { OnboardRepositoryInput } from "@/lib/onboarding";
 
 export async function POST(request: Request) {
   try {
+    const { createDraftProjectFromRepository, deriveProjectName } =
+      await import("@/lib/onboarding");
     const body = (await request.json()) as OnboardRepositoryInput;
     if (!body?.repository_url?.trim()) {
       return NextResponse.json(

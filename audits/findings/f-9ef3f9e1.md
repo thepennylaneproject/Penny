@@ -1,6 +1,6 @@
 # Finding: f-9ef3f9e1
 
-> **Status:** open | **Severity:** major | **Priority:** P1 | **Type:** debt | **Confidence:** evidence
+> **Status:** fixed_verified | **Severity:** major | **Priority:** P1 | **Type:** debt | **Confidence:** evidence
 
 ## Title
 
@@ -19,7 +19,9 @@ Migrations create penny_projects, penny_audit_jobs, penny_audit_runs, penny_repa
 ## History
 
 - 2026-04-07T18:45:00.000Z — **synthesizer** — merged: Normalized finding_id from data id field.
+- 2026-04-10 — **synthesizer** — verified in repo: `supabase/migrations/20260408120000_penny_tables_rls.sql` enables RLS and policies on `penny_*` tables. Confirm migration applied on remote Supabase (see **f-23063538**). Removed from `open_findings.json` (`synthesized-20260410-201500`).
 
 ## Sources
 
 - `data-20260407-052750`
+- `synthesized-20260410-201500`

@@ -62,7 +62,7 @@ function getLifecycleNextSteps(status: FindingStatus, isQueued: boolean): string
       "Verify the fix and update status to Fixed & Verified.",
     ];
   }
-  // open / accepted
+  // open / accepted / assigned
   return [
     "Queue for automatic repair, or implement the fix manually.",
     "Mark as Fixed (Pending Verification) when the change is ready.",
@@ -73,6 +73,7 @@ function getLifecycleNextSteps(status: FindingStatus, isQueued: boolean): string
 const WORKFLOW_HINTS: Record<FindingStatus, string> = {
   open: "Finding is new and unresolved. Start work or defer.",
   accepted: "Finding is acknowledged and pending action.",
+  assigned: "Finding is assigned; begin implementation when ready.",
   in_progress: "You're actively working on this fix.",
   fixed_pending_verify: "Fix is implemented; awaiting verification.",
   fixed_verified: "Fix has been verified and is complete.",

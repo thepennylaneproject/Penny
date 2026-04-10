@@ -1,0 +1,117 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "logic",
+  "run_id": "logic-20260410-030202",
+  "agent": {
+    "name": "runtime-bug-hunter",
+    "role": "Audit runtime behavior, control flow, and API correctness for dashboard paths in the WIP batch scope.",
+    "inputs_used": [
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/typecheck.txt",
+      "audits/artifacts/_run_/tests.txt",
+      "audits/open_findings.json",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/lib/api-fetch.ts",
+      "apps/dashboard/lib/enqueue-secret-store.ts",
+      "apps/dashboard/lib/auth-constants.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/lib/api-fetch.ts",
+      "apps/dashboard/lib/enqueue-secret-store.ts"
+    ],
+    "files_skipped": [
+      "apps/dashboard/tsconfig.tsbuildinfo"
+    ],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-1ff003db",
+      "category": "error-handling",
+      "title": "Onboarding cluster POST uses process.cwd() when repo path is not local",
+      "type": "bug",
+      "severity": "major",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "fixed_verified",
+      "description": "Re-audit: route rejects non-local repoAccess with 400 and uses only absolute localPath as repoPath; no process.cwd() fallback remains.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "isLocal gate returns 400 when repoAccess does not start with '/'; repoPath = repoAccess only after local check",
+          "file": "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+          "start_line": 33,
+          "end_line": 45
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "Preflight lint/typecheck/tests/build all exit 0 (audits/artifacts/_run_/*.txt)"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T03:02:02Z",
+          "actor": "runtime-bug-hunter",
+          "event": "note_added",
+          "notes": "Re-audit (logic-20260410-030202): cwd fallback absent; remote-only URL cannot reach collectors."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-8603ee3b",
+      "category": "secrets-exposure",
+      "title": "Orchestration enqueue secret can be read from sessionStorage by page scripts",
+      "type": "debt",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "fixed_verified",
+      "description": "Re-audit: enqueue secret is held in module memory; writeEnqueueSecret does not persist to sessionStorage. Legacy key is read once to migrate then removed.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "readEnqueueSecret returns memorySecret; writeEnqueueSecret sets memory only and removeItem on legacy key",
+          "file": "apps/dashboard/lib/enqueue-secret-store.ts",
+          "start_line": 1,
+          "end_line": 45
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "mergeEnqueueSecret calls readEnqueueSecret (in-memory), not sessionStorage.getItem for the live secret",
+          "file": "apps/dashboard/lib/api-fetch.ts",
+          "start_line": 1,
+          "end_line": 20
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T03:02:02Z",
+          "actor": "runtime-bug-hunter",
+          "event": "note_added",
+          "notes": "Re-audit: original sessionStorage-as-source vector addressed; residual XSS could still read in-tab memory (documented tradeoff)."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "major": 1, "minor": 1 },
+    "by_category": { "error-handling": 1, "secrets-exposure": 1 },
+    "by_type": { "bug": 1, "debt": 1 },
+    "by_status": { "fixed_verified": 2 }
+  },
+  "next_actions": [
+    {
+      "action": "None for f-1ff003db / f-8603ee3b — verified closed in synthesizer merge.",
+      "finding_id": "f-1ff003db",
+      "rationale": "Batch re-audit complete."
+    }
+  ]
+}

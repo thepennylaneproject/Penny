@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { apiFetchWithEnqueueSecret } from "@/lib/api-fetch";
-import { penny_ENQUEUE_SECRET_STORAGE_KEY } from "@/lib/auth-constants";
+import { readEnqueueSecret, writeEnqueueSecret } from "@/lib/enqueue-secret-store";
 import type { PortfolioOrchestrationState, OrchestrationActionKind } from "@/lib/orchestration";
 import type { DurableStateSummary } from "@/lib/durable-state";
 import type { pennyAuditJobRow, pennyAuditRunRow } from "@/lib/orchestration-jobs";
@@ -90,23 +90,13 @@ export function OrchestrationPanel() {
   const [showClearQueueConfirm, setShowClearQueueConfirm] = useState(false);
 
   useEffect(() => {
-    try {
-      const storedSecret = sessionStorage.getItem(penny_ENQUEUE_SECRET_STORAGE_KEY);
-      if (storedSecret) setEnqueueSecret(storedSecret);
-    } catch {
-      /* ignore */
-    }
+    const stored = readEnqueueSecret();
+    if (stored) setEnqueueSecret(stored);
   }, []);
 
   const persistSecret = (secretValue: string) => {
     setEnqueueSecret(secretValue);
-    try {
-      if (secretValue.trim())
-        sessionStorage.setItem(penny_ENQUEUE_SECRET_STORAGE_KEY, secretValue.trim());
-      else sessionStorage.removeItem(penny_ENQUEUE_SECRET_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    writeEnqueueSecret(secretValue.trim() ? secretValue : null);
   };
 
   const load = useCallback(async (
@@ -397,7 +387,7 @@ export function OrchestrationPanel() {
           }}
         />
         <label style={{ fontSize: "9px", color: "var(--ink-text-4)", display: "block", marginBottom: "0.25rem" }}>
-          ORCHESTRATION_ENQUEUE_SECRET (stored in session only)
+          ORCHESTRATION_ENQUEUE_SECRET (this tab only, in memory — not saved to browser storage)
         </label>
         <input
           type="password"

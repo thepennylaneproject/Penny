@@ -11,7 +11,7 @@ function project(partial: Partial<Project> & { name: string }): Project {
 }
 
 describe("resolveNextAction", () => {
-  it("prefers backlog over active findings", () => {
+  it("prefers higher-priority active finding over lower-priority backlog", () => {
     const projects: Project[] = [
       project({
         name: "a",
@@ -33,6 +33,42 @@ describe("resolveNextAction", () => {
             canonical_status: "open",
             source_type: "finding",
             priority: "P2",
+            severity: "nit",
+            risk_class: "low",
+            next_action: "review",
+            finding_ids: ["fx"],
+          },
+        ],
+      }),
+    ];
+    const r = resolveNextAction(projects);
+    expect(r?.source).toBe("finding");
+    expect(r?.title).toBe("Critical bug");
+    expect(r?.findingId).toBe("f1");
+  });
+
+  it("prefers backlog when it outranks the best active finding (P0 backlog vs P2 finding)", () => {
+    const projects: Project[] = [
+      project({
+        name: "a",
+        findings: [
+          {
+            finding_id: "f1",
+            title: "Lower priority",
+            type: "bug",
+            severity: "nit",
+            priority: "P2",
+            status: "open",
+          },
+        ],
+        maintenanceBacklog: [
+          {
+            id: "b1",
+            project_name: "a",
+            title: "Backlog task",
+            canonical_status: "open",
+            source_type: "finding",
+            priority: "P0",
             severity: "nit",
             risk_class: "low",
             next_action: "review",

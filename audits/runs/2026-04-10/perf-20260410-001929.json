@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "performance",
+  "run_id": "perf-20260410-001929",
+  "agent": {
+    "name": "performance-cost-auditor",
+    "role": "Assess bundle tracing, query patterns, and build-time costs from preflight and next.config import graph.",
+    "inputs_used": [
+      "audits/artifacts/_run_/build.txt",
+      "audits/open_findings.json",
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/lib/onboarding-cluster-snapshot.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/lib/supabase.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/lib/onboarding-cluster-snapshot.ts",
+      "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+      "apps/dashboard/lib/supabase.ts"
+    ],
+    "files_skipped": [
+      "apps/worker/src/process-job.ts"
+    ],
+    "coverage_complete": true,
+    "incomplete_reason": ""
+  },
+  "findings": [
+    {
+      "finding_id": "f-203ecae0",
+      "category": "bundle",
+      "title": "Turbopack NFT warnings: onboarding cluster route still pulls next.config → snapshot fs trace",
+      "type": "debt",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "status": "in_progress",
+      "description": "Production build succeeds but repeats NFT warnings: import trace next.config.ts → lib/onboarding-cluster-snapshot.ts → onboarding cluster route. Same class of issue as prior perf finding; may enlarge traced server chunks. Consider turbopackIgnore-scoped paths or narrowing snapshot imports per build log hints.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "audits/artifacts/_run_/build.txt lines 11–48 — two unexpected file in NFT list warnings with cluster route trace",
+          "file": "audits/artifacts/_run_/build.txt"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "cluster route imports onboarding-cluster-snapshot collectors",
+          "file": "apps/dashboard/app/api/projects/[name]/onboarding/cluster/route.ts",
+          "start_line": 1,
+          "end_line": 10
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-04-10T00:19:29Z",
+          "actor": "performance-cost-auditor",
+          "event": "note_added",
+          "notes": "Reconfirmed from preflight build.txt; snapshot module name matches current tree."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "major": 1 },
+    "by_category": { "bundle": 1 },
+    "by_type": { "debt": 1 },
+    "by_status": { "in_progress": 1 }
+  },
+  "next_actions": [
+    {
+      "action": "Apply outputFileTracingRoot / turbopackIgnore comments from Next 16 docs for fs-heavy snapshot modules.",
+      "finding_id": "f-203ecae0",
+      "rationale": "Reduces server bundle trace and cold-start cost."
+    },
+    {
+      "action": "Keep f-893aa236 verification plan (select column lists) on dashboard list endpoints.",
+      "finding_id": "f-893aa236",
+      "rationale": "Still fixed_pending_verify in open_findings."
+    }
+  ]
+}

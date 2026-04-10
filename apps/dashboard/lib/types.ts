@@ -63,6 +63,7 @@ export type MaintenanceTaskStatus =
 export type FindingStatus =
   | "open"
   | "accepted"
+  | "assigned"
   | "in_progress"
   | "fixed_pending_verify"
   | "fixed_verified"

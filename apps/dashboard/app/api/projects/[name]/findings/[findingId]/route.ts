@@ -3,7 +3,7 @@ import { getRepository } from "@/lib/repository-instance";
 import type { Finding, FindingStatus } from "@/lib/types";
 import { apiErrorMessage } from "@/lib/api-error";
 import { validatePartialFinding } from "@/lib/finding-validation";
-import { summarizeAuditDecision } from "@/lib/onboarding";
+import { summarizeAuditDecision } from "@/lib/decision-events";
 import { normalizeMaintenanceBacklog } from "@/lib/maintenance-backlog";
 import { upsertMaintenanceBacklogItems } from "@/lib/maintenance-store";
 import { hasSupabaseProjectsStore } from "@/lib/store-supabase";
@@ -13,6 +13,7 @@ type Params = { params: Promise<{ name: string; findingId: string }> };
 const VALID_STATUSES: FindingStatus[] = [
   "open",
   "accepted",
+  "assigned",
   "in_progress",
   "fixed_pending_verify",
   "fixed_verified",
