@@ -1,9 +1,30 @@
 
-[41m                                                                               [0m
-[41m[37m                This is not the tsc command you are looking for                [0m
-[41m                                                                               [0m
+> penny@3.0.0 typecheck /Users/sarahsahl/Desktop/penny
+> turbo run typecheck
 
-To get access to the TypeScript compiler, [34mtsc[0m, from the command line either:
+• turbo 2.9.3
 
-- Use [1mnpm install typescript[0m to first add TypeScript to your project [1mbefore[0m using npx
-- Use [1myarn[0m to avoid accidentally running code from un-installed packages
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running typecheck in 3 packages
+   • Remote caching disabled
+
+penny-worker:typecheck: cache bypass, force executing 137bfa9cd791bb4b
+penny-dashboard:typecheck: cache bypass, force executing 488a7825d0bae6c1
+@penny/shared-types:typecheck: cache bypass, force executing aea1f92f280e5b30
+penny-dashboard:typecheck: 
+penny-dashboard:typecheck: > penny-dashboard@0.1.0 typecheck /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:typecheck: > tsc --noEmit
+penny-dashboard:typecheck: 
+penny-worker:typecheck: 
+penny-worker:typecheck: > penny-worker@1.0.0 typecheck /Users/sarahsahl/Desktop/penny/apps/worker
+penny-worker:typecheck: > tsc --noEmit
+penny-worker:typecheck: 
+@penny/shared-types:typecheck: 
+@penny/shared-types:typecheck: > @penny/shared-types@3.0.0 typecheck /Users/sarahsahl/Desktop/penny/packages/shared-types
+@penny/shared-types:typecheck: > tsc --noEmit
+@penny/shared-types:typecheck: 
+
+ Tasks:    3 successful, 3 total
+Cached:    0 cached, 3 total
+  Time:    4.626s 
+

@@ -8,37 +8,37 @@
    • Running build in 3 packages
    • Remote caching disabled
 
-penny-worker:build: cache miss, executing 3a14bf3d591a3d0f
-penny-dashboard:build: cache miss, executing 555497c0175b0822
-@penny/shared-types:build: cache hit, replaying logs fa7b57e2e333b029
+penny-dashboard:build: cache miss, executing 90a0108685a81892
+@penny/shared-types:build: cache hit, replaying logs 96fda3cc4c3c4dbd
+penny-worker:build: cache hit, replaying logs 40b317e7933aa983
 @penny/shared-types:build: 
-@penny/shared-types:build: > @penny/shared-types@3.0.0 build /Users/sarahsahl/penny/packages/shared-types
+@penny/shared-types:build: > @penny/shared-types@3.0.0 build /Users/sarahsahl/Desktop/penny/packages/shared-types
 @penny/shared-types:build: > tsc
 @penny/shared-types:build: 
-penny-dashboard:build: 
-penny-dashboard:build: > penny-dashboard@0.1.0 build /Users/sarahsahl/Desktop/penny/apps/dashboard
-penny-dashboard:build: > node ./scripts/next-with-env.cjs build
-penny-dashboard:build: 
 penny-worker:build: 
 penny-worker:build: > penny-worker@1.0.0 build /Users/sarahsahl/Desktop/penny/apps/worker
 penny-worker:build: > tsc
 penny-worker:build: 
+penny-dashboard:build: 
+penny-dashboard:build: > penny-dashboard@0.1.0 build /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:build: > node ./scripts/next-with-env.cjs build
+penny-dashboard:build: 
 penny-dashboard:build: ▲ Next.js 16.2.2 (Turbopack)
 penny-dashboard:build: - Experiments (use with caution):
 penny-dashboard:build:   · clientTraceMetadata
 penny-dashboard:build: 
 penny-dashboard:build:   Creating an optimized production build ...
-penny-dashboard:build: ✓ Compiled successfully in 5.1s
+penny-dashboard:build: ✓ Compiled successfully in 7.5s
 penny-dashboard:build:   Running next.config.js provided runAfterProductionCompile ...
-penny-dashboard:build: ✓ Completed runAfterProductionCompile in 499ms
+penny-dashboard:build: ✓ Completed runAfterProductionCompile in 1507ms
 penny-dashboard:build:   Running TypeScript ...
-penny-dashboard:build:   Finished TypeScript in 4.6s ...
+penny-dashboard:build:   Finished TypeScript in 6.2s ...
 penny-dashboard:build:   Collecting page data using 7 workers ...
 penny-dashboard:build:   Generating static pages using 7 workers (0/35) ...
 penny-dashboard:build:   Generating static pages using 7 workers (8/35) 
 penny-dashboard:build:   Generating static pages using 7 workers (17/35) 
 penny-dashboard:build:   Generating static pages using 7 workers (26/35) 
-penny-dashboard:build: ✓ Generating static pages using 7 workers (35/35) in 208ms
+penny-dashboard:build: ✓ Generating static pages using 7 workers (35/35) in 224ms
 penny-dashboard:build:   Finalizing page optimization ...
 penny-dashboard:build: 
 penny-dashboard:build: Route (app)
@@ -97,6 +97,6 @@ penny-dashboard:build: ƒ  (Dynamic)  server-rendered on demand
 penny-dashboard:build: 
 
  Tasks:    3 successful, 3 total
-Cached:    1 cached, 3 total
-  Time:    13.212s 
+Cached:    2 cached, 3 total
+  Time:    17.546s 
 

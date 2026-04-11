@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { apiErrorMessage } from "@/lib/api-error";
 import { buildRoutingConfig, readFileRoutingConfig } from "@/lib/routing-config";
 
 export async function GET() {
@@ -7,6 +8,12 @@ export async function GET() {
     return NextResponse.json(buildRoutingConfig(fileConfig ?? undefined));
   } catch (error) {
     console.error("GET /api/engine/routing", error);
-    return NextResponse.json(buildRoutingConfig(), { status: 200 });
+    return NextResponse.json(
+      {
+        error: apiErrorMessage(error),
+        code: "routing_config_unavailable",
+      },
+      { status: 503 }
+    );
   }
 }

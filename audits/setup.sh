@@ -72,6 +72,8 @@ else
 fi
 echo "Detected package manager: $PKG"
 echo ""
+echo "Note: install dependencies first (e.g. pnpm install / npm ci) so typecheck resolves the workspace TypeScript compiler, not the wrong npm 'tsc' stub package."
+echo ""
 
 # Run preflight
 echo "Running preflight captures..."
@@ -87,7 +89,12 @@ if command -v $PKG &> /dev/null; then
     $PKG run build > "$AUDIT_DIR/artifacts/_run_/build.txt" 2>&1 || true
     echo "  build.txt captured (exit $?)"
 
-    npx tsc --noEmit > "$AUDIT_DIR/artifacts/_run_/typecheck.txt" 2>&1 || true
+    # Monorepo: use turbo typecheck (root package.json) — never bare npx tsc (wrong package).
+    if [ "$PKG" = "pnpm" ] && [ -f "package.json" ] && grep -q '"typecheck"' package.json 2>/dev/null; then
+        pnpm run typecheck > "$AUDIT_DIR/artifacts/_run_/typecheck.txt" 2>&1 || true
+    else
+        $PKG exec tsc --noEmit -p apps/dashboard/tsconfig.json > "$AUDIT_DIR/artifacts/_run_/typecheck.txt" 2>&1 || true
+    fi
     echo "  typecheck.txt captured (exit $?)"
 else
     echo "  WARNING: $PKG not found. Skipping preflight."
