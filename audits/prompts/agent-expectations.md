@@ -35,9 +35,8 @@ This is the "did we break our own rules?" audit.
 ## Required Inputs
 
 - `audits/expectations.md` (the project's expectations document -- READ THIS FIRST)
-- `audits/project.json` (project identity and stack info)
-- Source to verify claims: primarily `apps/**`, `packages/**`, `services/**`, and `supabase/**`
-- Root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json`
+- `audits/project.toml` (project identity and stack info) if present
+<!-- LYRA:PATHS:expectations — session.py injects project-specific source paths here at batch time -->
 - Config files referenced in the expectations doc
 - `audits/open_findings.json` for prior expectations findings
 

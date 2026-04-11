@@ -10,18 +10,15 @@ Find runtime errors, logic bugs, null-safety violations, dead code paths, async 
 
 ## Required Inputs
 
-- Application source: `apps/**` (e.g. `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/lib/`, `apps/worker/src/`)
-- Shared packages: `packages/**`
-- Python services: `services/**` when runtime or integration logic applies
-- Root `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `turbo.json`, and the `tsconfig*.json` files your changes touch
+<!-- LYRA:PATHS:logic — session.py injects project-specific paths here at batch time -->
 - `audits/artifacts/_run_/tests.txt`
 - `audits/artifacts/_run_/lint.txt`
 - `audits/artifacts/_run_/typecheck.txt`
 - `audits/open_findings.json` and relevant files under `audits/findings/`
 
-## Must Do
+**Penny monorepo — application source:** `apps/dashboard/`, `apps/worker/`, `apps/repair-service/`, `packages/`, `services/repair/`, `supabase/`.
 
-**Re-audit / `fixed_pending_verify`:** Every row in `audits/open_findings.json` with status `fixed_pending_verify` that this suite can assess must appear in your output `findings` array with the **same `finding_id`**. Re-check proof hooks in the repo; set `fixed_verified` when substantiated, or keep `fixed_pending_verify` / `open` with refreshed evidence and `history`. Skip IDs outside this suite’s scope (other agents own them in a batched run).
+## Must Do
 
 1. Perform history lookup first to avoid duplicate findings.
 2. Use typed proof hooks for every finding.

@@ -8,8 +8,12 @@ Updates:
   - audits/findings/<finding_id>.md for NEW finding IDs only (minimal case file from JSON)
 
 Usage:
-  python3 audits/ingest_synthesizer.py <path/to/synthesized-*.json>
-  python3 audits/session.py ingest-synth <path/to/synthesized-*.json>
+  python3 audits/ingest_synthesizer.py <path/to/synthesized-*.json> [--strict]
+  python3 audits/session.py ingest-synth <path/to/synthesized-*.json> [--strict]
+
+  --strict  Exit with code 1 if any finding still fixed_pending_verify in
+            open_findings.json is missing from the synthesizer findings array
+            (partial merge would leave verification stale).
 """
 
 from __future__ import annotations
@@ -102,6 +106,43 @@ def _render_case_file(f: dict, synth_run_id: str) -> str:
 """
 
 
+def _pending_verify_ids(findings: list) -> set[str]:
+    return {f["finding_id"] for f in findings if f.get("status") == "fixed_pending_verify"}
+
+
+def _synth_finding_ids(synth: dict) -> set[str]:
+    out: set[str] = set()
+    for sf in synth.get("findings", []) or []:
+        fid = sf.get("finding_id")
+        if fid:
+            out.add(fid)
+    return out
+
+
+def _check_pending_verify_coverage(
+    prior_findings: list, synth: dict, *, strict: bool
+) -> None:
+    pending = _pending_verify_ids(prior_findings)
+    if not pending:
+        return
+    synth_ids = _synth_finding_ids(synth)
+    missing = sorted(pending - synth_ids)
+    if not missing:
+        return
+    lines = [
+        "ingest_synthesizer: synthesizer output omits "
+        f"{len(missing)} finding(s) still fixed_pending_verify in open_findings.json:",
+        *(f"  - {fid}" for fid in missing),
+        "Carry each ID in synthesizer findings (see audits/prompts/synthesizer.md Step 4/6) "
+        "or mark verified manually (session.py verify).",
+    ]
+    msg = "\n".join(lines)
+    if strict:
+        print(msg, file=sys.stderr)
+        sys.exit(1)
+    print(msg, file=sys.stderr)
+
+
 def _index_prepend_synthesizer(index_path: str, synth: dict, synth_rel_path: str) -> None:
     """If audits/index.json lacks this synthesizer run_id, prepend one row (idempotent)."""
     run_id = synth.get("run_id")
@@ -150,7 +191,7 @@ def _index_prepend_synthesizer(index_path: str, synth: dict, synth_rel_path: str
     print(f"Prepended synthesizer row to {index_path}")
 
 
-def ingest(synth_path: str) -> None:
+def ingest(synth_path: str, *, strict: bool = False) -> None:
     root = repo_root()
     synth_path = os.path.normpath(os.path.join(root, synth_path))
     if not os.path.isfile(synth_path):
@@ -174,6 +215,8 @@ def ingest(synth_path: str) -> None:
     key = "open_findings" if "open_findings" in data else "findings"
     findings: list = data[key]
     by_id = {f["finding_id"]: f for f in findings}
+
+    _check_pending_verify_coverage(findings, synth, strict=strict)
 
     synth_run_id = synth.get("run_id", "unknown")
     new_ids: list[str] = []
@@ -242,10 +285,15 @@ def ingest(synth_path: str) -> None:
 
 
 def main() -> None:
-    if len(sys.argv) < 2:
+    argv = sys.argv[1:]
+    strict = False
+    if argv and argv[-1] == "--strict":
+        strict = True
+        argv = argv[:-1]
+    if len(argv) != 1:
         print(__doc__.strip(), file=sys.stderr)
         sys.exit(1)
-    ingest(sys.argv[1])
+    ingest(argv[0], strict=strict)
 
 
 if __name__ == "__main__":

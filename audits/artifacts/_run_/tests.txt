@@ -1,26 +1,42 @@
 
-> penny-dashboard@0.1.0 test /Users/sarahsahl/Desktop/penny/apps/dashboard
-> vitest --watch=false
+> penny@3.0.0 test /Users/sarahsahl/Desktop/penny
+> turbo run test -- --run
 
-[33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+• turbo 2.9.3
 
- RUN  v2.1.9 /Users/sarahsahl/Desktop/penny/apps/dashboard
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running test in 3 packages
+   • Remote caching disabled
 
- ✓ lib/__tests__/middleware.test.ts (22 tests) 9ms
- ✓ lib/__tests__/linear.test.ts (23 tests) 5ms
- ✓ lib/__tests__/auth-session.test.ts (12 tests) 5ms
- ✓ lib/__tests__/audit-run-forensics.test.ts (11 tests) 4ms
- ✓ lib/__tests__/repository.test.ts (10 tests) 10ms
- ✓ lib/__tests__/fragile-files.test.ts (5 tests) 3ms
- ✓ lib/__tests__/resolve-next-action.test.ts (7 tests) 5ms
- ✓ lib/__tests__/repair-proof.test.ts (6 tests) 3ms
- ✓ lib/__tests__/import-summary.test.ts (4 tests) 3ms
- ✓ lib/__tests__/dashboard-secret.test.ts (4 tests) 2ms
- ✓ lib/__tests__/degraded-audit-finding.test.ts (3 tests) 2ms
- ✓ lib/__tests__/runtime-config.test.ts (3 tests) 2ms
+penny-dashboard:test: cache bypass, force executing 028d907d4c118769
+penny-dashboard:test: 
+penny-dashboard:test: > penny-dashboard@0.1.0 test /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:test: > vitest --watch=false --run
+penny-dashboard:test: 
+penny-dashboard:test: [33mThe CJS build of Vite's Node API is deprecated. See https://vite.dev/guide/troubleshooting.html#vite-cjs-node-api-deprecated for more details.[39m
+penny-dashboard:test: 
+penny-dashboard:test:  RUN  v2.1.9 /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:test: 
+penny-dashboard:test:  ✓ lib/__tests__/middleware.test.ts (22 tests) 7ms
+penny-dashboard:test:  ✓ lib/__tests__/repository.test.ts (10 tests) 4ms
+penny-dashboard:test:  ✓ lib/__tests__/audit-run-forensics.test.ts (11 tests) 9ms
+penny-dashboard:test:  ✓ lib/__tests__/fragile-files.test.ts (5 tests) 3ms
+penny-dashboard:test:  ✓ lib/__tests__/resolve-next-action.test.ts (7 tests) 5ms
+penny-dashboard:test:  ✓ lib/__tests__/linear.test.ts (23 tests) 7ms
+penny-dashboard:test:  ✓ lib/__tests__/auth-session.test.ts (12 tests) 11ms
+penny-dashboard:test:  ✓ lib/__tests__/import-summary.test.ts (4 tests) 3ms
+penny-dashboard:test:  ✓ lib/__tests__/repair-proof.test.ts (6 tests) 3ms
+penny-dashboard:test:  ✓ lib/__tests__/degraded-audit-finding.test.ts (3 tests) 2ms
+penny-dashboard:test:  ✓ lib/__tests__/runtime-config.test.ts (3 tests) 2ms
+penny-dashboard:test:  ✓ lib/__tests__/dashboard-secret.test.ts (4 tests) 2ms
+penny-dashboard:test: 
+penny-dashboard:test:  Test Files  12 passed (12)
+penny-dashboard:test:       Tests  110 passed (110)
+penny-dashboard:test:    Start at  10:29:00
+penny-dashboard:test:    Duration  948ms (transform 421ms, setup 0ms, collect 742ms, tests 57ms, environment 2ms, prepare 1.54s)
+penny-dashboard:test: 
 
- Test Files  12 passed (12)
-      Tests  110 passed (110)
-   Start at  17:19:09
-   Duration  715ms (transform 370ms, setup 0ms, collect 629ms, tests 53ms, environment 2ms, prepare 1.12s)
+ Tasks:    1 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    1.806s 
 

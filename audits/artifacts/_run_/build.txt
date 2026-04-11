@@ -1,76 +1,102 @@
 
-> penny-dashboard@0.1.0 build /Users/sarahsahl/Desktop/penny/apps/dashboard
-> node ./scripts/next-with-env.cjs build
+> penny@3.0.0 build /Users/sarahsahl/Desktop/penny
+> turbo run build
 
-▲ Next.js 16.2.2 (Turbopack)
-- Experiments (use with caution):
-  · clientTraceMetadata
+• turbo 2.9.3
 
-  Creating an optimized production build ...
-✓ Compiled successfully in 4.5s
-  Running next.config.js provided runAfterProductionCompile ...
-✓ Completed runAfterProductionCompile in 487ms
-  Running TypeScript ...
-  Finished TypeScript in 7.6s ...
-  Collecting page data using 7 workers ...
-  Generating static pages using 7 workers (0/35) ...
-  Generating static pages using 7 workers (8/35) 
-  Generating static pages using 7 workers (17/35) 
-  Generating static pages using 7 workers (26/35) 
-✓ Generating static pages using 7 workers (35/35) in 264ms
-  Finalizing page optimization ...
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running build in 3 packages
+   • Remote caching disabled
 
-Route (app)
-┌ ○ /
-├ ○ /_not-found
-├ ○ /activity
-├ ƒ /api/auth/login
-├ ƒ /api/auth/logout
-├ ƒ /api/bulk-operations/clear-jobs
-├ ƒ /api/bulk-operations/clear-runs
-├ ƒ /api/bulk-operations/linear-sync
-├ ƒ /api/bulk-operations/linear-sync-all
-├ ƒ /api/bulk-operations/repair-queue
-├ ƒ /api/durable-state
-├ ƒ /api/engine/complete
-├ ƒ /api/engine/dequeue
-├ ƒ /api/engine/queue
-├ ƒ /api/engine/routing
-├ ƒ /api/engine/status
-├ ƒ /api/findings/lifecycle
-├ ƒ /api/health
-├ ƒ /api/import
-├ ƒ /api/lane/audit
-├ ƒ /api/lane/generate-patch
-├ ƒ /api/onboarding
-├ ƒ /api/orchestration
-├ ƒ /api/orchestration/jobs
-├ ƒ /api/orchestration/queue/clear
-├ ƒ /api/orchestration/runs
-├ ƒ /api/projects
-├ ƒ /api/projects/[name]
-├ ƒ /api/projects/[name]/export-findings
-├ ƒ /api/projects/[name]/findings
-├ ƒ /api/projects/[name]/findings/[findingId]
-├ ƒ /api/projects/[name]/maintenance
-├ ƒ /api/projects/[name]/manifest
-├ ƒ /api/projects/[name]/onboarding
-├ ƒ /api/projects/[name]/onboarding/cluster
-├ ƒ /api/projects/[name]/repair-costs
-├ ƒ /api/repair-jobs
-├ ƒ /api/repair-jobs/[jobId]
-├ ƒ /api/repair-jobs/[jobId]/candidates
-├ ƒ /api/repair-jobs/[jobId]/events
-├ ƒ /api/sync/audit
-├ ƒ /api/sync/linear/pull
-├ ƒ /api/sync/linear/push
-├ ƒ /api/sync/linear/status
-├ ƒ /projects/[name]
-└ ○ /repairs
+penny-worker:build: cache miss, executing 3a14bf3d591a3d0f
+penny-dashboard:build: cache miss, executing 555497c0175b0822
+@penny/shared-types:build: cache hit, replaying logs fa7b57e2e333b029
+@penny/shared-types:build: 
+@penny/shared-types:build: > @penny/shared-types@3.0.0 build /Users/sarahsahl/penny/packages/shared-types
+@penny/shared-types:build: > tsc
+@penny/shared-types:build: 
+penny-dashboard:build: 
+penny-dashboard:build: > penny-dashboard@0.1.0 build /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:build: > node ./scripts/next-with-env.cjs build
+penny-dashboard:build: 
+penny-worker:build: 
+penny-worker:build: > penny-worker@1.0.0 build /Users/sarahsahl/Desktop/penny/apps/worker
+penny-worker:build: > tsc
+penny-worker:build: 
+penny-dashboard:build: ▲ Next.js 16.2.2 (Turbopack)
+penny-dashboard:build: - Experiments (use with caution):
+penny-dashboard:build:   · clientTraceMetadata
+penny-dashboard:build: 
+penny-dashboard:build:   Creating an optimized production build ...
+penny-dashboard:build: ✓ Compiled successfully in 5.1s
+penny-dashboard:build:   Running next.config.js provided runAfterProductionCompile ...
+penny-dashboard:build: ✓ Completed runAfterProductionCompile in 499ms
+penny-dashboard:build:   Running TypeScript ...
+penny-dashboard:build:   Finished TypeScript in 4.6s ...
+penny-dashboard:build:   Collecting page data using 7 workers ...
+penny-dashboard:build:   Generating static pages using 7 workers (0/35) ...
+penny-dashboard:build:   Generating static pages using 7 workers (8/35) 
+penny-dashboard:build:   Generating static pages using 7 workers (17/35) 
+penny-dashboard:build:   Generating static pages using 7 workers (26/35) 
+penny-dashboard:build: ✓ Generating static pages using 7 workers (35/35) in 208ms
+penny-dashboard:build:   Finalizing page optimization ...
+penny-dashboard:build: 
+penny-dashboard:build: Route (app)
+penny-dashboard:build: ┌ ○ /
+penny-dashboard:build: ├ ○ /_not-found
+penny-dashboard:build: ├ ○ /activity
+penny-dashboard:build: ├ ƒ /api/auth/login
+penny-dashboard:build: ├ ƒ /api/auth/logout
+penny-dashboard:build: ├ ƒ /api/bulk-operations/clear-jobs
+penny-dashboard:build: ├ ƒ /api/bulk-operations/clear-runs
+penny-dashboard:build: ├ ƒ /api/bulk-operations/linear-sync
+penny-dashboard:build: ├ ƒ /api/bulk-operations/linear-sync-all
+penny-dashboard:build: ├ ƒ /api/bulk-operations/repair-queue
+penny-dashboard:build: ├ ƒ /api/durable-state
+penny-dashboard:build: ├ ƒ /api/engine/complete
+penny-dashboard:build: ├ ƒ /api/engine/dequeue
+penny-dashboard:build: ├ ƒ /api/engine/queue
+penny-dashboard:build: ├ ƒ /api/engine/routing
+penny-dashboard:build: ├ ƒ /api/engine/status
+penny-dashboard:build: ├ ƒ /api/findings/lifecycle
+penny-dashboard:build: ├ ƒ /api/health
+penny-dashboard:build: ├ ƒ /api/import
+penny-dashboard:build: ├ ƒ /api/lane/audit
+penny-dashboard:build: ├ ƒ /api/lane/generate-patch
+penny-dashboard:build: ├ ƒ /api/onboarding
+penny-dashboard:build: ├ ƒ /api/orchestration
+penny-dashboard:build: ├ ƒ /api/orchestration/jobs
+penny-dashboard:build: ├ ƒ /api/orchestration/queue/clear
+penny-dashboard:build: ├ ƒ /api/orchestration/runs
+penny-dashboard:build: ├ ƒ /api/projects
+penny-dashboard:build: ├ ƒ /api/projects/[name]
+penny-dashboard:build: ├ ƒ /api/projects/[name]/export-findings
+penny-dashboard:build: ├ ƒ /api/projects/[name]/findings
+penny-dashboard:build: ├ ƒ /api/projects/[name]/findings/[findingId]
+penny-dashboard:build: ├ ƒ /api/projects/[name]/maintenance
+penny-dashboard:build: ├ ƒ /api/projects/[name]/manifest
+penny-dashboard:build: ├ ƒ /api/projects/[name]/onboarding
+penny-dashboard:build: ├ ƒ /api/projects/[name]/onboarding/cluster
+penny-dashboard:build: ├ ƒ /api/projects/[name]/repair-costs
+penny-dashboard:build: ├ ƒ /api/repair-jobs
+penny-dashboard:build: ├ ƒ /api/repair-jobs/[jobId]
+penny-dashboard:build: ├ ƒ /api/repair-jobs/[jobId]/candidates
+penny-dashboard:build: ├ ƒ /api/repair-jobs/[jobId]/events
+penny-dashboard:build: ├ ƒ /api/sync/audit
+penny-dashboard:build: ├ ƒ /api/sync/linear/pull
+penny-dashboard:build: ├ ƒ /api/sync/linear/push
+penny-dashboard:build: ├ ƒ /api/sync/linear/status
+penny-dashboard:build: ├ ƒ /projects/[name]
+penny-dashboard:build: └ ○ /repairs
+penny-dashboard:build: 
+penny-dashboard:build: 
+penny-dashboard:build: ƒ Proxy (Middleware)
+penny-dashboard:build: 
+penny-dashboard:build: ○  (Static)   prerendered as static content
+penny-dashboard:build: ƒ  (Dynamic)  server-rendered on demand
+penny-dashboard:build: 
 
-
-ƒ Proxy (Middleware)
-
-○  (Static)   prerendered as static content
-ƒ  (Dynamic)  server-rendered on demand
+ Tasks:    3 successful, 3 total
+Cached:    1 cached, 3 total
+  Time:    13.212s 
 

@@ -10,11 +10,10 @@ Audit every user-facing page for layout structure, spacing rhythm, section patte
 
 ## Required Inputs
 
-- Page routes under `apps/dashboard/app/`
-- Layout shells and chrome in `apps/dashboard/components/` (sidebars, headers, footers)
-- `apps/dashboard/tailwind.config.ts` (spacing, breakpoints, container)
-- Layout helpers and grid utilities in `apps/dashboard/components/`
-- `apps/dashboard/app/globals.css` for global layout rules
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit
 

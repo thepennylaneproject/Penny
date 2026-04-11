@@ -67,7 +67,13 @@ export function createSupabaseBrowserClient(): SupabaseClient | null {
     return null;
   }
 
-  return createClient(config.url, config.anonKey);
+  return createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
 }
 
 /**

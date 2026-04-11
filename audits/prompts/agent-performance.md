@@ -10,15 +10,13 @@ Find N+1 queries, missing indexes, redundant API calls, oversized bundles, unnec
 
 ## Required Inputs
 
-- Database and cache usage: Supabase/pg/Redis callers in `apps/**`, persistence and queries in `services/**`
-- Data fetching and API handlers in `apps/dashboard/app/` and `services/**`
-- Root `package.json`, `turbo.json`, and `apps/dashboard/next.config.ts` (bundling, images, experimental flags)
+<!-- LYRA:PATHS:performance — session.py injects project-specific paths here at batch time -->
 - `audits/artifacts/_run_/build.txt` and `bundle-stats.txt` if available
 - `audits/open_findings.json` and relevant files under `audits/findings/`
 
-## Must Do
+**Penny — hot paths:** `apps/dashboard/lib/`, `apps/worker/src/`, `services/repair/repair_engine/`, root `turbo.json` and `package.json`.
 
-**Re-audit / `fixed_pending_verify`:** Every row in `audits/open_findings.json` with status `fixed_pending_verify` that this suite can assess must appear in your output `findings` array with the **same `finding_id`**. Re-check proof hooks in the repo; set `fixed_verified` when substantiated, or keep `fixed_pending_verify` / `open` with refreshed evidence and `history`. Skip IDs outside this suite’s scope (other agents own them in a batched run).
+## Must Do
 
 1. Perform history lookup first to avoid duplicate findings.
 2. Find every DB query: SELECT *? Inside a loop? Unbounded results? Missing index?

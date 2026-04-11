@@ -9,12 +9,9 @@ Normalizes:
   - Renames corresponding finding case files
 
 Usage:
-  python3 cleanup_open_findings.py [--dry-run] [--prune-resolved]
+  python3 cleanup_open_findings.py [--dry-run]
 
-  --dry-run         Show what would change without writing files.
-  --prune-resolved  Drop findings whose status is not unresolved per LYRA
-                    (keep only: open, accepted, in_progress, fixed_pending_verify).
-                    Removes e.g. fixed_verified, wont_fix, deferred, duplicate.
+  --dry-run   Show what would change without writing files.
 """
 
 import json
@@ -32,12 +29,6 @@ BACKUP_SUFFIX = ".pre-cleanup.bak"
 NOW = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 DRY_RUN = "--dry-run" in sys.argv
-PRUNE_RESOLVED = "--prune-resolved" in sys.argv
-
-# Synthesizer contract: only these belong in open_findings.json
-UNRESOLVED_STATUSES = frozenset({
-    "open", "accepted", "in_progress", "fixed_pending_verify",
-})
 
 # --- Normalization Maps ---
 
@@ -210,23 +201,6 @@ def main():
         if normalize_enum(f, "status", VALID_STATUS, STATUS_MAP, "open", changes):
             enum_fixes += 1
 
-    # --- Pass 1b: Prune resolved / terminal statuses ---
-    pruned_ids: list[str] = []
-    if PRUNE_RESOLVED:
-        kept = []
-        for f in findings:
-            st = f.get("status", "open")
-            if st in UNRESOLVED_STATUSES:
-                kept.append(f)
-            else:
-                pruned_ids.append(f.get("finding_id", "?"))
-        if pruned_ids:
-            changes.append(
-                f"Pruned {len(pruned_ids)} non-open finding(s): {', '.join(pruned_ids)}"
-            )
-        findings = kept
-        data[findings_key] = findings
-
     # --- Pass 2: Normalize IDs ---
     id_fixes = 0
     for f in findings:
@@ -244,8 +218,6 @@ def main():
 
     # --- Summary ---
     print(f"Enum normalizations: {enum_fixes}")
-    if PRUNE_RESOLVED:
-        print(f"Prune-resolved: removed {len(pruned_ids)} finding(s)")
     print(f"ID normalizations: {id_fixes}")
     print(f"File renames: {len(file_renames)}")
     print()

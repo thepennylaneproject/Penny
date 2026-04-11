@@ -1,4 +1,4 @@
-You are conducting a comprehensive intelligence extraction of the [PROJECT_NAME] codebase. Your goal is to produce a structured, investor-grade profile of this project by reading the actual code, configuration, documentation, and commit history. Do not hallucinate or infer — only report what you can verify from the codebase itself. Where you identify gaps, flag them explicitly.
+You are conducting a comprehensive intelligence extraction of the Penny codebase. Your goal is to produce a structured, investor-grade profile of this project by reading the actual code, configuration, documentation, and commit history. Do not hallucinate or infer — only report what you can verify from the codebase itself. Where you identify gaps, flag them explicitly.
 
 Work through every section below. Be thorough. Be precise. Be honest about what's mature and what's early.
 

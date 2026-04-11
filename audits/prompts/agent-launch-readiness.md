@@ -22,12 +22,12 @@ Your mandate: no surprises, no silent failures, no panic moments. A product is l
 
 ## Required Inputs
 
-- Routes and pages: `apps/dashboard/app/`, `apps/dashboard/components/`
-- Auth and session logic under `apps/dashboard/` (e.g. `lib/`, hooks) and backend/session code in `services/**` where applicable
-- State and persistence layer (local storage, DB, API)
-- Error handling and loading state implementations
+- Frontend journeys and UI: `frontend/src/**` (`App.tsx`, `components/`, `features/`, workspace state)
+- Auth and session: `frontend/src/features/auth/**`, `frontend/src/lib/**`
+- Backend behavior: `backend/app/api/**`, `backend/app/services/**` (orchestration, timeouts, errors)
+- State and persistence (client + API contracts) across `frontend/src/` and `backend/app/`
 - `audits/open_findings.json` and relevant files under `audits/findings/`
-- Any onboarding, settings, or role/permission configuration
+- Environment and onboarding hints: `.env.example`, `docs/GETTING_STARTED.md` or `README.md` (for claimed vs actual flows)
 
 ## Must Do
 
@@ -114,7 +114,7 @@ The fenced block below is an illustrative schema example; your actual response m
   "agent": {
     "name": "launch-readiness-auditor",
     "role": "Simulates real human usage across multiple personas, environments, and failure modes to determine whether the product is launch-ready",
-    "inputs_used": ["apps/dashboard/app/", "apps/dashboard/components/", "apps/dashboard/lib/", "audits/open_findings.json"],
+    "inputs_used": ["src/pages/", "src/components/", "netlify/functions/", "audits/open_findings.json"],
     "stop_conditions_hit": []
   },
   "journeys": [

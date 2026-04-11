@@ -1,53 +1,101 @@
 
-> penny-dashboard@0.1.0 lint /Users/sarahsahl/Desktop/penny/apps/dashboard
-> eslint app components lib hooks --ext .ts,.tsx
+> penny@3.0.0 lint /Users/sarahsahl/Desktop/penny
+> turbo run lint
 
+• turbo 2.9.3
 
-/Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/engine/dequeue/route.ts
-  3:10  warning  'markRepairJobRunning' is defined but never used  @typescript-eslint/no-unused-vars
+   • Packages in scope: @penny/shared-types, penny-dashboard, penny-worker
+   • Running lint in 3 packages
+   • Remote caching disabled
 
-/Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/orchestration/jobs/route.ts
-  2:10  warning  'Queue' is defined but never used  @typescript-eslint/no-unused-vars
+penny-worker:lint: cache bypass, force executing 1d3ccb751a89506e
+penny-dashboard:lint: cache bypass, force executing b8bcaac14ccd0340
+penny-dashboard:lint: 
+penny-dashboard:lint: > penny-dashboard@0.1.0 lint /Users/sarahsahl/Desktop/penny/apps/dashboard
+penny-dashboard:lint: > eslint app components lib hooks --ext .ts,.tsx
+penny-dashboard:lint: 
+penny-worker:lint: 
+penny-worker:lint: > penny-worker@1.0.0 lint /Users/sarahsahl/Desktop/penny/apps/worker
+penny-worker:lint: > eslint src
+penny-worker:lint: 
+penny-worker:lint: 
+penny-worker:lint: /Users/sarahsahl/Desktop/penny/apps/worker/src/context.ts
+penny-worker:lint:     3:25  warning  'dirname' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+penny-worker:lint:   336:41  warning  'rel' is defined but never used. Allowed unused args must match /^_/u      @typescript-eslint/no-unused-vars
+penny-worker:lint: 
+penny-worker:lint: /Users/sarahsahl/Desktop/penny/apps/worker/src/llm-router.ts
+penny-worker:lint:   6:10  warning  'getRegistry' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+penny-worker:lint: 
+penny-worker:lint: /Users/sarahsahl/Desktop/penny/apps/worker/src/process-job.ts
+penny-worker:lint:     27:27  warning  'resolveLLMTier' is defined but never used. Allowed unused vars must match /^_/u        @typescript-eslint/no-unused-vars
+penny-worker:lint:    245:10  warning  'loadPrompts' is defined but never used. Allowed unused vars must match /^_/u           @typescript-eslint/no-unused-vars
+penny-worker:lint:    675:10  warning  'selectExhaustiveness' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+penny-worker:lint:   1268:20  warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   1411:20  warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   1907:33  warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   1921:8   warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   1936:3   warning  'auditAgent' is defined but never used. Allowed unused args must match /^_/u            @typescript-eslint/no-unused-vars
+penny-worker:lint:   1944:33  warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   2002:8   warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   2017:3   warning  'auditAgent' is defined but never used. Allowed unused args must match /^_/u            @typescript-eslint/no-unused-vars
+penny-worker:lint:   2022:24  warning  Unexpected any. Specify a different type                                                @typescript-eslint/no-explicit-any
+penny-worker:lint:   2086:3   warning  'auditAgent' is defined but never used. Allowed unused args must match /^_/u            @typescript-eslint/no-unused-vars
+penny-worker:lint: 
+penny-worker:lint: /Users/sarahsahl/Desktop/penny/apps/worker/src/repair-client.ts
+penny-worker:lint:   6:10  warning  'randomUUID' is defined but never used. Allowed unused vars must match /^_/u  @typescript-eslint/no-unused-vars
+penny-worker:lint: 
+penny-worker:lint: ✖ 17 problems (0 errors, 17 warnings)
+penny-worker:lint: 
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/engine/dequeue/route.ts
+penny-dashboard:lint:   3:10  warning  'markRepairJobRunning' is defined but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/orchestration/jobs/route.ts
+penny-dashboard:lint:   2:10  warning  'Queue' is defined but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/repair-jobs/route.ts
+penny-dashboard:lint:   12:37  warning  'config' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/app/page.tsx
+penny-dashboard:lint:    7:10  warning  'DashboardLogin' is defined but never used      @typescript-eslint/no-unused-vars
+penny-dashboard:lint:   43:5   warning  'loginHint' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/AddProjectFlow.tsx
+penny-dashboard:lint:   22:10  warning  'ConfirmDialog' is defined but never used         @typescript-eslint/no-unused-vars
+penny-dashboard:lint:   23:10  warning  'UI_COPY' is defined but never used               @typescript-eslint/no-unused-vars
+penny-dashboard:lint:   91:10  warning  'discardOpen' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint:   92:9   warning  'fileRef' is assigned a value but never used      @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/FindingDetail.tsx
+penny-dashboard:lint:     5:10  warning  'STATUS_GROUPS' is defined but never used        @typescript-eslint/no-unused-vars
+penny-dashboard:lint:   145:25  warning  'jobLoading' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/FindingStatusFlow.tsx
+penny-dashboard:lint:   31:9  warning  'category' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectManagementPanel.tsx
+penny-dashboard:lint:   216:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectPageClient.tsx
+penny-dashboard:lint:   82:5  warning  'loginHint' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectView.tsx
+penny-dashboard:lint:   136:6   warning  React Hook useEffect has a missing dependency: 'setFilter'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+penny-dashboard:lint:   139:31  warning  'totalCost' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/components/RepairStatusBadge.tsx
+penny-dashboard:lint:   16:3  warning  'isRepairTerminal' is defined but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/lib/onboarding.ts
+penny-dashboard:lint:   878:9  warning  'scanRoots' is assigned a value but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: /Users/sarahsahl/Desktop/penny/apps/dashboard/lib/repair-status-machine.ts
+penny-dashboard:lint:   8:15  warning  'RepairJob' is defined but never used  @typescript-eslint/no-unused-vars
+penny-dashboard:lint: 
+penny-dashboard:lint: ✖ 19 problems (0 errors, 19 warnings)
+penny-dashboard:lint: 
 
-/Users/sarahsahl/Desktop/penny/apps/dashboard/app/api/repair-jobs/route.ts
-  12:37  warning  'config' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/app/page.tsx
-    7:10  warning  'DashboardLogin' is defined but never used         @typescript-eslint/no-unused-vars
-  216:9   warning  'appReadiness' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/AddProjectFlow.tsx
-  22:10  warning  'ConfirmDialog' is defined but never used         @typescript-eslint/no-unused-vars
-  23:10  warning  'UI_COPY' is defined but never used               @typescript-eslint/no-unused-vars
-  91:10  warning  'discardOpen' is assigned a value but never used  @typescript-eslint/no-unused-vars
-  92:9   warning  'fileRef' is assigned a value but never used      @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/FindingDetail.tsx
-    5:10  warning  'STATUS_GROUPS' is defined but never used        @typescript-eslint/no-unused-vars
-  145:25  warning  'jobLoading' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/FindingStatusFlow.tsx
-  31:9  warning  'category' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectManagementPanel.tsx
-  216:14  warning  'e' is defined but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectPageClient.tsx
-    7:10  warning  'DashboardLogin' is defined but never used         @typescript-eslint/no-unused-vars
-  164:9   warning  'appReadiness' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/ProjectView.tsx
-  136:6   warning  React Hook useEffect has a missing dependency: 'setFilter'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
-  139:31  warning  'totalCost' is assigned a value but never used                                                                @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/components/RepairStatusBadge.tsx
-  16:3  warning  'isRepairTerminal' is defined but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/lib/onboarding.ts
-  878:9  warning  'scanRoots' is assigned a value but never used  @typescript-eslint/no-unused-vars
-
-/Users/sarahsahl/Desktop/penny/apps/dashboard/lib/repair-status-machine.ts
-  8:15  warning  'RepairJob' is defined but never used  @typescript-eslint/no-unused-vars
-
-✖ 20 problems (0 errors, 20 warnings)
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    3.645s 
 

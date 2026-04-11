@@ -1,0 +1,104 @@
+# audits/project.toml — Project identity and paths for LYRA agents
+#
+# session.py reads this for audit-batch path hints and re-audit trigger mapping.
+# Use globs; prefix matching strips trailing * and /.
+
+[project]
+name = "penny"
+description = "Multi-agent code auditing and repair system (dashboard, worker, repair services)"
+stack = "Turborepo + Next.js + Supabase + Python repair service"
+
+[preflight]
+lint = "pnpm run lint"
+typecheck = "pnpm run typecheck"
+test = "pnpm run test"
+build = "pnpm run build"
+cwd = ""
+
+[paths.logic]
+source = [
+  "apps/dashboard/**",
+  "apps/worker/**",
+  "apps/repair-service/**",
+  "packages/**",
+  "services/repair/**",
+]
+config = [
+  "package.json",
+  "pnpm-workspace.yaml",
+  "turbo.json",
+  "apps/dashboard/package.json",
+  "apps/worker/package.json",
+]
+
+[paths.data]
+migrations = ["supabase/migrations/**"]
+types = ["packages/shared-types/**"]
+validation = ["apps/dashboard/lib/**"]
+writers = [
+  "supabase/functions/**",
+  "services/repair/api/**",
+  "apps/dashboard/app/api/**",
+]
+
+[paths.ux]
+ui = [
+  "apps/dashboard/app/**",
+  "apps/dashboard/components/**",
+  "apps/dashboard/hooks/**",
+]
+styles = []
+i18n = []
+
+[paths.performance]
+queries = ["apps/dashboard/lib/**", "services/repair/repair_engine/**"]
+fetching = ["apps/dashboard/lib/**", "apps/worker/src/**"]
+build_config = [
+  "turbo.json",
+  "package.json",
+  "apps/dashboard/next.config.ts",
+]
+
+[paths.security]
+auth = [
+  "apps/dashboard/app/api/auth/**",
+  "services/repair/api/**",
+]
+endpoints = [
+  "apps/dashboard/app/api/**",
+  "supabase/functions/**",
+]
+env = [".env.example"]
+
+[paths.deploy]
+build = [
+  "apps/dashboard/next.config.ts",
+  "apps/dashboard/netlify/**",
+]
+ci = [".github/workflows/**"]
+infra = [
+  "services/repair/Dockerfile",
+  "services/repair/railway.toml",
+  "netlify.toml",
+]
+logging = [
+  "apps/worker/src/**",
+  "services/repair/api/**",
+]
+
+[paths.visual]
+ui = [
+  "apps/dashboard/app/**",
+  "apps/dashboard/components/**",
+]
+styles = []
+config = ["apps/dashboard/tailwind.config.ts"]
+
+[paths.expectations]
+doc = "audits/expectations_TEMPLATE.md"
+
+[integrations.linear]
+api_key_env = "LINEAR_API_KEY"
+team_id_env = "LINEAR_TEAM_ID"
+project_id_env = "LINEAR_PROJECT_ID"
+label_ids_env = "LINEAR_LABEL_IDS"

@@ -10,10 +10,10 @@ Audit every shared UI component family for visual consistency. Do all buttons lo
 
 ## Required Inputs
 
-- Shared UI under `apps/dashboard/components/` (e.g. `components/ui/` if present)
-- Page files in `apps/dashboard/app/` that inline buttons, cards, or forms
-- Component library wrappers (shadcn, Radix, etc.) as used in `apps/dashboard/`
-- `apps/dashboard/tailwind.config.ts` for component-related tokens (borderRadius, boxShadow, etc.)
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit (by component family)
 

@@ -20,9 +20,9 @@ import { isInQueuedSet } from "@/lib/finding-validation";
 import { fragileShortPathSet, overlappingFragileShortPaths } from "@/lib/fragile-files";
 import { resolveNextAction } from "@/lib/resolve-next-action";
 import { usePortfolioProjects } from "@/hooks/use-portfolio-projects";
+import { useSupabaseAuthReady } from "@/hooks/use-supabase-auth-ready";
 import { useEngineQueue } from "@/hooks/use-engine-queue";
 import { useQueueRepair } from "@/hooks/use-queue-repair";
-import { resolveAppReadiness } from "@/hooks/use-app-readiness";
 import { UI_COPY } from "@/lib/ui-copy";
 import type { ImportSummary } from "@/lib/import-summary";
 
@@ -44,6 +44,8 @@ export default function Home() {
     setLoginHint,
     fetchProjects,
   } = usePortfolioProjects();
+
+  const authReady = useSupabaseAuthReady();
 
   const {
     queuedFindingIds,
@@ -68,17 +70,19 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
+    if (!authReady) return;
     void fetchProjects();
     void fetchQueue();
-  }, [fetchProjects, fetchQueue]);
+  }, [authReady, fetchProjects, fetchQueue]);
 
   // Re-fetch queue every 30 s so "queued" badges stay accurate without a full page reload.
   useEffect(() => {
+    if (!authReady) return;
     const interval = setInterval(() => {
       void fetchQueue();
     }, 30_000);
     return () => clearInterval(interval);
-  }, [fetchQueue]);
+  }, [authReady, fetchQueue]);
 
   useEffect(() => {
     const handleUndoSuccess = () => {
@@ -212,16 +216,6 @@ export default function Home() {
       ? `Hotspot overlap — other active findings share: ${fragileLabels.join(", ")}`
       : null;
 
-  // Consolidated app readiness state
-  const appReadiness = resolveAppReadiness({
-    projectsLoading: loading,
-    queueLoading: false,
-    needsAuth,
-    projectsError,
-    hostMisconfigured,
-    loginHint,
-  });
-
   if (hostMisconfigured) {
     return (
       <ConfigurationError
@@ -233,6 +227,14 @@ export default function Home() {
           void fetchProjects();
         }}
       />
+    );
+  }
+
+  if (!authReady || loading) {
+    return (
+      <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
+        <PageLoadingSkeleton />
+      </DashboardRouteShell>
     );
   }
 
@@ -280,14 +282,6 @@ export default function Home() {
     ).length;
     return findings.length > 0 && blockerCount === 0 && questionCount === 0;
   }).length;
-
-  if (loading) {
-    return (
-      <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
-        <PageLoadingSkeleton />
-      </DashboardRouteShell>
-    );
-  }
 
   if (projectsError && projects.length === 0) {
     return (

@@ -10,10 +10,10 @@ Audit color usage across every user-facing surface for palette consistency, sema
 
 ## Required Inputs
 
-- `apps/dashboard/tailwind.config.ts` (colors / `theme.extend`)
-- Global styles: `apps/dashboard/app/globals.css` (`:root`, `[data-theme]`, `.dark` if used)
-- Pages and components under `apps/dashboard/app/` and `apps/dashboard/components/` (actual class/style usage)
-- Brand guidelines or design doc if referenced in the repo
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit
 

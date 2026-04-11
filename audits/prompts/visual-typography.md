@@ -10,11 +10,10 @@ Audit every user-facing page for typographic consistency: heading hierarchy, fon
 
 ## Required Inputs
 
-- Full-page views under `apps/dashboard/app/`
-- Shared layout and nav under `apps/dashboard/components/`
-- `apps/dashboard/tailwind.config.ts` (fontSize, fontWeight, lineHeight, letterSpacing)
-- `apps/dashboard/app/globals.css` for `@font-face` and base text styles
-- Typography primitives under `apps/dashboard/components/` (Text, Heading, Label, Badge, etc.)
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit (page by page)
 

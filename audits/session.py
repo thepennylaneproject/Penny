@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LYRA Session Runner v1.1
+LYRA Session Runner v2.0
 
 One script for the entire audit-fix-ship cycle. Reduces cognitive load to:
   1. Run this script
@@ -19,12 +19,13 @@ Usage:
   python3 audits/session.py audit-batch      # Preflight + re-audit plan + one batched checklist file
   python3 audits/session.py audit-batch --full   # Same, but all 6 agents + monorepo scope (no WIP required)
   python3 audits/session.py audit-batch --skip-preflight  # Plan + checklist only (reuse last artifacts)
-  python3 audits/session.py ingest-synth audits/runs/<date>/synthesized-<id>.json  # Merge synth JSON → open_findings + case files + index
+  python3 audits/session.py ingest-synth audits/runs/<date>/synthesized-<id>.json [--strict]  # Merge synth JSON → open_findings + case files + index (--strict fails if fixed_pending_verify IDs omitted)
   python3 audits/session.py verify <finding_id>  # Mark re-audit passed (fixed_pending_verify -> fixed_verified)
   python3 audits/session.py prune-closed [--dry-run]  # Drop terminal findings from open_findings.json (case .md kept)
   python3 audits/session.py status           # Full dashboard
   python3 audits/session.py canship          # Am I ready to deploy?
   python3 audits/session.py decide <finding_id> <decision>  # Answer a question finding
+  python3 audits/session.py init                            # Generate audits/project.toml with auto-detected paths
 """
 
 import json
@@ -87,24 +88,146 @@ PRUNE_CLOSED_STATUSES = frozenset(
     {"fixed_verified", "wont_fix", "duplicate", "converted_to_enhancement"}
 )
 
-# What "changed" means for triggering re-audit
-TRIGGER_MAP = {
-    "src/services/": ["logic", "data"],
-    "src/hooks/": ["logic", "ux"],
-    "src/components/": ["ux", "logic"],
-    "src/pages/": ["ux", "logic"],
-    "src/lib/": ["logic", "security"],
-    "src/utils/": ["logic", "performance"],
-    "netlify/functions/": ["logic", "data", "security"],
+# Default trigger map — used when project.toml is absent.
+# Maps path prefixes to which agents should re-run when those paths change.
+# When project.toml exists, this is rebuilt from [paths.*] sections so it
+# always matches the actual project layout.
+DEFAULT_TRIGGER_MAP = {
+    "src/": ["logic", "ux"],
+    "lib/": ["logic"],
+    "app/": ["logic", "ux"],
+    "pages/": ["ux", "logic"],
+    "server/": ["logic", "data", "security"],
+    "api/": ["logic", "data", "security"],
+    "backend/": ["logic", "data", "security"],
+    "frontend/": ["logic", "ux", "performance"],
+    "apps/": ["logic", "ux", "data"],
+    "packages/": ["logic", "performance"],
+    "services/": ["logic", "data"],
     "supabase/migrations/": ["data", "security"],
     "supabase/": ["data"],
+    "netlify/functions/": ["logic", "data", "security"],
+    "infra/": ["deploy", "security"],
     ".env": ["security", "deploy"],
     "package.json": ["deploy", "performance"],
     "vite.config": ["deploy", "performance"],
+    "next.config": ["deploy", "performance"],
     "netlify.toml": ["deploy"],
     ".github/workflows/": ["deploy"],
     "tsconfig": ["deploy"],
+    "docker": ["deploy"],
+    "Dockerfile": ["deploy"],
 }
+
+# --- Project config ---
+
+def _try_load_toml(path):
+    """Load a TOML file. Uses tomllib (3.11+) or falls back to a minimal parser."""
+    try:
+        import tomllib
+    except ImportError:
+        try:
+            import tomli as tomllib  # pip install tomli for <3.11
+        except ImportError:
+            return None
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as f:
+        return tomllib.load(f)
+
+
+def load_project_config():
+    """Load audits/project.toml from repo root. Returns dict or None."""
+    root = repo_root()
+    for candidate in ("audits/project.toml", "lyra.toml"):
+        cfg = _try_load_toml(os.path.join(root, candidate))
+        if cfg is not None:
+            return cfg
+    return None
+
+
+def build_trigger_map(config):
+    """Build trigger map from project.toml [paths.*] sections, or use defaults."""
+    if config is None:
+        return DEFAULT_TRIGGER_MAP
+    paths = config.get("paths", {})
+    if not paths:
+        return DEFAULT_TRIGGER_MAP
+    tmap = {}
+    for agent_name, agent_paths in paths.items():
+        if not isinstance(agent_paths, dict):
+            continue
+        for _key, val in agent_paths.items():
+            entries = val if isinstance(val, list) else [val]
+            for entry in entries:
+                # Strip trailing glob for prefix matching
+                prefix = entry.rstrip("*").rstrip("/")
+                if prefix:
+                    existing = tmap.get(prefix, [])
+                    if agent_name not in existing:
+                        existing.append(agent_name)
+                    tmap[prefix] = existing
+    # Merge with defaults for common config files
+    for key in (".env", "package.json", "tsconfig", ".github/workflows/",
+                "docker", "Dockerfile", "netlify.toml"):
+        if key not in tmap:
+            tmap[key] = DEFAULT_TRIGGER_MAP.get(key, ["deploy"])
+    return tmap
+
+
+def get_agent_paths(config, agent_name):
+    """Return the list of paths for a given agent from project.toml, or empty list."""
+    if config is None:
+        return []
+    paths = config.get("paths", {}).get(agent_name, {})
+    result = []
+    for _key, val in paths.items():
+        if isinstance(val, list):
+            result.extend(val)
+        elif isinstance(val, str) and val:
+            result.append(val)
+    return result
+
+
+def get_preflight_config(config):
+    """Return preflight commands + cwd from project.toml, or detect defaults."""
+    defaults = {
+        "lint": None,
+        "typecheck": None,
+        "test": None,
+        "build": None,
+        "cwd": "",
+    }
+    if config and "preflight" in config:
+        pf = config["preflight"]
+        for key in ("lint", "typecheck", "test", "build", "cwd"):
+            if key in pf and pf[key]:
+                defaults[key] = pf[key]
+        return defaults
+
+    # Auto-detect: find the first directory with a package.json
+    root = repo_root()
+    # Check for apps/dashboard (Turbo monorepo pattern)
+    dash = os.path.join(root, "apps", "dashboard")
+    if os.path.isdir(dash) and os.path.isfile(os.path.join(dash, "package.json")):
+        pkg = "pnpm" if os.path.isfile(os.path.join(root, "pnpm-lock.yaml")) else "npm"
+        defaults["cwd"] = dash
+        for key in ("lint", "typecheck", "test", "build"):
+            defaults[key] = f"{pkg} run {key}"
+        return defaults
+    # Check for frontend/ subdirectory
+    fe = os.path.join(root, "frontend")
+    if os.path.isdir(fe) and os.path.isfile(os.path.join(fe, "package.json")):
+        pkg = "pnpm" if os.path.isfile(os.path.join(root, "pnpm-lock.yaml")) else "npm"
+        defaults["cwd"] = fe
+        for key in ("lint", "typecheck", "test", "build"):
+            defaults[key] = f"{pkg} run {key}"
+        return defaults
+    # Fallback: repo root
+    pkg = "pnpm" if os.path.isfile(os.path.join(root, "pnpm-lock.yaml")) else "npm"
+    for key in ("lint", "typecheck", "test", "build"):
+        defaults[key] = f"{pkg} run {key}"
+    return defaults
 
 
 # --- Helpers ---
@@ -211,6 +334,40 @@ def git_changed_paths():
         return []
 
 
+def full_scope_focus_paths():
+    """
+    Globs for audit-batch --full: probe repo root so Lane (backend/, frontend/) and
+    generic monorepos (apps/, packages/) both get real trees, not only absent paths.
+    """
+    root = repo_root()
+    dir_globs = []
+    for name in (
+        "backend",
+        "frontend",
+        "apps",
+        "packages",
+        "services",
+        "supabase",
+        "repair_engine",
+        "infra",
+    ):
+        if os.path.isdir(os.path.join(root, name)):
+            dir_globs.append(f"{name}/**")
+
+    root_files = [
+        "package.json",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "pnpm-workspace.yaml",
+        "turbo.json",
+    ]
+    touched = dir_globs + [f for f in root_files if os.path.isfile(os.path.join(root, f))]
+    gh = os.path.join(root, ".github", "workflows")
+    if os.path.isdir(gh):
+        touched.append(".github/workflows/**")
+    return touched
+
+
 def collect_reaudit_plan(full_scope=False):
     """
     full_scope: all six agents + monorepo path hints (deep audit), no WIP required.
@@ -218,17 +375,7 @@ def collect_reaudit_plan(full_scope=False):
     vs HEAD when any such finding exists, merged with TRIGGER_MAP.
     """
     if full_scope:
-        touched = [
-            "apps/**",
-            "packages/**",
-            "services/**",
-            "supabase/**",
-            ".github/workflows/**",
-            "package.json",
-            "pnpm-lock.yaml",
-            "pnpm-workspace.yaml",
-            "turbo.json",
-        ]
+        touched = full_scope_focus_paths()
         return {
             "touched_files": touched,
             "agents_needed": [a for a in AGENT_ORDER if a in AGENT_PROMPTS],
@@ -253,8 +400,11 @@ def collect_reaudit_plan(full_scope=False):
         for p in git_changed_paths():
             touched_files.add(p)
 
+    config = load_project_config()
+    trigger_map = build_trigger_map(config)
+
     for tf in list(touched_files):
-        for pattern, agents in TRIGGER_MAP.items():
+        for pattern, agents in trigger_map.items():
             if pattern in tf:
                 for a in agents:
                     agents_needed.add(a)
@@ -277,28 +427,28 @@ def cmd_preflight():
     root = repo_root()
     art = os.path.join(root, "audits", "artifacts", "_run_")
     os.makedirs(art, exist_ok=True)
-    dash = os.path.join(root, "apps", "dashboard")
-    if os.path.isdir(dash):
-        cwd = dash
-        pkg = "pnpm"
-    else:
-        cwd = root
-        pkg = "npm"
+    config = load_project_config()
+    pf = get_preflight_config(config)
+    cwd = pf["cwd"] if pf["cwd"] else root
 
     steps = [
-        ("lint", [pkg, "run", "lint"]),
-        ("typecheck", [pkg, "run", "typecheck"]),
-        ("tests", [pkg, "run", "test"]),
-        ("build", [pkg, "run", "build"]),
+        ("lint", pf["lint"]),
+        ("typecheck", pf["typecheck"]),
+        ("tests", pf["test"]),
+        ("build", pf["build"]),
     ]
     print(f"Preflight ({cwd}) → audits/artifacts/_run_/")
     print("=" * 50)
-    for name, cmd in steps:
+    for name, cmd_str in steps:
+        if not cmd_str:
+            print(f"  {name}: skipped (not configured)")
+            continue
         log = os.path.join(art, f"{name}.txt")
         try:
             with open(log, "w", encoding="utf-8") as fp:
                 p = subprocess.run(
-                    cmd,
+                    cmd_str,
+                    shell=True,
                     cwd=cwd,
                     stdout=fp,
                     stderr=subprocess.STDOUT,
@@ -338,13 +488,6 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
     latest = os.path.join(batch_dir, "LATEST.md")
 
     run_ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    findings_snapshot, _ = load_findings()
-    pending_verify = sorted(
-        f["finding_id"]
-        for f in findings_snapshot
-        if f.get("status") == "fixed_pending_verify" and f.get("finding_id")
-    )
-
     lines = [
         "# LYRA audit batch",
         "",
@@ -357,7 +500,7 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
         "",
         "- `audits/artifacts/_run_/lint.txt`",
         "- `audits/artifacts/_run_/typecheck.txt`",
-        "- `audits/artifacts/_run_/tests.txt`  _(from `npm run test` at repo root, or `pnpm run test` in `apps/dashboard`)_",
+        "- `audits/artifacts/_run_/tests.txt`",
         "- `audits/artifacts/_run_/build.txt`",
         "",
         "(If you used `--skip-preflight`, re-run `python3 audits/session.py preflight` first.)",
@@ -370,28 +513,6 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
             lines.append(f"- `{p}`")
     else:
         lines.append("- _(none — use repo-wide prompts)_")
-    lines.extend(["", "## Pending verification (carry-forward required)", ""])
-    if pending_verify:
-        lines.append(
-            f"`audits/open_findings.json` has **{len(pending_verify)}** row(s) with status `fixed_pending_verify`:"
-        )
-        lines.append("")
-        for fid in pending_verify:
-            lines.append(f"- `{fid}`")
-        lines.extend(
-            [
-                "",
-                "Each agent in this batch **must** include one `findings[]` object per listed ID that falls under that agent’s domain, using the **same `finding_id`**. Re-check proof hooks in the repo (or explain why hosted/external verification is still impossible). Use `fixed_verified` when substantiated; otherwise keep `fixed_pending_verify` or `open` with refreshed `proof_hooks` / `history`. Skip IDs outside your suite’s scope (other agents in this batch own them).",
-                "",
-            ]
-        )
-    else:
-        lines.extend(
-            [
-                "_No `fixed_pending_verify` rows at batch generation time — no carry-forward requirement._",
-                "",
-            ]
-        )
     lines.extend(
         [
             "",
@@ -405,24 +526,26 @@ def cmd_audit_batch(skip_preflight=False, full_scope=False):
         ]
     )
     step = 1
+    config = load_project_config()
     for a in agents:
         prompt = AGENT_PROMPTS.get(a, "?")
         suite = a if a != "performance" else "perf"
-        lines.append(f"{step}. **{a}** — read `{prompt}`, write `{suite}-{run_ts}.json`")
+        agent_paths = get_agent_paths(config, a)
+        path_hint = ""
+        if agent_paths:
+            path_hint = "  Paths: " + ", ".join(f"`{p}`" for p in agent_paths[:6])
+        lines.append(f"{step}. **{a}** — read `{prompt}`, write `{suite}-{run_ts}.json`{path_hint}")
         step += 1
     lines.extend(
         [
             "",
             f"{step}. **synthesizer** — read `audits/prompts/synthesizer.md`, merge all agent JSON above, write `synthesized-{run_ts}.json`",
             "",
-            f"{step + 1}. **canonical merge** — `python3 audits/session.py ingest-synth audits/runs/{day}/synthesized-{run_ts}.json`  _(updates `open_findings.json`, `findings/*.md` for new IDs, `index.json`)_",
+            f"{step + 1}. **canonical merge** — `python3 audits/session.py ingest-synth audits/runs/{day}/synthesized-{run_ts}.json --strict`  _(updates `open_findings.json`, `findings/*.md` for new IDs, `index.json`; fails if carry-forward contract is violated)_",
             "",
             "## One-block prompt (paste into Cursor / ChatGPT)",
             "",
-            (
-                "Audit pass: do not edit application code (backend/**, frontend/**, infra/**, etc.). For each agent prompt below, read the prompt file and emit exactly one JSON object per LYRA output contract. Use preflight artifacts under `audits/artifacts/_run_/`, read `audits/open_findings.json`, and focus on the paths listed under Focus paths. Save agent and synthesizer JSON under `audits/runs/<YYYY-MM-DD>/` with the run_id format shown in each prompt. After the synthesizer JSON is saved, run the **ingest-synth** command from the checklist so canonical audit files update. "
-                "**Pending verification:** obey the “Pending verification (carry-forward required)” section above — for each listed `finding_id` your suite can assess, emit that ID in your `findings` array (not only brand-new issues). Omitting IDs you should cover leaves them in `diff_summary.not_rereported` and canonical state unchanged for those rows."
-            ),
+            "Audit pass: do not edit application source code. For each agent prompt below, read the prompt file and emit exactly one JSON object per LYRA output contract. Use preflight artifacts under `audits/artifacts/_run_/`, read `audits/open_findings.json`, and focus on the paths listed under Focus paths. Save agent and synthesizer JSON under `audits/runs/<YYYY-MM-DD>/` with the run_id format shown in each prompt. After the synthesizer JSON is saved, run the **ingest-synth** command from the checklist so canonical audit files update.",
             "",
         ]
     )
@@ -925,6 +1048,133 @@ def cmd_default():
 
 # --- Main ---
 
+def cmd_init():
+    """Generate audits/project.toml with auto-detected values for this repo."""
+    root = repo_root()
+    out = os.path.join(root, "audits", "project.toml")
+    if os.path.isfile(out):
+        print(f"Already exists: {out}")
+        print("Delete it first if you want to regenerate.")
+        return
+
+    # Detect project name from directory
+    name = os.path.basename(root).lower().replace(" ", "-")
+
+    # Detect package manager
+    if os.path.isfile(os.path.join(root, "pnpm-lock.yaml")):
+        pkg = "pnpm"
+    elif os.path.isfile(os.path.join(root, "yarn.lock")):
+        pkg = "yarn"
+    else:
+        pkg = "npm"
+
+    # Detect preflight cwd
+    cwd = ""
+    for candidate in ("apps/dashboard", "frontend"):
+        d = os.path.join(root, candidate)
+        if os.path.isdir(d) and os.path.isfile(os.path.join(d, "package.json")):
+            cwd = candidate
+            break
+
+    # Detect source directories
+    detected_dirs = []
+    for d in ("backend", "frontend", "src", "lib", "app", "apps", "packages",
+              "services", "server", "api", "supabase", "infra", ".github/workflows"):
+        if os.path.isdir(os.path.join(root, d)):
+            detected_dirs.append(d)
+
+    # Detect stack from files present
+    stack_hints = []
+    for marker, hint in [
+        ("next.config.js", "Next.js"), ("next.config.ts", "Next.js"), ("next.config.mjs", "Next.js"),
+        ("vite.config.ts", "Vite"), ("vite.config.js", "Vite"),
+        ("requirements.txt", "Python"), ("pyproject.toml", "Python"),
+        ("supabase/config.toml", "Supabase"),
+        ("turbo.json", "Turborepo"),
+        ("netlify.toml", "Netlify"),
+    ]:
+        if os.path.isfile(os.path.join(root, marker)):
+            stack_hints.append(hint)
+    stack = " + ".join(dict.fromkeys(stack_hints))  # dedupe preserving order
+
+    lines = [
+        f'# audits/project.toml — LYRA project config for {name}',
+        f'# Generated by: python3 audits/session.py init',
+        f'# Detected directories: {", ".join(detected_dirs) or "none"}',
+        '',
+        '[project]',
+        f'name = "{name}"',
+        f'description = ""',
+        f'stack = "{stack}"',
+        '',
+        '[preflight]',
+        f'lint = "{pkg} run lint"',
+        f'typecheck = "{pkg} run typecheck"',
+        f'test = "{pkg} run test"',
+        f'build = "{pkg} run build"',
+        f'cwd = "{cwd}"',
+        '',
+        '# --- Agent paths ---',
+        '# Fill in the paths each agent should examine in YOUR repo.',
+        '# Use globs. session.py verifies they exist before including them.',
+        '# Leave arrays empty to let session.py auto-detect.',
+        '',
+        '[paths.logic]',
+        f'source = {_toml_array([f"{d}/**" for d in detected_dirs if d in ("backend", "frontend", "src", "apps", "packages", "services", "lib", "app", "server", "api")])}',
+        f'config = {_toml_array([f for f in ("package.json", "tsconfig.json") if os.path.isfile(os.path.join(root, f))])}',
+        '',
+        '[paths.data]',
+        f'migrations = {_toml_array([f"{d}/migrations/**" for d in detected_dirs if d == "supabase"] or [])}',
+        'types = []',
+        'validation = []',
+        'writers = []',
+        '',
+        '[paths.ux]',
+        f'ui = {_toml_array([f"{d}/**" for d in detected_dirs if d in ("frontend", "src", "apps")])}',
+        'styles = []',
+        'i18n = []',
+        '',
+        '[paths.performance]',
+        'queries = []',
+        'fetching = []',
+        f'build_config = {_toml_array([f for f in ("package.json", "vite.config.ts", "next.config.ts", "next.config.js") if os.path.isfile(os.path.join(root, f))])}',
+        '',
+        '[paths.security]',
+        'auth = []',
+        'endpoints = []',
+        f'env = {_toml_array([".env.example"] if os.path.isfile(os.path.join(root, ".env.example")) else [])}',
+        '',
+        '[paths.deploy]',
+        f'build = {_toml_array([f for f in ("vite.config.ts", "next.config.ts", "next.config.js") if os.path.isfile(os.path.join(root, f))])}',
+        f'ci = {_toml_array([".github/workflows/**"] if os.path.isdir(os.path.join(root, ".github/workflows")) else [])}',
+        f'infra = {_toml_array([f"{d}/**" for d in detected_dirs if d == "infra"])}',
+        'logging = []',
+        '',
+        '[paths.visual]',
+        f'ui = {_toml_array([f"{d}/**" for d in detected_dirs if d in ("frontend", "src", "apps")])}',
+        'styles = []',
+        'config = []',
+        '',
+        '[integrations.linear]',
+        'api_key_env = "LINEAR_API_KEY"',
+        'team_id_env = "LINEAR_TEAM_ID"',
+        'project_id_env = "LINEAR_PROJECT_ID"',
+        'label_ids_env = "LINEAR_LABEL_IDS"',
+    ]
+    with open(out, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"Created: {out}")
+    print(f"Edit the [paths.*] sections to match your repo layout.")
+    print(f"Detected: {pkg} package manager, {len(detected_dirs)} source dir(s)")
+
+
+def _toml_array(items):
+    """Format a Python list as a TOML inline array."""
+    if not items:
+        return "[]"
+    return "[" + ", ".join(f'"{i}"' for i in items) + "]"
+
+
 def main():
     if len(sys.argv) < 2:
         cmd_default()
@@ -969,11 +1219,28 @@ def main():
         full = "--full" in rest
         cmd_audit_batch(skip_preflight=skip, full_scope=full)
     elif cmd in ("ingest-synth", "ingest-synthesizer"):
-        if len(sys.argv) < 3:
-            print("Usage: python3 audits/session.py ingest-synth <path/to/synthesized-*.json>")
+        args = sys.argv[2:]
+        if not args:
+            print(
+                "Usage: python3 audits/session.py ingest-synth "
+                "<path/to/synthesized-*.json> [--strict]"
+            )
+            sys.exit(1)
+        strict = False
+        if args[-1] == "--strict":
+            strict = True
+            args = args[:-1]
+        if len(args) != 1:
+            print(
+                "Usage: python3 audits/session.py ingest-synth "
+                "<path/to/synthesized-*.json> [--strict]"
+            )
             sys.exit(1)
         ingest_mod = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ingest_synthesizer.py")
-        r = subprocess.run([sys.executable, ingest_mod, sys.argv[2]], cwd=repo_root())
+        cmd_line = [sys.executable, ingest_mod, args[0]]
+        if strict:
+            cmd_line.append("--strict")
+        r = subprocess.run(cmd_line, cwd=repo_root())
         sys.exit(r.returncode)
     elif cmd == "verify":
         if len(sys.argv) < 3:
@@ -985,6 +1252,8 @@ def main():
         cmd_prune_closed(dry_run=dry)
     elif cmd == "canship":
         cmd_canship()
+    elif cmd == "init":
+        cmd_init()
     elif cmd == "help":
         print(__doc__)
     else:

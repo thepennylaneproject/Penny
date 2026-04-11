@@ -10,11 +10,10 @@ Audit the tactile and dynamic layer: hover states, focus indicators, transitions
 
 ## Required Inputs
 
-- Interactive UI under `apps/dashboard/components/` and `apps/dashboard/app/`
-- `apps/dashboard/tailwind.config.ts` (transition, animation, shadow, radius)
-- `apps/dashboard/app/globals.css` for keyframes and global motion
-- Loading/skeleton components under `apps/dashboard/components/`
-- Animation libraries (Framer Motion, etc.) as referenced from `apps/dashboard/`
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit
 

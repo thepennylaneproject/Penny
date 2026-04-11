@@ -10,10 +10,10 @@ Audit the design system foundation: are there defined, consistent tokens for col
 
 ## Required Inputs
 
-- `apps/dashboard/tailwind.config.ts`
-- `apps/dashboard/app/globals.css` (base layers, CSS variables)
-- Optional theme or token folders under `apps/dashboard/` if present (e.g. `styles/`, `design-tokens/`)
-- Sample of 10–15 components from `apps/dashboard/components/` and routes from `apps/dashboard/app/` (varied page types)
+<!-- LYRA:PATHS:visual — session.py injects project-specific paths here at batch time -->
+- `audits/open_findings.json` and relevant files under `audits/findings/`
+
+**Penny — UI & tokens:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/tailwind.config.ts`.
 
 ## What to Audit
 

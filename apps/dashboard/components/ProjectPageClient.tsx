@@ -4,15 +4,14 @@ import { useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import type { FindingStatus, Project } from "@/lib/types";
 import { apiFetch } from "@/lib/api-fetch";
-import { DashboardLogin } from "@/components/DashboardLogin";
 import { ProjectView } from "@/components/ProjectView";
 import { DashboardRouteShell } from "@/components/DashboardRouteShell";
 import { PageLoadingSkeleton } from "@/components/PageLoadingSkeleton";
 import { SignInPrompt, ConfigurationError, RetryableError } from "@/components/AppReadinessUI";
 import { usePortfolioProjects } from "@/hooks/use-portfolio-projects";
+import { useSupabaseAuthReady } from "@/hooks/use-supabase-auth-ready";
 import { useEngineQueue } from "@/hooks/use-engine-queue";
 import { useQueueRepair } from "@/hooks/use-queue-repair";
-import { resolveAppReadiness } from "@/hooks/use-app-readiness";
 import { UI_COPY } from "@/lib/ui-copy";
 
 interface ProjectPageClientProps {
@@ -85,13 +84,16 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     fetchProjectByName,
   } = usePortfolioProjects();
 
+  const authReady = useSupabaseAuthReady();
+
   const { queuedFindingIds, fetchQueue } = useEngineQueue();
   const { queueRepair } = useQueueRepair({ fetchQueue });
 
   useEffect(() => {
+    if (!authReady) return;
     void fetchProjectByName(projectName);
     void fetchQueue();
-  }, [fetchProjectByName, fetchQueue, projectName]);
+  }, [authReady, fetchProjectByName, fetchQueue, projectName]);
 
   useEffect(() => {
     document.title = `${projectName} — Penny`;
@@ -160,16 +162,6 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     []
   );
 
-  // Consolidated app readiness state
-  const appReadiness = resolveAppReadiness({
-    projectsLoading: loading,
-    queueLoading: false,
-    needsAuth,
-    projectsError,
-    hostMisconfigured,
-    loginHint,
-  });
-
   if (hostMisconfigured) {
     return (
       <ConfigurationError
@@ -184,6 +176,14 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     );
   }
 
+  if (!authReady || loading) {
+    return (
+      <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
+        <PageLoadingSkeleton />
+      </DashboardRouteShell>
+    );
+  }
+
   if (needsAuth) {
     return (
       <SignInPrompt
@@ -195,14 +195,6 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
           void fetchQueue();
         }}
       />
-    );
-  }
-
-  if (loading) {
-    return (
-      <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
-        <PageLoadingSkeleton />
-      </DashboardRouteShell>
     );
   }
 

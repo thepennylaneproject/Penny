@@ -10,14 +10,13 @@ Find broken user flows, inconsistent copy, missing UI states (loading, error, em
 
 ## Required Inputs
 
-- Routes and UI: `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/hooks/`
-- i18n, copy constants, tokens, and theme config under `apps/dashboard/` and `packages/**` if shared
+<!-- LYRA:PATHS:ux — session.py injects project-specific paths here at batch time -->
 - `audits/artifacts/_run_/build.txt` (for UI build warnings)
 - `audits/open_findings.json` and relevant files under `audits/findings/`
 
-## Must Do
+**Penny — UX surfaces:** `apps/dashboard/app/`, `apps/dashboard/components/`, `apps/dashboard/hooks/`.
 
-**Re-audit / `fixed_pending_verify`:** Every row in `audits/open_findings.json` with status `fixed_pending_verify` that this suite can assess must appear in your output `findings` array with the **same `finding_id`**. Re-check proof hooks in the repo; set `fixed_verified` when substantiated, or keep `fixed_pending_verify` / `open` with refreshed evidence and `history`. Skip IDs outside this suite’s scope (other agents own them in a batched run).
+## Must Do
 
 1. Perform history lookup first to avoid duplicate findings.
 2. Map every route: does it have loading, error, and empty states?
