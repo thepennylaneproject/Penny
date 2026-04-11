@@ -13,6 +13,10 @@ function pool() {
   return createPostgresPool();
 }
 
+/** Aligned to repair job row mappers — avoids SELECT * when new columns are added. */
+const PENNY_REPAIR_JOBS_COLUMNS =
+  "id, project_name, finding_id, status, repair_policy, targeted_files, verification_commands, rollback_notes, maintenance_task_id, backlog_id, provenance, payload, patch_applied, error, started_at, finished_at, created_at";
+
 function asJsonObject(value: unknown): Record<string, unknown> {
   return typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
@@ -56,7 +60,7 @@ export async function listRepairJobsForProject(
 ): Promise<RepairJob[]> {
   const projectNameKey = normalizeProjectName(projectName);
   const rows = await pool().query(
-    `SELECT *
+    `SELECT ${PENNY_REPAIR_JOBS_COLUMNS}
        FROM penny_repair_jobs
        WHERE lower(trim(project_name)) = $1
        ORDER BY created_at DESC
@@ -128,7 +132,7 @@ export async function listRepairJobsForFinding(
 ): Promise<RepairJob[]> {
   const projectNameKey = normalizeProjectName(projectName);
   const rows = await pool().query(
-    `SELECT *
+    `SELECT ${PENNY_REPAIR_JOBS_COLUMNS}
        FROM penny_repair_jobs
        WHERE lower(trim(project_name)) = $1
          AND finding_id = $2
@@ -195,7 +199,7 @@ export async function listRepairJobsForFinding(
 
 export async function listRecentRepairJobs(limit = 50): Promise<RepairJob[]> {
   const rows = await pool().query(
-    `SELECT *
+    `SELECT ${PENNY_REPAIR_JOBS_COLUMNS}
        FROM penny_repair_jobs
       ORDER BY created_at DESC
       LIMIT $1`,
@@ -281,7 +285,7 @@ export async function insertRepairJobRecord(args: {
        payload
      )
      VALUES ($1, $2, 'queued', $3::jsonb, $4::jsonb, $5::jsonb, $6, $7, $8, $9::jsonb, $10::jsonb)
-     RETURNING *`,
+     RETURNING ${PENNY_REPAIR_JOBS_COLUMNS}`,
     [
       args.project_name,
       args.finding_id,

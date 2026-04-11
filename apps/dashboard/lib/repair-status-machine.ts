@@ -5,8 +5,6 @@
  * Used for real-time feedback on long-running repair operations.
  */
 
-import type { RepairJob } from "@/lib/types";
-
 export type RepairJobStatus = "queued" | "running" | "completed" | "failed" | "cancelled";
 
 /**

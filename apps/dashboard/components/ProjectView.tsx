@@ -93,10 +93,10 @@ export function ProjectView({
     try { return sessionStorage.getItem(searchStorageKey) ?? ""; }
     catch { return ""; }
   });
-  const setFilter = (v: FilterKey) => {
+  const setFilter = useCallback((v: FilterKey) => {
     setFilterState(v);
     try { sessionStorage.setItem(filterStorageKey, v); } catch { /* ignore */ }
-  };
+  }, [filterStorageKey]);
   const setSearch = (v: string) => {
     setSearchState(v);
     try {
@@ -133,10 +133,10 @@ export function ProjectView({
       // Switch filter to "all" if the finding wouldn't be visible under the current filter
       setFilter("all");
     }
-  }, [initialFindingId, findings]);
+  }, [initialFindingId, findings, setFilter]);
 
   // Fetch repair costs for this project
-  const { costs: repairCosts, totalCost } = useRepairCosts(project.name, {
+  const { costs: repairCosts } = useRepairCosts(project.name, {
     enabled: opsHydrated.repair,
   });
 

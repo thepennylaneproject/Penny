@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Queue } from "bullmq";
 import {
   cancelAuditJob,
   insertAuditJob,

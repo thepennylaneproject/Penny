@@ -42,7 +42,8 @@ Phase 1 migrates all data persistence from local JSON files and direct PostgreSQ
 
 **Dashboard:**
 - `apps/dashboard/lib/supabase.ts` — Supabase JS client with typed query helpers
-  - `getSupabaseServerClient()` — service role key for server-side operations
+  - `createSupabaseUserClient(accessToken)` — anon key + user JWT; **RLS enforced** (use via `requireTenantSupabaseClient` in tenant API routes)
+  - `createSupabaseServiceRoleClient()` / `getSupabaseServiceRoleClient()` — service role; **bypasses RLS** (workers and explicit dev-only paths)
   - Query helpers: `getProjects()`, `getFindings()`, `getAuditRuns()`, etc.
   - Mutation helpers: `updateFindingStatus()`, `insertAuditRun()`, etc.
 

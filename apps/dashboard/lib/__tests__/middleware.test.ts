@@ -155,9 +155,9 @@ describe("Middleware Auth", () => {
   describe("Auth bypass condition", () => {
     it("documents fail-closed behavior when no secret in production", () => {
       // When both secrets are unset:
-      // - development: middleware allows all /api/* (open API for local DX)
-      // - production: middleware returns 503 unless penny_ALLOW_OPEN_API is true/1
-      // See isOpenApiAllowedWithoutSecret() in lib/dashboard-secret.ts and middleware.ts
+      // - development: middleware may allow all /api/* (open API for local DX)
+      // - production: always 503 until DASHBOARD_API_SECRET or SUPABASE_JWT_SECRET is set
+      // See isOpenApiAllowedWithoutSecret() in lib/dashboard-secret.ts and proxy.ts
       const secret = "";
       expect(secret).toBe("");
     });

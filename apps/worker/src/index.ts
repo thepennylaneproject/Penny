@@ -2,6 +2,7 @@ import "./load-env.js";
 import { createRequire } from "node:module";
 import { Worker } from "bullmq";
 import { completeJob, createPool } from "./db.js";
+import { validateWorkerEnv } from "./env.js";
 import { processJob } from "./process-job.js";
 
 const require = createRequire(import.meta.url);
@@ -21,6 +22,7 @@ const pollBatchSize = Math.max(
 );
 
 async function main() {
+  validateWorkerEnv();
   const pool = createPool();
   console.log("[penny-worker] started, repo root:", process.env.penny_REPO_ROOT || "(auto)");
 

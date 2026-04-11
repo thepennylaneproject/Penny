@@ -55,8 +55,6 @@ export async function POST(request: Request) {
 
     const projectSummaries: Array<{ project_name: string; findings_count: number }> = [];
     let totalSyncedFindings = 0;
-
-    // Collect all (project_name, finding_id) pairs across every project
     const allProjectNames: string[] = [];
     const allFindingIds: string[] = [];
 
@@ -76,19 +74,10 @@ export async function POST(request: Request) {
 
       if (findingIds.length === 0) continue;
 
-      // Create/update sync mappings for each finding
-      const syncPromises = findingIds.map((fId: string) =>
-        pool.query(
-          `INSERT INTO penny_linear_sync_new (project_name, finding_id, linear_issue_id, linear_team_key)
-           VALUES ($1, $2, '', $3)
-           ON CONFLICT (project_name, finding_id) DO UPDATE SET
-             linear_team_key = COALESCE($3, penny_linear_sync_new.linear_team_key),
-             updated_at = now()`,
-          [projectName, fId, teamKey]
-        )
-      );
-
-      await Promise.all(syncPromises);
+      for (const fId of findingIds) {
+        allProjectNames.push(projectName);
+        allFindingIds.push(fId);
+      }
 
       projectSummaries.push({
         project_name: projectName,
@@ -98,7 +87,6 @@ export async function POST(request: Request) {
       totalSyncedFindings += findingIds.length;
     }
 
-    // Upsert all sync mappings in a single batch query
     if (allFindingIds.length > 0) {
       await pool.query(
         `INSERT INTO penny_linear_sync_new (project_name, finding_id, linear_issue_id, linear_team_key)

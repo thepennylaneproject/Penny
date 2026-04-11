@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { requireTenantSupabaseClient } from "@/lib/supabase-request";
 import { resolveProjectIdByNameOrId } from "@/lib/repair-jobs";
 
 export async function POST(request: NextRequest) {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
-  }
+  const gate = await requireTenantSupabaseClient(request);
+  if (!gate.ok) return gate.response;
+  const supabase = gate.client;
   try {
     const body = await request.json();
-    const { finding_id, project_id, config } = body;
+    const { finding_id, project_id } = body;
 
     if (!finding_id || !project_id) {
       return NextResponse.json(

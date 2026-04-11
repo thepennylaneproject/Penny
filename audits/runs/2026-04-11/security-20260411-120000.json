@@ -1,0 +1,269 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "security",
+  "run_id": "security-20260411-120000",
+  "run_metadata": {
+    "timestamp": "2026-04-11T12:00:00.000Z",
+    "branch": "main",
+    "commit": "c73f17b",
+    "environment": "local",
+    "tool_platform": "cursor",
+    "model": "agent-security-audit",
+    "notes": "Trust model: Dashboard `/api/*` is gated by `proxy.ts` (Bearer shared secret, optional Supabase JWT, or HMAC cookie). Repair FastAPI uses `REPAIR_SERVICE_SECRET`. Supabase Edge Functions run outside that boundary: `ingest-audit` uses the service role with no request authentication in code—any caller who can reach the function URL can write. `github-webhook` relies on HMAC; `repair-callback` uses Bearer compare. Data plane: Postgres via Supabase; compromise of ingest or weak secrets affects audit/repair integrity."
+  },
+  "agent": {
+    "name": "security-and-privacy-auditor",
+    "role": "Identify practical auth, validation, secret, and data-exposure risks with realistic attack scenarios.",
+    "inputs_used": [
+      "apps/dashboard/proxy.ts",
+      "apps/dashboard/lib/dashboard-secret.ts",
+      "apps/dashboard/app/api/auth/login/route.ts",
+      "apps/dashboard/app/api/lane/audit/route.ts",
+      "services/repair/api/auth.py",
+      "services/repair/api/main.py",
+      "supabase/functions/ingest-audit/index.ts",
+      "supabase/functions/github-webhook/index.ts",
+      "supabase/functions/repair-callback/index.ts",
+      ".env.example",
+      "audits/open_findings.json"
+    ],
+    "stop_conditions_hit": [
+      "blocker_unauthenticated_service_role_ingest_found"
+    ]
+  },
+  "coverage": {
+    "files_examined": [
+      "apps/dashboard/proxy.ts",
+      "apps/dashboard/lib/dashboard-secret.ts",
+      "apps/dashboard/app/api/auth/login/route.ts",
+      "apps/dashboard/app/api/lane/audit/route.ts",
+      "services/repair/api/auth.py",
+      "services/repair/api/main.py",
+      "supabase/functions/ingest-audit/index.ts",
+      "supabase/functions/github-webhook/index.ts",
+      "supabase/functions/repair-callback/index.ts",
+      ".env.example"
+    ],
+    "files_skipped": [
+      "apps/dashboard/app/api/**/*.ts — sampled representative routes; auth is centralized in proxy.ts",
+      "services/repair/api/routes/*.py — protected by global Depends(require_auth) on /repair and /config"
+    ],
+    "coverage_complete": false,
+    "incomplete_reason": "Stopped after documenting a P0 unauthenticated ingest surface per agent stop rule; remaining dashboard API routes not exhaustively reviewed."
+  },
+  "findings": [
+    {
+      "finding_id": "f-a9726f2f",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "blocker",
+      "priority": "P0",
+      "confidence": "evidence",
+      "title": "Ingest edge function has no caller authentication",
+      "description": "The `ingest-audit` Supabase Edge Function creates a `supabase-js` client with `SUPABASE_SERVICE_ROLE_KEY` and upserts `audit_runs`, `findings`, and `orchestration_events` from the request body. There is no verification of a shared secret, Supabase JWT, or other caller credential in the handler. Attack scenario: anyone who can invoke the deployed function URL (URL discovery, leaked project ref, or browser/CORS context if exposed) sends a crafted JSON body and overwrites or poisons audit results and findings for arbitrary `project_id` values, corrupting compliance data and downstream repair/orchestration decisions.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Handler uses service role and writes without auth check.",
+          "file": "supabase/functions/ingest-audit/index.ts",
+          "symbol": "serve",
+          "start_line": 10,
+          "end_line": 84
+        },
+        {
+          "hook_type": "repro_steps",
+          "summary": "Unauthenticated POST path to ingest.",
+          "steps": [
+            "Deploy or point at the ingest-audit function endpoint.",
+            "POST JSON with project_id and synthesizer_payload matching expected shape.",
+            "Observe 200 and rows inserted/updated in audit_runs/findings without any Authorization validation in code."
+          ]
+        }
+      ],
+      "repro_steps": [
+        "POST to the edge function URL with a valid synthesizer-shaped body.",
+        "Confirm writes succeed without presenting a secret or user JWT in application logic."
+      ],
+      "impact": "Full integrity loss for audit data tied to this pipeline: fake findings, deleted accountability, and wrong repair triggers for projects.",
+      "suggested_fix": {
+        "approach": "Require a server-only secret (compare timing-safe), or verify Supabase JWT with role checks, or disable public invocation and rely on Supabase function JWT verification in project config—ensure code and platform config agree.",
+        "affected_files": ["supabase/functions/ingest-audit/index.ts"],
+        "estimated_effort": "small",
+        "risk_notes": "Breaking change for any caller until they send the new credential.",
+        "tests_needed": ["Integration test: unauthenticated request rejected", "Authenticated pipeline still ingests"]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Evidence from static review of edge function source."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-1958c58a",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Empty REPAIR_SERVICE_SECRET accepts empty Bearer token",
+      "description": "`repair-callback` compares `Authorization` Bearer text to `Deno.env.get('REPAIR_SERVICE_SECRET')`. If the secret is set to an empty string in deployment, `token !== expectedToken` is false when both are empty, so the handler accepts `Authorization: Bearer ` with no secret. Attack scenario: misconfiguration (empty env in Supabase secrets) leaves the callback open; an attacker invokes the function and updates arbitrary `repair_job_id` rows via the service-role client.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Bearer compared to env; no reject when secret missing or empty before compare.",
+          "file": "supabase/functions/repair-callback/index.ts",
+          "symbol": "handler",
+          "start_line": 28,
+          "end_line": 44
+        }
+      ],
+      "repro_steps": [
+        "Set REPAIR_SERVICE_SECRET to empty in the function environment.",
+        "POST with Header Authorization: Bearer (empty token after prefix).",
+        "Observe 200 and repair_jobs update if id exists."
+      ],
+      "impact": "Unauthorized updates to repair job status, PR metadata, and orchestration_events linkage.",
+      "suggested_fix": {
+        "approach": "Reject early if `!expectedToken?.trim()` with 503; use timing-safe compare for secrets.",
+        "affected_files": ["supabase/functions/repair-callback/index.ts"],
+        "estimated_effort": "trivial",
+        "tests_needed": ["Missing secret returns 503", "Empty bearer rejected"]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Logic review of callback auth branch."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-28c39310",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "penny_ALLOW_OPEN_API disables dashboard API authentication",
+      "description": "When neither `DASHBOARD_API_SECRET` nor `SUPABASE_JWT_SECRET` is set, production allows all `/api/*` traffic if `penny_ALLOW_OPEN_API` is `1` or `true`. `proxy.ts` logs a warning but still calls `next()`. Attack scenario: operator mistake or compromised env leaves the dashboard API fully open; any client can read or mutate project state exposed by those routes with no shared secret or user session.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Open API branch returns next() for all API routes.",
+          "file": "apps/dashboard/proxy.ts",
+          "symbol": "proxy",
+          "start_line": 115,
+          "end_line": 131
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Flag enables open API in production when no secrets.",
+          "file": "apps/dashboard/lib/dashboard-secret.ts",
+          "symbol": "isOpenApiAllowedWithoutSecret",
+          "start_line": 23,
+          "end_line": 27
+        }
+      ],
+      "repro_steps": [
+        "Unset DASHBOARD_API_SECRET and SUPABASE_JWT_SECRET in a production-like build.",
+        "Set penny_ALLOW_OPEN_API=true.",
+        "Call any /api/* route without Authorization and observe success."
+      ],
+      "impact": "Unauthorized access to dashboard-backed data and actions (project CRUD, orchestration, imports) depending on route behavior.",
+      "suggested_fix": {
+        "approach": "Remove or gate `penny_ALLOW_OPEN_API` behind explicit local-only hostname; fail closed in production regardless of flag; alert on startup.",
+        "affected_files": ["apps/dashboard/lib/dashboard-secret.ts", "apps/dashboard/proxy.ts"],
+        "estimated_effort": "small",
+        "risk_notes": "May break intentional staging setups; document migration."
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Documented intentional DX escape hatch with production hazard."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-cabdbd5c",
+      "type": "bug",
+      "category": "timing-leak",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Bearer secrets compared with plain equality",
+      "description": "Repair service `require_auth` and the repair-callback use `!=` / `!==` for bearer tokens. Attack scenario: local timing side channels are usually low risk on cloud runtimes, but network attackers with very fine-grained timing to the same instance could theoretically learn bytes; primary practical concern is consistency with crypto best practices for long-lived shared secrets.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "String compare for bearer token.",
+          "file": "services/repair/api/auth.py",
+          "symbol": "require_auth",
+          "start_line": 16,
+          "end_line": 30
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "String compare for callback bearer.",
+          "file": "supabase/functions/repair-callback/index.ts",
+          "symbol": "handler",
+          "start_line": 37,
+          "end_line": 44
+        }
+      ],
+      "impact": "Marginal risk of secret byte leakage via timing; defense-in-depth gap versus constant-time compare.",
+      "suggested_fix": {
+        "approach": "Use timing-safe comparison (e.g. `hmac.compare_digest` in Python; SubtleCrypto or hex compare loop in Deno) after normalizing encoding once.",
+        "affected_files": ["services/repair/api/auth.py", "supabase/functions/repair-callback/index.ts"],
+        "estimated_effort": "small",
+        "risk_notes": "None significant if only fixing comparison."
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Pairing Python and Deno bearer checks."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 1, "major": 2, "minor": 1, "nit": 0 },
+    "by_category": { "auth-bypass": 3, "timing-leak": 1 },
+    "by_type": { "bug": 4, "enhancement": 0, "debt": 0, "question": 0 },
+    "by_status": { "open": 4 }
+  },
+  "next_actions": [
+    {
+      "action": "Add authentication or platform-level JWT verification to ingest-audit before any service-role write.",
+      "finding_id": "f-a9726f2f",
+      "rationale": "P0 integrity: unauthenticated service-role ingest is the widest blast radius."
+    },
+    {
+      "action": "Fail closed when REPAIR_SERVICE_SECRET is missing or empty in repair-callback.",
+      "finding_id": "f-1958c58a",
+      "rationale": "Prevents empty-token auth under misconfiguration."
+    },
+    {
+      "action": "Restrict or remove penny_ALLOW_OPEN_API for production deployments.",
+      "finding_id": "f-28c39310",
+      "rationale": "Removes accidental full API exposure from env mistakes."
+    },
+    {
+      "action": "Replace string equality with timing-safe secret compare on repair paths.",
+      "finding_id": "f-cabdbd5c",
+      "rationale": "Low-cost hardening after critical auth paths are fixed."
+    }
+  ]
+}

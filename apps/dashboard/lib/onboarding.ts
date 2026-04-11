@@ -875,10 +875,6 @@ function buildExpectations(snapshot: RepoSnapshot): string {
 
   // ── Document assembly ─────────────────────────────────────────────────────
 
-  const scanRoots =
-    snapshot.scanRoots.length > 0
-      ? snapshot.scanRoots.map((dir) => `- \`${dir}\``).join("\n")
-      : "- `.`";
   const commands = formatCommands(snapshot.commands);
 
   const sections: string[] = [];

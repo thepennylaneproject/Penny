@@ -1,4 +1,5 @@
 import pg from "pg";
+import { resolvePgPoolMax } from "./concurrency-config.js";
 
 const { Pool } = pg;
 
@@ -15,28 +16,8 @@ function normalizeRepositoryUrl(value?: string | null): string | null {
     .toLowerCase();
 }
 
-async function resolveCanonicalProjectIdentity(
-  pool: pg.Pool,
-  name: string,
-  repositoryUrl?: string | null
-): Promise<{ name: string; repository_url: string | null } | null> {
-  const normalizedName = normalizeProjectName(name);
-  const normalizedRepo = normalizeRepositoryUrl(repositoryUrl);
-  const result = await pool.query(
-    `SELECT name, repository_url
-       FROM penny_projects
-      WHERE lower(name) = $1
-         OR (
-           $2::text IS NOT NULL
-           AND repository_url IS NOT NULL
-           AND lower(
-             regexp_replace(
-               regexp_replace(repository_url, '\\.git$', '', 'i'),
-               '/+$',
-               ''
-             )
-           ) = $2
-         )
+/** Params: $1 normalized name, $2 normalized repo or null, $3 raw name for ordering tie-break. */
+const PENNY_PROJECT_IDENTITY_ORDER_BY = `
       ORDER BY
         CASE
           WHEN name = $3 THEN 0
@@ -53,10 +34,22 @@ async function resolveCanonicalProjectIdentity(
           ELSE 3
         END,
         name ASC
-      LIMIT 1`,
-    [normalizedName, normalizedRepo, name]
-  );
-  return result.rows[0] ?? null;
+      LIMIT 1`;
+
+function pennyProjectIdentityWhereClause(): string {
+  return `
+      WHERE lower(name) = $1
+         OR (
+           $2::text IS NOT NULL
+           AND repository_url IS NOT NULL
+           AND lower(
+             regexp_replace(
+               regexp_replace(repository_url, '\\.git$', '', 'i'),
+               '/+$',
+               ''
+             )
+           ) = $2
+         )`;
 }
 
 export function createPool(): pg.Pool {
@@ -95,7 +88,7 @@ export function createPool(): pg.Pool {
   return new Pool({
     connectionString: url,
     ssl: url.includes("localhost") ? false : { rejectUnauthorized: false },
-    max: 5,
+    max: resolvePgPoolMax(),
   });
 }
 
@@ -214,14 +207,32 @@ export async function loadProject(
   pool: pg.Pool,
   name: string
 ): Promise<Record<string, unknown> | null> {
-  const identity = await resolveCanonicalProjectIdentity(pool, name);
-  const canonicalName = identity?.name ?? name;
-  const r = await pool.query(
-    `SELECT project_json FROM penny_projects WHERE name = $1`,
-    [canonicalName]
+  const normalizedName = normalizeProjectName(name);
+  const normalizedRepo = normalizeRepositoryUrl(null);
+  const primary = await pool.query(
+    `SELECT name, repository_url, project_json
+       FROM penny_projects
+      ${pennyProjectIdentityWhereClause()}
+      ${PENNY_PROJECT_IDENTITY_ORDER_BY}`,
+    [normalizedName, normalizedRepo, name]
   );
-  if (r.rows.length === 0) return null;
-  const j = r.rows[0].project_json;
+  let row = primary.rows[0] as
+    | { name: string; repository_url: string | null; project_json: unknown }
+    | undefined;
+  if (!row) {
+    const fallback = await pool.query(
+      `SELECT name, repository_url, project_json
+         FROM penny_projects
+        WHERE name = $1`,
+      [name]
+    );
+    row = fallback.rows[0] as
+      | { name: string; repository_url: string | null; project_json: unknown }
+      | undefined;
+  }
+  if (!row) return null;
+  const canonicalName = String(row.name);
+  const j = row.project_json;
   let p: Record<string, unknown>;
   try {
     p = typeof j === "string" ? JSON.parse(j) : (j as Record<string, unknown>);
@@ -235,7 +246,7 @@ export async function loadProject(
     ...p,
     name: (p.name as string) || canonicalName,
     repositoryUrl:
-      (p.repositoryUrl as string | undefined) ?? identity?.repository_url ?? undefined,
+      (p.repositoryUrl as string | undefined) ?? row.repository_url ?? undefined,
     findings: Array.isArray(p.findings) ? p.findings : [],
   };
 }
@@ -245,30 +256,61 @@ export async function saveProject(
   project: Record<string, unknown> & { name: string; findings: unknown[] }
 ): Promise<void> {
   // repositoryUrl goes into the dedicated column; body goes into project_json.
-  const canonical = await resolveCanonicalProjectIdentity(
-    pool,
-    project.name,
+  // Single round-trip: resolve identity in a CTE, then INSERT ... ON CONFLICT (matches loadProject predicate).
+  const normalizedName = normalizeProjectName(project.name);
+  const normalizedRepo = normalizeRepositoryUrl(
     (project.repositoryUrl as string | null | undefined) ?? null
   );
-  const canonicalName = canonical?.name ?? project.name;
-  const repositoryUrl =
-    normalizeRepositoryUrl(
-      (project.repositoryUrl as string | null | undefined) ?? canonical?.repository_url ?? null
-    ) ?? null;
-  const body = {
+  const lastUpdated =
+    (project.lastUpdated as string | undefined) ?? new Date().toISOString();
+  const bodyJson = JSON.stringify({
     ...project,
-    name: canonicalName,
-    repositoryUrl: repositoryUrl ?? undefined,
-    lastUpdated: (project.lastUpdated as string | undefined) ?? new Date().toISOString(),
-  };
+    name: project.name,
+    lastUpdated,
+  });
   await pool.query(
-    `INSERT INTO penny_projects (name, repository_url, project_json, updated_at)
-     VALUES ($1, $2, $3::jsonb, now())
+    `WITH resolved AS (
+       SELECT name, repository_url
+         FROM penny_projects
+        ${pennyProjectIdentityWhereClause()}
+        ${PENNY_PROJECT_IDENTITY_ORDER_BY}
+     ),
+     canon AS (
+       SELECT
+         COALESCE((SELECT r.name FROM resolved r), $3::text) AS canonical_name,
+         COALESCE(
+           $2::text,
+           (
+             SELECT lower(
+               regexp_replace(
+                 regexp_replace(trim(repository_url), '\\.git$', '', 'i'),
+                 '/+$',
+                 ''
+               )
+             )
+             FROM resolved
+           )
+         ) AS repo_col
+     )
+     INSERT INTO penny_projects (name, repository_url, project_json, updated_at)
+     SELECT
+       c.canonical_name,
+       c.repo_col,
+       jsonb_set(
+         CASE
+           WHEN c.repo_col IS NULL THEN ($4::jsonb #- '{repositoryUrl}')
+           ELSE jsonb_set($4::jsonb, '{repositoryUrl}', to_jsonb(c.repo_col::text))
+         END,
+         '{name}',
+         to_jsonb(c.canonical_name)
+       ),
+       now()
+     FROM canon c
      ON CONFLICT (name) DO UPDATE SET
        repository_url = COALESCE(EXCLUDED.repository_url, penny_projects.repository_url),
        project_json = EXCLUDED.project_json,
        updated_at = now()`,
-    [canonicalName, repositoryUrl, JSON.stringify(body)]
+    [normalizedName, normalizedRepo, project.name, bodyJson]
   );
 }
 

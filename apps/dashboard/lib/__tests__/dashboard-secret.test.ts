@@ -20,15 +20,15 @@ describe("isOpenApiAllowedWithoutSecret", () => {
     expect(isOpenApiAllowedWithoutSecret()).toBe(false);
   });
 
-  it("returns true in production when penny_ALLOW_OPEN_API is 1", () => {
+  it("returns false in production even when penny_ALLOW_OPEN_API is 1", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("penny_ALLOW_OPEN_API", "1");
-    expect(isOpenApiAllowedWithoutSecret()).toBe(true);
+    expect(isOpenApiAllowedWithoutSecret()).toBe(false);
   });
 
-  it("returns true in production when penny_ALLOW_OPEN_API is true (case-insensitive)", () => {
+  it("returns false in production even when penny_ALLOW_OPEN_API is true (case-insensitive)", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("penny_ALLOW_OPEN_API", "TRUE");
-    expect(isOpenApiAllowedWithoutSecret()).toBe(true);
+    expect(isOpenApiAllowedWithoutSecret()).toBe(false);
   });
 });

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import type { Finding, FindingStatus, RepairJob, SyncMapping } from "@/lib/types";
 import { Badge } from "./Badge";
 import { useRuntimeConfig } from "@/components/RuntimeConfigProvider";
-import { STATUS_GROUPS } from "@/lib/constants";
 import { isInQueuedSet } from "@/lib/finding-validation";
 import { UI_COPY } from "@/lib/ui-copy";
 import { apiFetch } from "@/lib/api-fetch";
@@ -142,7 +141,7 @@ export function FindingDetail({
   const stripe   = SEVERITY_BORDER[finding.severity ?? ""] ?? "var(--ink-border)";
 
   // Repair job hooks (if repair_job_id exists on finding)
-  const { job, loading: jobLoading, refresh: refreshRepairJob } = useRepairJob(finding.repair_job_id ?? null);
+  const { job, refresh: refreshRepairJob } = useRepairJob(finding.repair_job_id ?? null);
   const { candidates } = useRepairCandidates(finding.repair_job_id ?? null);
   const { events } = useOrchestrationEvents(finding.repair_job_id ?? null);
 

@@ -5,68 +5,7 @@ import {
   DASHBOARD_MISCONFIGURED_MESSAGE,
   isOpenApiAllowedWithoutSecret,
 } from "@/lib/dashboard-secret";
-
-function decodeBase64Url(value: string): string | null {
-  try {
-    const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    return atob(padded);
-  } catch {
-    return null;
-  }
-}
-
-async function verifySupabaseJwt(
-  token: string,
-  secret: string,
-  audience: string
-): Promise<boolean> {
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  const [headerPart, payloadPart, signaturePart] = parts;
-  const payloadRaw = decodeBase64Url(payloadPart);
-  if (!payloadRaw) return false;
-
-  let payload: Record<string, unknown>;
-  try {
-    payload = JSON.parse(payloadRaw) as Record<string, unknown>;
-  } catch {
-    return false;
-  }
-
-  const exp = Number(payload.exp);
-  if (!Number.isFinite(exp) || exp * 1000 < Date.now()) return false;
-  if (typeof payload.sub !== "string" || payload.sub.length === 0) return false;
-  if (audience) {
-    const aud = payload.aud;
-    const audienceOk =
-      typeof aud === "string"
-        ? aud === audience
-        : Array.isArray(aud)
-          ? aud.includes(audience)
-          : false;
-    if (!audienceOk) return false;
-  }
-
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const signature = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    enc.encode(`${headerPart}.${payloadPart}`)
-  );
-  const expected = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-  return expected === signaturePart;
-}
+import { verifySupabaseAccessToken } from "@/lib/supabase-jwt";
 
 async function verifySessionCookie(
   token: string,
@@ -119,15 +58,7 @@ export async function proxy(request: NextRequest) {
         { status: 503 }
       );
     }
-    // penny_ALLOW_OPEN_API is set — all APIs are unauthenticated.
-    // This is only safe for local development. Log a loud warning so
-    // it is visible in Railway/Netlify function logs if accidentally set in production.
-    if (process.env.NODE_ENV === "production") {
-      console.warn(
-        "[penny] SECURITY WARNING: penny_ALLOW_OPEN_API is set in a production environment. " +
-        "All /api/* routes are unauthenticated. Set DASHBOARD_API_SECRET or SUPABASE_JWT_SECRET to secure the dashboard."
-      );
-    }
+    // Non-production only: open /api/* when no DASHBOARD_API_SECRET or SUPABASE_JWT_SECRET (local DX).
     return NextResponse.next();
   }
 
@@ -142,7 +73,10 @@ export async function proxy(request: NextRequest) {
     if (raw && norm(token) === norm(raw)) {
       return NextResponse.next();
     }
-    if (supabaseJwtSecret && (await verifySupabaseJwt(token, supabaseJwtSecret, supabaseAudience))) {
+    if (
+      supabaseJwtSecret &&
+      (await verifySupabaseAccessToken(token, supabaseJwtSecret, supabaseAudience))
+    ) {
       return NextResponse.next();
     }
   }

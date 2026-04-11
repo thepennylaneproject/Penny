@@ -1,0 +1,232 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "performance",
+  "run_id": "perf-20260411-160545",
+  "agent": {
+    "name": "performance-cost-auditor",
+    "role": "Read-only performance and cost audit for DB access patterns, API usage, bundles, and LLM spend risk.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "audits/artifacts/_run_/build.txt",
+      "turbo.json",
+      "package.json",
+      "apps/dashboard/lib/maintenance-store.ts",
+      "apps/dashboard/lib/orchestration-jobs.ts",
+      "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+      "apps/worker/src/db.ts",
+      "apps/worker/src/process-job.ts",
+      "supabase/migrations/20260403104948_penny_repair_tables.sql",
+      "supabase/migrations/20260407210000_findings_index_repair_jobs_grants.sql",
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/package.json"
+    ],
+    "stop_conditions_hit": [
+      "Completed scan of declared hot paths and artifacts present in audits/artifacts/_run_; bundle-stats artifact absent."
+    ]
+  },
+  "coverage": {
+    "hot_paths_reviewed": [
+      "apps/dashboard/lib/",
+      "apps/worker/src/",
+      "services/repair/repair_engine/ (no DB/query matches in Python scan)",
+      "turbo.json",
+      "package.json"
+    ],
+    "artifacts": {
+      "build_txt": "audits/artifacts/_run_/build.txt",
+      "bundle_stats_txt": null,
+      "build_highlights": {
+        "turbo_time_s": 13.212,
+        "dashboard_compile_s": 5.1,
+        "dashboard_typescript_s": 4.6,
+        "static_pages": 35,
+        "remote_caching": "disabled"
+      }
+    },
+    "gaps": [
+      "No bundle-stats.txt or analyzer output in audits/artifacts/_run_; client bundle size breakdown not verified.",
+      "No EXPLAIN ANALYZE against a live database (per audit rules)."
+    ]
+  },
+  "findings": [
+    {
+      "id": "f-6da7f951",
+      "title": "Linear sync-all issues one INSERT per finding and leaves batch upsert dead",
+      "summary": "POST /api/bulk-operations/linear-sync-all runs Promise.all of per-finding INSERTs per project while allProjectNames/allFindingIds stay empty, so the UNNEST batch block never runs. Large portfolios can stress the pool with many round-trips.",
+      "category": "db",
+      "severity": "major",
+      "priority": "P1",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+          "line_start": 59,
+          "line_end": 91
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+          "line_start": 101,
+          "line_end": 112
+        }
+      ]
+    },
+    {
+      "id": "f-a0973cda",
+      "title": "Repair job list queries use SELECT *",
+      "summary": "Postgres helpers select all columns from penny_repair_jobs. Payload-heavy jsonb columns inflate memory and network when only a subset is needed for list UIs.",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/maintenance-store.ts",
+          "line_start": 57,
+          "line_end": 65
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/maintenance-store.ts",
+          "line_start": 129,
+          "line_end": 137
+        }
+      ]
+    },
+    {
+      "id": "f-4e0bb50c",
+      "title": "Orchestration audit lists use SELECT * on job and run tables",
+      "summary": "listRecentAuditJobs, listRecentAuditRuns, and project-scoped variants fetch full rows. Consider explicit column lists aligned to rowJob/rowRun mappers to reduce I/O as payload columns grow.",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/orchestration-jobs.ts",
+          "line_start": 222,
+          "line_end": 281
+        }
+      ]
+    },
+    {
+      "id": "f-2b5f4082",
+      "title": "loadProject and saveProject pay an identity-resolution query before the main read/write",
+      "summary": "resolveCanonicalProjectIdentity runs a regexp-heavy WHERE on penny_projects before SELECT project_json or UPSERT. Each load/save does at least two database round-trips.",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "medium",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 18,
+          "line_end": 60
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 213,
+          "line_end": 272
+        },
+        {
+          "hook_type": "query",
+          "note": "Run EXPLAIN (ANALYZE, BUFFERS) on resolveCanonicalProjectIdentity's SELECT with production-like row counts and typical name/repo parameters; do not guess plan shape."
+        }
+      ]
+    },
+    {
+      "id": "f-bb4b525e",
+      "title": "Worker pg Pool max may cap concurrent DB work",
+      "summary": "createPool sets max: 5. Under parallel portfolio work or many concurrent claim/complete paths, queueing may add latency; validate against expected job concurrency.",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P3",
+      "type": "question",
+      "status": "open",
+      "confidence": "speculation",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 95,
+          "line_end": 99
+        }
+      ]
+    },
+    {
+      "id": "f-42b6aa3d",
+      "title": "Intelligence audit uses one wide LLM pass over full anchor context",
+      "summary": "intelligence runs buildIntelligenceContext and a single auditWithLane before domain passes. Cost and latency scale with repository size and prompt length; monitor token metrics already partially logged.",
+      "category": "llm_cost",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "large",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/process-job.ts",
+          "line_start": 1203,
+          "line_end": 1233
+        }
+      ]
+    },
+    {
+      "id": "f-75f94008",
+      "title": "Turbo remote caching disabled in recorded build",
+      "summary": "build.txt shows Remote caching disabled, increasing repeated CI or local build wall time versus a cache-enabled pipeline.",
+      "category": "ci",
+      "severity": "nit",
+      "priority": "P3",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "file_path": "audits/artifacts/_run_/build.txt",
+          "line_start": 8,
+          "line_end": 8
+        },
+        {
+          "hook_type": "command",
+          "text": "pnpm run build"
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 0, "major": 1, "minor": 5, "nit": 1 },
+    "by_category": { "db": 5, "llm_cost": 1, "ci": 1 },
+    "by_type": { "bug": 0, "enhancement": 1, "debt": 5, "question": 1 },
+    "by_status": { "open": 7 }
+  },
+  "next_actions": [
+    "Refactor linear-sync-all to populate arrays and use one batched UNNEST upsert (or COPY) per request, and remove redundant per-finding Promise.all.",
+    "Add webpack-bundle-analyzer or @next/bundle-analyzer output to audits/artifacts for numeric client chunk sizes.",
+    "Run EXPLAIN (ANALYZE, BUFFERS) on hot list queries and resolveCanonicalProjectIdentity against production-scale data.",
+    "Narrow SELECT lists in maintenance-store and orchestration-jobs once column needs are confirmed."
+  ]
+}

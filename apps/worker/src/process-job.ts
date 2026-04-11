@@ -24,7 +24,7 @@ import {
   listAllProjects,
   upsertMaintenanceBacklogFromFindings,
 } from "./db.js";
-import { logAuditMetrics, resolveLLMTier } from "./llm-router.js";
+import { logAuditMetrics, type AuditMetricUsage } from "./llm-router.js";
 import { PennyObservability } from "./observability.js";
 import { getSupabaseClient } from "./supabase-client.js";
 import { getRegistry } from "./providers/registry.js";
@@ -37,6 +37,10 @@ import {
 } from "./manifest.js";
 import { getRepairClient, type RepairJobRequest } from "./repair-client.js";
 import { downloadRepoTarball, isGitHubAppConfigured } from "./github-app.js";
+import {
+  resolvePassConcurrency,
+  resolvePortfolioProjectConcurrency,
+} from "./concurrency-config.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const promptFileCache = new Map<string, string>();
@@ -241,12 +245,6 @@ Use \\n for newlines inside the "description" string. Do not include any text ou
   return { core, auditAgent };
 }
 
-/** @deprecated Use loadClusterPrompts() */
-function loadPrompts(): { core: string; auditAgent: string } {
-  return loadClusterPrompts("full");
-}
-
-
 /**
  * Run an array of async tasks with a maximum concurrency limit.
  * Preserves input order in the returned results array.
@@ -276,26 +274,8 @@ async function runWithConcurrency<T>(
   return results;
 }
 
-const DEFAULT_PASS_CONCURRENCY = 2;
 const DEFAULT_MAX_PROJECT_LLM_COST_USD = 0.5;
 const DEFAULT_MAX_PROJECT_LLM_FALLBACK_CALLS = 24;
-
-function resolvePassConcurrency(): number {
-  const raw = process.env.penny_PASS_CONCURRENCY?.trim();
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PASS_CONCURRENCY;
-  return Math.min(parsed, 10);
-}
-
-const DEFAULT_PORTFOLIO_PROJECT_CONCURRENCY = 1;
-
-/** When a job audits multiple projects, run up to N in parallel (bounded LLM/IO). Default 1 preserves prior ordering and global metrics. */
-function resolvePortfolioProjectConcurrency(): number {
-  const raw = process.env.penny_PORTFOLIO_PROJECT_CONCURRENCY?.trim();
-  const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-  if (!Number.isFinite(parsed) || parsed < 1) return DEFAULT_PORTFOLIO_PROJECT_CONCURRENCY;
-  return Math.min(parsed, 8);
-}
 
 type PortfolioProjectJobMetricsSlice = {
   total_llm_cost_usd: number;
@@ -665,29 +645,6 @@ function normalizeScopePaths(
   }
   const resolved = resolveScopePathsFromManifest(manifest, scope);
   return resolved.length > 0 ? resolved : manifest.modules.map((mod) => mod.path);
-}
-
-/**
- * Determine optimal exhaustiveness based on finding accumulation.
- * If findings are accumulating too fast (coverage_complete=false) and we're
- * doing a full rebuild, use sampled mode to reduce noise.
- */
-function selectExhaustiveness(
-  manifestReused: boolean,
-  existingFindingsCount: number,
-  previouslyRebuilt: boolean
-): "exhaustive" | "sampled" {
-  // If manifest was reused, keep exhaustive
-  if (manifestReused) return "exhaustive";
-
-  // If we have many findings AND this would be a full rebuild, use sampled mode
-  // to avoid duplicate noise from re-checking everything
-  if (existingFindingsCount > 5 && !previouslyRebuilt) {
-    return "sampled";
-  }
-
-  // Otherwise use exhaustive for complete coverage
-  return "exhaustive";
 }
 
 function buildDomainPasses(
@@ -1205,6 +1162,9 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
         // architecture (package.json, README, schema, entry points, Dockerfiles,
         // CI config) — not 8-file domain slices. We bypass buildDomainPasses
         // entirely and run one LLM call over the curated anchor context.
+        // Cost/latency scale with repo size; token and spend are tracked below
+        // (prompt_context_chars, logAuditMetrics, PennyObservability). A future
+        // multi-stage or capped-context design would be an explicit product change.
         if (auditKindStr === "intelligence") {
           // execution.repoRoot is already the project-specific directory (resolved
           // from PORTFOLIO_SCAN_DIRS or localPath). scanRoots are relative to the
@@ -1256,16 +1216,17 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           // Log model usage to Supabase for cost tracking
           const supabaseClient = getSupabaseClient();
           if (supabaseClient) {
+            const intelligenceUsage: AuditMetricUsage = {
+              model: llm.model ?? "unknown",
+              inputTokens: llm.inputTokens ?? 0,
+              outputTokens: llm.outputTokens ?? 0,
+              latency_ms: llm.latency_ms ?? 0,
+            };
             await logAuditMetrics(
               supabaseClient,
               job.id,
               "intelligence",
-              {
-                model: llm.model,
-                inputTokens: llm.inputTokens ?? 0,
-                outputTokens: llm.outputTokens ?? 0,
-                latency_ms: llm.latency_ms ?? 0,
-              } as any // AuditLlmResult-like object for cost calculation
+              intelligenceUsage
             );
           }
 
@@ -1399,16 +1360,17 @@ export async function processJob(pool: pg.Pool, dbJobId: string): Promise<void> 
           // Log model usage to Supabase for cost tracking
           const supabaseClient = getSupabaseClient();
           if (supabaseClient) {
+            const passUsage: AuditMetricUsage = {
+              model: llm.model ?? "unknown",
+              inputTokens: llm.inputTokens ?? 0,
+              outputTokens: llm.outputTokens ?? 0,
+              latency_ms: llm.latency_ms ?? 0,
+            };
             await logAuditMetrics(
               supabaseClient,
               job.id,
               auditKindStr || "full",
-              {
-                model: llm.model,
-                inputTokens: llm.inputTokens ?? 0,
-                outputTokens: llm.outputTokens ?? 0,
-                latency_ms: llm.latency_ms ?? 0,
-              } as any // AuditLlmResult-like object for cost calculation
+              passUsage
             );
           }
 
@@ -1904,7 +1866,14 @@ async function runClusterSynthesize(
     synthesisText = `Synthesis failed: ${synthErr instanceof Error ? synthErr.message : String(synthErr)}`;
   }
 
-  const summaries = (project as any).clusterSummaries || {};
+  const pr = project as Record<string, unknown>;
+  const rawSummaries = pr.clusterSummaries;
+  const summaries =
+    rawSummaries &&
+    typeof rawSummaries === "object" &&
+    !Array.isArray(rawSummaries)
+      ? { ...(rawSummaries as Record<string, unknown>) }
+      : {};
   summaries[cluster] = {
     cluster,
     project: project.name,
@@ -1918,7 +1887,7 @@ async function runClusterSynthesize(
   await saveProject(pool, {
     ...project,
     clusterSummaries: summaries,
-  } as any);
+  } as Record<string, unknown> & { name: string; findings: unknown[] });
 
   await completeJob(pool, job.id, null, {
     job_type: job.job_type,
@@ -1933,7 +1902,7 @@ async function runMetaSynthesize(
   pool: pg.Pool,
   job: { id: string; job_type: string; project_name: string | null },
   core: string,
-  auditAgent: string
+  _auditAgent: string
 ): Promise<void> {
   if (!job.project_name) throw new Error("meta_synthesize requires a project_name");
   const allProjects = await listAllProjects(pool);
@@ -1941,12 +1910,21 @@ async function runMetaSynthesize(
   if (projects.length === 0) throw new Error("Project not found");
   
   const project = projects[0];
-  const summaries = (project as any).clusterSummaries || {};
+  const pr = project as Record<string, unknown>;
+  const rawSummaries = pr.clusterSummaries;
+  const summaries =
+    rawSummaries &&
+    typeof rawSummaries === "object" &&
+    !Array.isArray(rawSummaries)
+      ? (rawSummaries as Record<string, Record<string, unknown>>)
+      : {};
   const clustersRun = Object.keys(summaries);
   
   const blobData = clustersRun.map((c) => {
     const s = summaries[c];
-    return `Cluster: ${c}\nScore: ${s.score ?? "?"}\nSummary: ${s.synthesisText}\nTop Findings: ${s.topFindings.join(", ")}`;
+    const topRaw = s.topFindings;
+    const topJoined = Array.isArray(topRaw) ? topRaw.join(", ") : String(topRaw ?? "");
+    return `Cluster: ${c}\nScore: ${s.score ?? "?"}\nSummary: ${String(s.synthesisText ?? "")}\nTop Findings: ${topJoined}`;
   }).join("\n\n");
   
   const blob = blobData || "No cluster summaries available.";
@@ -1999,7 +1977,7 @@ async function runMetaSynthesize(
   await saveProject(pool, {
     ...project,
     metaSummary,
-  } as any);
+  } as Record<string, unknown> & { name: string; findings: unknown[] });
 
   await completeJob(pool, job.id, null, {
     job_type: job.job_type,
@@ -2014,18 +1992,26 @@ async function runPortfolioSynthesize(
   pool: pg.Pool,
   job: { id: string; job_type: string; project_name: string | null },
   core: string,
-  auditAgent: string
+  _auditAgent: string
 ): Promise<void> {
   const allProjects = await listAllProjects(pool);
   
   const blobData = allProjects.map((p) => {
-    const meta = (p as any).metaSummary;
+    const meta = (p as Record<string, unknown>).metaSummary as
+      | Record<string, unknown>
+      | undefined;
     if (!meta) return `Project: ${p.name}\nNo meta summary available.`;
+    const cr = meta.clustersRun;
+    const clustersStr = Array.isArray(cr) ? cr.join(", ") : String(cr ?? "none");
+    const p0 = meta.crossClusterP0s;
+    const p0Str = Array.isArray(p0) ? p0.join("; ") : String(p0 ?? "none");
+    const t5 = meta.todaysTop5;
+    const t5Str = Array.isArray(t5) ? t5.join("; ") : String(t5 ?? "none");
     return `Project: ${p.name}
-Clusters Run: ${meta.clustersRun?.join(", ") ?? "none"}
-Cross-cluster P0s: ${meta.crossClusterP0s?.join("; ") ?? "none"}
-Today's Top 5: ${meta.todaysTop5?.join("; ") ?? "none"}
-Narrative: ${meta.narrativeSummary}`;
+Clusters Run: ${clustersStr}
+Cross-cluster P0s: ${p0Str}
+Today's Top 5: ${t5Str}
+Narrative: ${String(meta.narrativeSummary ?? "")}`;
   }).join("\n\n---\n\n");
   
   const blob = blobData || "No projects found.";
@@ -2083,7 +2069,7 @@ async function runSynthesize(
   pool: pg.Pool,
   job: { id: string; job_type: string; project_name: string | null },
   core: string,
-  auditAgent: string
+  _auditAgent: string
 ): Promise<void> {
   const allProjects = await listAllProjects(pool);
   // When a project_name is set, scope the synthesis to that project only

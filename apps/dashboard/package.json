@@ -6,7 +6,7 @@
     "dev": "node ./scripts/next-with-env.cjs dev",
     "build": "node ./scripts/next-with-env.cjs build",
     "start": "node ./scripts/next-with-env.cjs start",
-    "lint": "eslint app components lib hooks --ext .ts,.tsx",
+    "lint": "eslint app components lib hooks --ext .ts,.tsx --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest --watch=false",
     "test:watch": "vitest",

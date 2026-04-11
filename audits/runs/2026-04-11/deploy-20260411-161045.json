@@ -1,0 +1,211 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "deploy",
+  "run_id": "deploy-20260411-161045",
+  "run_metadata": {
+    "timestamp": "2026-04-11T16:10:45Z",
+    "branch": "main",
+    "commit": "c73f17b",
+    "environment": "local",
+    "tool_platform": "cursor",
+    "model": "agent",
+    "preflight_artifacts": {
+      "lint_output": "audits/artifacts/_run_/lint.txt",
+      "build_output": "audits/artifacts/_run_/build.txt"
+    }
+  },
+  "agent": {
+    "name": "build-deploy-auditor",
+    "role": "Assess build config, CI/CD, env management, error boundaries, and deployment safety for Penny.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "audits/artifacts/_run_/build.txt",
+      "audits/artifacts/_run_/lint.txt",
+      ".github/workflows/ci.yml",
+      "netlify.toml",
+      "apps/dashboard/next.config.ts",
+      "apps/dashboard/app/error.tsx",
+      "apps/dashboard/app/global-error.tsx",
+      "apps/dashboard/tsconfig.json",
+      "apps/worker/tsconfig.json",
+      ".env.example",
+      "pnpm-lock.yaml",
+      "services/repair/Dockerfile",
+      "services/repair/railway.toml",
+      "apps/dashboard/netlify/functions/enqueue-weekly-audit.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      ".github/workflows/ci.yml",
+      "netlify.toml",
+      "apps/dashboard/next.config.ts",
+      "package.json",
+      "pnpm-lock.yaml",
+      ".env.example",
+      "apps/dashboard/app/error.tsx",
+      "apps/dashboard/app/global-error.tsx",
+      "services/repair/Dockerfile",
+      "services/repair/railway.toml",
+      "audits/artifacts/_run_/build.txt",
+      "audits/artifacts/_run_/lint.txt"
+    ],
+    "files_skipped": [
+      "Full grep for empty catch bodies across non-app vendored trees (scoped to apps/; none found)."
+    ],
+    "coverage_complete": true
+  },
+  "findings": [
+    {
+      "finding_id": "f-c83198bb",
+      "type": "debt",
+      "category": "ci-coverage-gap",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "CI does not build or test the Python repair service",
+      "description": "GitHub Actions runs `pnpm lint`, `typecheck`, `test`, and `build` for the pnpm/Turbo workspaces only. `services/repair` is deployed via Docker on Railway (`services/repair/railway.toml`, `services/repair/Dockerfile`) but has no CI step to `docker build` or run Python tests. Broken `requirements.txt` or Dockerfile changes can reach production without failing PR checks.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "CI job only runs pnpm commands; no repair service step.",
+          "file": ".github/workflows/ci.yml",
+          "symbol": "checks",
+          "start_line": 24,
+          "end_line": 37
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Repair image built from Dockerfile on Railway.",
+          "file": "services/repair/railway.toml",
+          "symbol": "build",
+          "start_line": 1,
+          "end_line": 4
+        }
+      ],
+      "impact": "Regressions in the repair API image or dependencies may ship undetected until deploy or runtime failure.",
+      "suggested_fix": {
+        "approach": "Add a CI job (or step) that builds `services/repair` with Docker and optionally runs `pytest` or `python -m compileall` if tests exist.",
+        "affected_files": [".github/workflows/ci.yml", "services/repair/Dockerfile"],
+        "estimated_effort": "small",
+        "tests_needed": ["CI green on a PR that only touches services/repair/"]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Compared Turbo package list in build.txt with CI scope."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-41230594",
+      "type": "debt",
+      "category": "lint-quality",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Lint reports many warnings while CI still passes",
+      "description": "Latest captured `pnpm lint` output shows 17 worker warnings and 19 dashboard warnings (unused symbols, `no-explicit-any`, hooks deps). ESLint exits zero on warnings, so CI does not block merges on this debt.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "Lint log shows 17 + 19 problems, all warnings.",
+          "file": "audits/artifacts/_run_/lint.txt"
+        },
+        {
+          "hook_type": "command",
+          "summary": "CI runs lint without `--max-warnings 0`.",
+          "command": "pnpm lint",
+          "expected": "Optional: fail on warnings if policy requires",
+          "actual": "Exit 0 with warnings (typical ESLint default)"
+        }
+      ],
+      "impact": "Unused code and `any` types accumulate; harder refactors and more runtime risk in hot paths over time.",
+      "suggested_fix": {
+        "approach": "Triage warnings, fix or prefix unused bindings with `_`, replace `any` incrementally; optionally add `--max-warnings 0` to lint scripts or CI once the backlog is cleared.",
+        "affected_files": ["apps/worker/src/process-job.ts", "apps/dashboard/package.json"],
+        "estimated_effort": "medium",
+        "risk_notes": "Turning warnings into errors will fail CI until the backlog is addressed."
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Evidence from audits/artifacts/_run_/lint.txt"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c91e4a62",
+      "type": "enhancement",
+      "category": "env-validation",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "title": "No single startup validation for all required environment variables",
+      "description": "`.env.example` documents many variables. Some paths validate configuration when used (for example `readDatabaseConfig` in `lib/postgres.ts`, and `proxy.ts` guards API auth), but there is no one central schema (for example Zod or explicit checks at process start) that fails fast in every deploy context if critical vars are missing or malformed.",
+      "proof_hooks": [
+        {
+          "hook_type": "config_key",
+          "summary": ".env.example lists many vars; validation is distributed.",
+          "file": ".env.example",
+          "summary": "Large template without a single validating entrypoint."
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Middleware returns 503 when secrets missing only for protected API paths logic.",
+          "file": "apps/dashboard/proxy.ts",
+          "symbol": "proxy",
+          "start_line": 109,
+          "end_line": 131
+        }
+      ],
+      "impact": "Misconfigured production deploys may partially work or fail late on specific routes instead of at boot with a clear list of missing keys.",
+      "suggested_fix": {
+        "approach": "Add a small env schema module validated once when the server starts (or in `instrumentation.ts` if used), listing required vars per deployment profile.",
+        "affected_files": ["apps/dashboard/lib/env.ts", "apps/worker/src/index.ts"],
+        "estimated_effort": "medium",
+        "tests_needed": ["Unit test: missing required env produces deterministic startup error"]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Inferred from distributed validation vs centralized schema."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 0, "major": 0, "minor": 3, "nit": 0 },
+    "by_category": { "ci-coverage-gap": 1, "lint-quality": 1, "env-validation": 1 },
+    "by_type": { "bug": 0, "enhancement": 1, "debt": 2, "question": 0 },
+    "by_status": { "open": 3 }
+  },
+  "next_actions": [
+    {
+      "action": "Add a Docker build (and optional Python test) step for services/repair in CI.",
+      "finding_id": "f-c83198bb",
+      "rationale": "Closes the largest gap between what ships to Railway and what CI verifies."
+    },
+    {
+      "action": "Introduce centralized env validation for dashboard and worker, aligned with .env.example.",
+      "finding_id": "f-c91e4a62",
+      "rationale": "Reduces misconfiguration surprises in production."
+    },
+    {
+      "action": "Drive lint warnings to zero or enforce --max-warnings 0 after cleanup.",
+      "finding_id": "f-41230594",
+      "rationale": "Keeps CI signal meaningful for TypeScript hygiene."
+    }
+  ]
+}

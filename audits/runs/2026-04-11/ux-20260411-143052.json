@@ -1,0 +1,255 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "ux",
+  "run_id": "ux-20260411-143052",
+  "agent": {
+    "name": "ux-flow-auditor",
+    "role": "UX flow, copy consistency, states, navigation, and accessibility auditor for Penny dashboard",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "audits/artifacts/_run_/build.txt",
+      "audits/findings/TEMPLATE.md (history template only)",
+      "apps/dashboard/app/**/*.tsx (pages, error boundaries)",
+      "apps/dashboard/components/{Shell,DashboardRouteShell,AppReadinessUI,ProjectPageClient,EngineView,JobQueueView,page.tsx}.tsx or related"
+    ],
+    "stop_conditions_hit": [
+      "Mapped primary UI routes /, /projects/[name], /repairs, /activity",
+      "Copy issue count under 20; coverage_complete set true",
+      "No duplicate findings in audits/open_findings.json (empty)"
+    ]
+  },
+  "coverage": {
+    "routes_reviewed": ["/", "/projects/[name]", "/repairs", "/activity", "/_not-found (default Next.js)"],
+    "surfaces_reviewed": ["apps/dashboard/app/", "apps/dashboard/components/", "apps/dashboard/hooks/"],
+    "build_warnings_ui": "none in build.txt (dashboard build succeeded)",
+    "coverage_complete": true,
+    "notes": "No apps/dashboard/app/loading.tsx; client-heavy pages use in-component loading (e.g. PageLoadingSkeleton, EngineView local state)."
+  },
+  "findings": [
+    {
+      "id": "f-614d997a",
+      "title": "RetryableError heading says portfolio on project detail load failure",
+      "category": "ux-copy",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "bug",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "description": "ProjectPageClient uses RetryableError with a project-specific hint, but the component hard-codes the H1 as Could not load portfolio, which mislabels the context when the user is on /projects/[name].",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/AppReadinessUI.tsx",
+          "symbol": "RetryableError",
+          "start_line": 93,
+          "end_line": 144
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/ProjectPageClient.tsx",
+          "symbol": "ProjectPageClient",
+          "start_line": 201,
+          "end_line": 213
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/projects/<name> (after auth, when fetch fails with empty projects)"
+        }
+      ]
+    },
+    {
+      "id": "f-525cd915",
+      "title": "No custom not-found page in app directory",
+      "category": "ux-routes",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "description": "apps/dashboard has no not-found.tsx; unknown URLs fall back to the default Next.js 404 without Penny navigation or voice-aligned copy.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "value": "glob: apps/dashboard/**/not-found.tsx → 0 files"
+        },
+        {
+          "hook_type": "artifact_ref",
+          "value": "build.txt route list includes /_not-found (framework default)"
+        }
+      ]
+    },
+    {
+      "id": "f-95c0cbf2",
+      "title": "No route-level loading.tsx for dashboard segments",
+      "category": "ux-loading",
+      "severity": "minor",
+      "priority": "P3",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "small",
+      "description": "There is no loading.tsx under apps/dashboard/app; first navigation relies on client bundles and per-page skeletons. Adding segment loading UI could improve perceived performance and consistency across routes.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "value": "glob: apps/dashboard/**/loading.tsx → 0 files"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/page.tsx",
+          "symbol": "Home",
+          "start_line": 233,
+          "end_line": 238
+        }
+      ]
+    },
+    {
+      "id": "f-e07e7ea6",
+      "title": "Document product voice and tone for Penny UI",
+      "category": "ux-voice",
+      "severity": "minor",
+      "priority": "P3",
+      "type": "question",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "medium",
+      "description": "UI_COPY centralizes many strings, but there is no single documented voice (e.g. formal vs conversational, when to use title case in section labels, monospace vs sans for body). A short voice doc would reduce drift as new surfaces ship.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/ui-copy.ts",
+          "symbol": "UI_COPY",
+          "start_line": 1,
+          "end_line": 40
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/layout.tsx",
+          "symbol": "metadata",
+          "start_line": 8,
+          "end_line": 14
+        }
+      ]
+    },
+    {
+      "id": "f-e1eefd4f",
+      "title": "Project-not-found eyebrow uses lowercase project",
+      "category": "ux-copy",
+      "severity": "nit",
+      "priority": "P3",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "description": "ProjectMissingState uses an uppercase-styled eyebrow with the literal project while other screens use labels like Portfolio or Engine (title-style). Align casing or use a shared pattern.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/ProjectPageClient.tsx",
+          "symbol": "ProjectMissingState",
+          "start_line": 31,
+          "end_line": 42
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/projects/<missing-name>"
+        }
+      ]
+    },
+    {
+      "id": "f-e417cf52",
+      "title": "Repairs engine initial load is plain loading text",
+      "category": "ux-loading",
+      "severity": "minor",
+      "priority": "P3",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "description": "EngineView shows a minimal loading… span while other views use PageLoadingSkeleton or richer layout placeholders, causing inconsistent perceived polish on /repairs.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/EngineView.tsx",
+          "symbol": "EngineView",
+          "start_line": 163,
+          "end_line": 168
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/repairs"
+        }
+      ]
+    },
+    {
+      "id": "f-ee1e10da",
+      "title": "Empty routing table message uses informal lowercase",
+      "category": "ux-copy",
+      "severity": "nit",
+      "priority": "P3",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "trivial",
+      "description": "When routes are empty and there is no error, the UI shows no routing config found without sentence case or terminal punctuation, unlike surrounding copy.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/EngineView.tsx",
+          "symbol": "EngineView",
+          "start_line": 310,
+          "end_line": 340
+        }
+      ]
+    },
+    {
+      "id": "f-3bbfbe6f",
+      "title": "Segment error UI drops app chrome (sidebar)",
+      "category": "ux-error",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "enhancement",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "medium",
+      "description": "app/error.tsx renders a standalone layout without Shell, so recoverable errors in nested routes remove navigation until the user follows Portfolio. Consider nested error boundaries or wrapping error UI with shell for wayfinding.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/error.tsx",
+          "symbol": "Error",
+          "start_line": 19,
+          "end_line": 52
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/Shell.tsx",
+          "symbol": "Shell",
+          "start_line": 371,
+          "end_line": 382
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 0, "major": 0, "minor": 5, "nit": 2 },
+    "by_category": {
+      "ux-copy": 2,
+      "ux-routes": 1,
+      "ux-loading": 2,
+      "ux-voice": 1,
+      "ux-error": 1
+    },
+    "by_type": { "bug": 1, "enhancement": 3, "debt": 3, "question": 1 },
+    "by_status": { "open": 8 }
+  },
+  "next_actions": [
+    "Parameterize RetryableError title (or add variant) so project fetch failures do not say portfolio.",
+    "Add apps/dashboard/app/not-found.tsx with Shell and return links to Portfolio, Repairs, and Activity.",
+    "Align EngineView loading state with PageLoadingSkeleton or a small engine-specific skeleton.",
+    "Optionally add nested error.tsx under route groups if preserving sidebar on errors becomes a priority."
+  ]
+}

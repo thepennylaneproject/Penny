@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase";
+import { requireTenantSupabaseClient } from "@/lib/supabase-request";
 import { resolveRepairJobByPublicId } from "@/lib/repair-jobs";
 
 type Params = { params: Promise<{ jobId: string }> };
@@ -8,10 +8,9 @@ export async function GET(
   request: NextRequest,
   { params }: Params
 ) {
-  const supabase = createSupabaseServerClient();
-  if (!supabase) {
-    return NextResponse.json({ error: "Supabase not configured" }, { status: 503 });
-  }
+  const gate = await requireTenantSupabaseClient(request);
+  if (!gate.ok) return gate.response;
+  const supabase = gate.client;
   try {
     const { jobId } = await params;
     const resolved = await resolveRepairJobByPublicId(supabase, jobId);

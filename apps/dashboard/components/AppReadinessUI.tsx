@@ -91,55 +91,53 @@ export function ConfigurationError({
 }
 
 export function RetryableError({
+  title = "Could not load portfolio",
   message,
   hint,
   onRetry,
 }: {
+  title?: string;
   message: string;
   hint?: string;
   onRetry: () => void;
 }) {
   return (
-    <DashboardRouteShell activeView="portfolio">
-      <div style={{ maxWidth: "440px" }}>
-        <div
-          style={{
-            fontSize: "9px",
-            letterSpacing: "0.1em",
-            textTransform: "uppercase",
-            color: "var(--ink-text-4)",
-            marginBottom: "0.5rem",
-          }}
-        >
-          Error
-        </div>
-        <h1 style={{ fontSize: "15px", fontWeight: 500, margin: "0 0 0.75rem" }}>
-          Could not load portfolio
-        </h1>
-        <p style={{ fontSize: "12px", color: "var(--ink-text-3)", lineHeight: 1.55, marginBottom: "1rem" }}>
-          {message}
-        </p>
-        {hint && (
-          <p style={{ fontSize: "12px", color: "var(--ink-text-4)", marginBottom: "1rem" }}>
-            {hint}
-          </p>
-        )}
-        <button
-          type="button"
-          onClick={onRetry}
-          style={{
-            padding: "6px 14px",
-            fontSize: "12px",
-            backgroundColor: "var(--ink-button-bg)",
-            color: "var(--ink-button-text)",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          Try again
-        </button>
+    <div style={{ maxWidth: "440px" }}>
+      <div
+        style={{
+          fontSize: "9px",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "var(--ink-text-4)",
+          marginBottom: "0.5rem",
+        }}
+      >
+        Error
       </div>
-    </DashboardRouteShell>
+      <h1 style={{ fontSize: "15px", fontWeight: 500, margin: "0 0 0.75rem" }}>{title}</h1>
+      <p style={{ fontSize: "12px", color: "var(--ink-text-3)", lineHeight: 1.55, marginBottom: "1rem" }}>
+        {message}
+      </p>
+      {hint && (
+        <p style={{ fontSize: "12px", color: "var(--ink-text-4)", marginBottom: "1rem" }}>
+          {hint}
+        </p>
+      )}
+      <button
+        type="button"
+        onClick={onRetry}
+        style={{
+          padding: "6px 14px",
+          fontSize: "12px",
+          backgroundColor: "var(--ink-button-bg)",
+          color: "var(--ink-button-text)",
+          border: "none",
+          borderRadius: "4px",
+          cursor: "pointer",
+        }}
+      >
+        Try again
+      </button>
+    </div>
   );
 }

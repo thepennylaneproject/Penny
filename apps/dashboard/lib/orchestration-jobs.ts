@@ -107,6 +107,14 @@ function rowJob(r: Record<string, unknown>): pennyAuditJobRow {
   };
 }
 
+/** Aligned to {@link rowJob} — avoids SELECT * when new columns are added. */
+const PENNY_AUDIT_JOBS_COLUMNS =
+  "id, job_type, project_name, repository_url, manifest_revision, checklist_id, repo_ref, status, payload, error, created_at, started_at, finished_at";
+
+/** Aligned to {@link rowRun}. */
+const PENNY_AUDIT_RUNS_COLUMNS =
+  "id, job_id, job_type, project_name, status, summary, findings_added, manifest_revision, checklist_id, coverage_complete, completion_confidence, exhaustiveness, payload, created_at";
+
 function rowRun(r: Record<string, unknown>): pennyAuditRunRow {
   return {
     id: String(r.id),
@@ -202,7 +210,7 @@ export async function insertAuditJob(
        payload
      )
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'queued', $8::jsonb)
-     RETURNING *`,
+     RETURNING ${PENNY_AUDIT_JOBS_COLUMNS}`,
     [
       id,
       jobType,
@@ -222,7 +230,7 @@ export async function insertAuditJob(
 export async function listRecentAuditJobs(limit = 25): Promise<pennyAuditJobRow[]> {
   const db = pool();
   const rows = await db.query(
-    `SELECT * FROM penny_audit_jobs ORDER BY created_at DESC LIMIT $1`,
+    `SELECT ${PENNY_AUDIT_JOBS_COLUMNS} FROM penny_audit_jobs ORDER BY created_at DESC LIMIT $1`,
     [limit]
   );
   return rows.map(rowJob);
@@ -231,7 +239,7 @@ export async function listRecentAuditJobs(limit = 25): Promise<pennyAuditJobRow[
 export async function listRecentAuditRuns(limit = 15): Promise<pennyAuditRunRow[]> {
   const db = pool();
   const rows = await db.query(
-    `SELECT * FROM penny_audit_runs ORDER BY created_at DESC LIMIT $1`,
+    `SELECT ${PENNY_AUDIT_RUNS_COLUMNS} FROM penny_audit_runs ORDER BY created_at DESC LIMIT $1`,
     [limit]
   );
   return rows.map(rowRun);
@@ -245,7 +253,7 @@ export async function listAuditRunsForProject(
   const db = pool();
   const projectNameKey = normalizeProjectName(projectName);
   const rows = await db.query(
-    `SELECT * FROM penny_audit_runs
+    `SELECT ${PENNY_AUDIT_RUNS_COLUMNS} FROM penny_audit_runs
      WHERE project_name IS NOT NULL
        AND LOWER(TRIM(project_name)) = $1
      ORDER BY created_at DESC
@@ -263,7 +271,7 @@ export async function listAuditJobsForProject(
   const db = pool();
   const projectNameKey = normalizeProjectName(projectName);
   const rows = await db.query(
-    `SELECT * FROM penny_audit_jobs
+    `SELECT ${PENNY_AUDIT_JOBS_COLUMNS} FROM penny_audit_jobs
      WHERE project_name IS NOT NULL
        AND LOWER(TRIM(project_name)) = $1
      ORDER BY created_at DESC
@@ -275,9 +283,10 @@ export async function listAuditJobsForProject(
 
 export async function getAuditJob(id: string): Promise<pennyAuditJobRow | null> {
   const db = pool();
-  const rows = await db.query(`SELECT * FROM penny_audit_jobs WHERE id = $1`, [
-    id,
-  ]);
+  const rows = await db.query(
+    `SELECT ${PENNY_AUDIT_JOBS_COLUMNS} FROM penny_audit_jobs WHERE id = $1`,
+    [id]
+  );
   return rows[0] ? rowJob(rows[0]) : null;
 }
 
@@ -316,7 +325,7 @@ export async function cancelAuditJob(id: string): Promise<pennyAuditJobRow | nul
     `UPDATE penny_audit_jobs
      SET status = 'failed', finished_at = now(), error = 'Cancelled by operator'
      WHERE id = $1 AND status IN ('queued', 'running')
-     RETURNING *`,
+     RETURNING ${PENNY_AUDIT_JOBS_COLUMNS}`,
     [id]
   );
   return rows.length > 0 ? rowJob(rows[0]) : null;

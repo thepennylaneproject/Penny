@@ -3,7 +3,6 @@
  * Maps audit kinds to providers with per-token cost tracking
  */
 
-import { getRegistry } from './providers/registry.js';
 import { insertModelUsage } from './supabase-client.js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 

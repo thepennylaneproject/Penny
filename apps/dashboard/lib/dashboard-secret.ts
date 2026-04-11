@@ -18,10 +18,8 @@ export function isDashboardApiAuthConfigured(): boolean {
 
 /**
  * When no secret is configured: allow unauthenticated `/api/*` (legacy local DX).
- * In production, false unless penny_ALLOW_OPEN_API is 1/true — otherwise APIs fail closed (503).
+ * In production this is always false — APIs fail closed (503) until secrets are set.
  */
 export function isOpenApiAllowedWithoutSecret(): boolean {
-  const flag = process.env.penny_ALLOW_OPEN_API?.trim().toLowerCase();
-  if (flag === "1" || flag === "true") return true;
   return process.env.NODE_ENV !== "production";
 }

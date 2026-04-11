@@ -35,3 +35,24 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: services/repair/requirements.txt
+
+      - name: Install repair deps, compile, and test
+        working-directory: services/repair
+        run: |
+          pip install --no-cache-dir -r requirements.txt pytest
+          python -m compileall -q api repair_engine
+          pytest repair_engine/tests -q
+
+      - name: Docker build repair service
+        run: docker build -f services/repair/Dockerfile services/repair

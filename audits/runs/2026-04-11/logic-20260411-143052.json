@@ -1,0 +1,346 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "logic",
+  "run_id": "logic-20260411-143052",
+  "run_metadata": {
+    "timestamp": "2026-04-11T14:30:52Z",
+    "branch": "main",
+    "commit": "c73f17b",
+    "environment": "local",
+    "tool_platform": "cursor",
+    "model": "agent",
+    "preflight_artifacts": {
+      "test_output": "audits/artifacts/_run_/tests.txt",
+      "lint_output": "audits/artifacts/_run_/lint.txt",
+      "typecheck_output": "audits/artifacts/_run_/typecheck.txt"
+    },
+    "notes": "open_findings.json empty; no prior findings to dedupe against."
+  },
+  "agent": {
+    "name": "runtime-bug-hunter",
+    "role": "Identifies runtime failures, logic defects, weak error handling, async hazards, and type-safety gaps using artifacts and targeted code review.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "audits/findings/TEMPLATE.md",
+      "audits/artifacts/_run_/tests.txt",
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/typecheck.txt",
+      "audits/schema/audit-output.schema.json",
+      "apps/dashboard/app/api/engine/routing/route.ts",
+      "apps/dashboard/components/ProjectView.tsx",
+      "apps/worker/src/process-job.ts"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": [
+      "audits/artifacts/_run_/tests.txt",
+      "audits/artifacts/_run_/lint.txt",
+      "audits/artifacts/_run_/typecheck.txt",
+      "apps/dashboard/app/api/engine/routing/route.ts",
+      "apps/dashboard/components/ProjectView.tsx",
+      "apps/worker/src/process-job.ts"
+    ],
+    "files_skipped": [
+      "apps/repair-service/** — not sampled for this pass",
+      "services/repair/** — not sampled",
+      "supabase/** — not sampled",
+      "packages/** — not exhaustively reviewed",
+      "remainder of apps/dashboard/** and apps/worker/** — spot-check only"
+    ],
+    "coverage_complete": false,
+    "incomplete_reason": "Reviewed CI artifacts and representative hot paths only; did not exhaustively walk the full monorepo scope listed in agent-logic."
+  },
+  "findings": [
+    {
+      "finding_id": "f-d3d3fdd2",
+      "type": "bug",
+      "category": "error-masking",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "inference",
+      "title": "Routing API returns HTTP 200 with default config when file-backed config throws",
+      "description": "GET /api/engine/routing catches any error from readFileRoutingConfig/buildRoutingConfig, logs it, then responds with NextResponse.json(buildRoutingConfig(), { status: 200 }). Callers and caches see a successful response and cannot distinguish failure from a valid empty/default routing configuration, which can hide misconfiguration or disk/read errors in production.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Catch block returns 200 with default buildRoutingConfig() after logging the error.",
+          "file": "apps/dashboard/app/api/engine/routing/route.ts",
+          "symbol": "GET",
+          "start_line": 4,
+          "end_line": 11
+        }
+      ],
+      "impact": "Operators and UIs may assume routing is valid when the engine is actually using fallbacks after a failed read; debugging production routing issues becomes harder and monitoring based on HTTP status will not fire.",
+      "suggested_fix": {
+        "approach": "On configuration read failure, return 503 or 500 with a structured error body, or include a boolean flag such as ok:false / source:'fallback' in the JSON while still returning a safe default if the product requires a body. Align with other engine routes that surface errors.",
+        "affected_files": ["apps/dashboard/app/api/engine/routing/route.ts"],
+        "estimated_effort": "small",
+        "risk_notes": "Clients that assume 200 always means file-backed config may need to handle new status codes or response fields.",
+        "tests_needed": ["Add route test: mock readFileRoutingConfig to throw; assert status and payload contract."]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Derived from static review of route handler."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-a7a396b7",
+      "type": "debt",
+      "category": "tooling",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Captured typecheck artifact is not a real TypeScript compile",
+      "description": "audits/artifacts/_run_/typecheck.txt contains the npm stub message 'This is not the tsc command you are looking for' instead of tsc --noEmit output. The audit batch therefore has no static type-check signal for this run, so type errors could ship without appearing in artifacts.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "typecheck.txt shows wrong tsc stub; no project typecheck output.",
+          "artifact_path": "audits/artifacts/_run_/typecheck.txt"
+        },
+        {
+          "hook_type": "command",
+          "summary": "Root package.json defines turbo typecheck; artifact capture did not invoke project tsc successfully.",
+          "command": "npm run typecheck (expected: turbo run typecheck / per-package tsc --noEmit)",
+          "expected": "TypeScript compiler diagnostics or empty success from tsc --noEmit",
+          "actual": "Stub message from mistaken global/wrong tsc on PATH"
+        }
+      ],
+      "impact": "Logic and typing regressions in dashboard/worker/packages may go undetected until runtime or a later CI run.",
+      "suggested_fix": {
+        "approach": "Ensure the audit pipeline runs typecheck from repo root with devDependencies (e.g. npx --no-install tsc or turbo run typecheck after npm ci) and fix PATH/npx so the wrong 'tsc' package is never invoked.",
+        "affected_files": ["audits/setup.sh", "package.json"],
+        "estimated_effort": "small",
+        "tests_needed": ["Re-run capture; confirm typecheck.txt contains tsc output or clean exit."]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Evidence from audits/artifacts/_run_/typecheck.txt"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-8d67bd48",
+      "type": "debt",
+      "category": "react-hooks",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Deep-link useEffect omits setFilter from dependency array",
+      "description": "eslint react-hooks/exhaustive-deps flags ProjectView: the effect that auto-selects a finding and calls setFilter('all') lists [initialFindingId, findings] but not setFilter. setFilter is recreated each render (not useCallback), so the effect can theoretically see a stale setter reference in edge cases; aligning with exhaustive-deps reduces subtle React 18 strict-mode or future refactors risk.",
+      "proof_hooks": [
+        {
+          "hook_type": "error_text",
+          "summary": "Lint reported missing dependency setFilter on useEffect in ProjectView.",
+          "error_text": "React Hook useEffect has a missing dependency: 'setFilter'. Either include it or remove the dependency array",
+          "file": "apps/dashboard/components/ProjectView.tsx"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Effect calls setFilter without listing it in deps.",
+          "file": "apps/dashboard/components/ProjectView.tsx",
+          "symbol": "ProjectView",
+          "start_line": 125,
+          "end_line": 136
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "Lint output records warning at ProjectView.tsx line 136.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Low probability of stale filter state when combining deep links with session storage filter changes; mostly maintainability and lint compliance.",
+      "suggested_fix": {
+        "approach": "Wrap setFilter in useCallback with stable deps, or add setFilter to the dependency array per ESLint, and verify deep-link + filter behavior in the UI.",
+        "affected_files": ["apps/dashboard/components/ProjectView.tsx"],
+        "estimated_effort": "trivial",
+        "tests_needed": ["Optional component test: initialFindingId + findings triggers setFilter('all') and selection."]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Matches lint.txt warning for ProjectView.tsx"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-123d7064",
+      "type": "debt",
+      "category": "type-safety",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Worker audit metrics uses explicit any casts around logAuditMetrics",
+      "description": "process-job.ts uses `as any` when passing LLM metric objects to logAuditMetrics (and similar patterns elsewhere per lint). That bypasses compile-time checks: a wrong property name or shape would only fail at runtime or in downstream cost code.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Cast to any for AuditLlmResult-like object passed to logAuditMetrics.",
+          "file": "apps/worker/src/process-job.ts",
+          "symbol": "process-job",
+          "start_line": 1257,
+          "end_line": 1269
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "ESLint reports @typescript-eslint/no-explicit-any at multiple lines in process-job.ts.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Incorrect token or model fields could silently produce wrong cost accounting or failed inserts without a type error at build time.",
+      "suggested_fix": {
+        "approach": "Define a narrow interface matching logAuditMetrics expectations and map llm fields explicitly; remove as any.",
+        "affected_files": ["apps/worker/src/process-job.ts"],
+        "estimated_effort": "small",
+        "tests_needed": ["Unit test or type-only test that metrics object matches logAuditMetrics signature."]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Confirmed from file read and lint.txt any warnings"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c940b282",
+      "type": "debt",
+      "category": "dead-code",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Unused symbols in worker process-job and related modules",
+      "description": "ESLint reports unused imports and locals (e.g. loadPrompts, selectExhaustiveness, resolveLLMTier, unused auditAgent parameters) in apps/worker/src/process-job.ts and other worker files. These increase noise and can hide real mistakes when warnings are ignored.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "lint.txt lists unused vars and any in process-job.ts and peer worker files.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Noise in CI; reviewers may miss new warnings; dead branches may imply incomplete features.",
+      "suggested_fix": {
+        "approach": "Remove or prefix with underscore unused bindings; wire up or delete dead helpers.",
+        "affected_files": [
+          "apps/worker/src/process-job.ts",
+          "apps/worker/src/context.ts",
+          "apps/worker/src/llm-router.ts",
+          "apps/worker/src/repair-client.ts"
+        ],
+        "estimated_effort": "small",
+        "tests_needed": ["npm run lint in apps/worker clean."]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "From lint.txt unused-var warnings"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c8974f96",
+      "type": "question",
+      "category": "api-behavior",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "speculation",
+      "title": "Should engine routing ever succeed with HTTP 200 after a read failure?",
+      "description": "Product intent is unclear: returning 200 with a default routing config may be deliberate so the dashboard never breaks when the file is missing, or it may be accidental. Confirm with owners whether clients should receive an explicit degraded/fallback signal.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Same catch block as f-d3d3fdd2; behavior ambiguity requires product decision.",
+          "file": "apps/dashboard/app/api/engine/routing/route.ts",
+          "symbol": "GET",
+          "start_line": 4,
+          "end_line": 11
+        }
+      ],
+      "impact": "Drives whether f-d3d3fdd2 is a bug or accepted resilience pattern.",
+      "suggested_fix": {
+        "approach": "Document intended contract in code comment or OpenAPI; then either keep 200 with a visible fallback flag or change status codes.",
+        "estimated_effort": "trivial"
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Ambiguous requirement; not a verified runtime failure."
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": {
+      "blocker": 0,
+      "major": 2,
+      "minor": 3,
+      "nit": 1
+    },
+    "by_category": {
+      "error-masking": 1,
+      "tooling": 1,
+      "react-hooks": 1,
+      "type-safety": 1,
+      "dead-code": 1,
+      "api-behavior": 1
+    },
+    "by_type": {
+      "bug": 1,
+      "debt": 4,
+      "enhancement": 0,
+      "question": 1
+    },
+    "by_status": {
+      "open": 6
+    }
+  },
+  "next_actions": [
+    {
+      "action": "Fix audit pipeline so typecheck.txt is produced by real tsc (turbo or package scripts), then re-run logic suite.",
+      "finding_id": "f-a7a396b7",
+      "rationale": "Restores compile-time safety signal for the whole monorepo; current artifact shows no typecheck ran."
+    },
+    {
+      "action": "Decide routing API contract on failure and implement 5xx or explicit fallback metadata; update tests.",
+      "finding_id": "f-d3d3fdd2",
+      "rationale": "Resolves error-masking and unblocks clarifying f-c8974f96."
+    },
+    {
+      "action": "Stabilize ProjectView deep-link effect deps (useCallback or exhaustive deps).",
+      "finding_id": "f-8d67bd48",
+      "rationale": "Clears a real eslint warning and reduces hook hazard surface."
+    },
+    {
+      "action": "Replace as any at logAuditMetrics call sites with typed DTOs.",
+      "finding_id": "f-123d7064",
+      "rationale": "Prevents silent metric shape bugs in cost tracking."
+    },
+    {
+      "action": "Prune unused symbols in worker process-job and related files to reduce lint noise.",
+      "finding_id": "f-c940b282",
+      "rationale": "Makes future lint signal actionable."
+    }
+  ]
+}

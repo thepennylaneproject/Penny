@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import type { Project } from "@/lib/types";
 import { apiFetch } from "@/lib/api-fetch";
-import { DashboardLogin } from "@/components/DashboardLogin";
 import { MetricCard } from "@/components/MetricCard";
 import { EmptyState } from "@/components/EmptyState";
 import { ProjectCard } from "@/components/ProjectCard";
@@ -40,7 +39,6 @@ export default function Home() {
     projectsError,
     hostMisconfigured,
     setHostMisconfigured,
-    loginHint,
     setLoginHint,
     fetchProjects,
   } = usePortfolioProjects();

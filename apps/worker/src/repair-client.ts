@@ -3,8 +3,6 @@
  * Handles repair job submission, status polling, and result retrieval.
  */
 
-import { randomUUID } from "node:crypto";
-
 export interface RepairJobRequest {
   finding: {
     finding_id: string;

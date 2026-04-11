@@ -25,7 +25,10 @@ Usage:
 
 Push is source of truth for mapped issues: each push fetches the issue from Linear and updates
 workflow state when it does not match open_findings (so the map file matching the JSON is not
-enough — Linear must actually be moved to Done / In Progress, etc.).
+enough — Linear must actually be moved to Done / In Progress, etc.). If a mapped issue was
+deleted in Linear, push drops the stale mapping and recreates an issue for that finding.
+Issues moved to Linear trash still resolve by ID with ``trashed: true``; those are treated
+as missing so they are recreated the same way.
 
 Push will not move a Linear issue backward when the issue is already in a state that implies a
 stronger LYRA status than open_findings (e.g. In Review while LYRA still says accepted), unless
@@ -227,18 +230,27 @@ def update_issue_state(issue_id, state_id):
 
 
 def get_issue(issue_id):
-    """Get a Linear issue's current state."""
+    """Get a Linear issue's current state.
+
+    Returns None if the issue does not exist, or if it is in the trash (deleted issues
+    still resolve over the API with trashed=true; we treat those like missing so push
+    can recreate).
+    """
     result = gql("""
         query($issueId: String!) {
             issue(id: $issueId) {
                 id identifier title
+                trashed
                 state { name }
                 priority
                 updatedAt
             }
         }
     """, {"issueId": issue_id})
-    return result.get("data", {}).get("issue")
+    issue = result.get("data", {}).get("issue")
+    if issue and issue.get("trashed"):
+        return None
+    return issue
 
 
 # --- Sync Map ---
@@ -365,74 +377,91 @@ def cmd_push():
             # Also reconcile when linear_sync.json already matches the file but Linear was
             # never updated (avoids pull downgrading fixed_verified -> open on the next sync).
             existing = mappings[fid]
-            if DRY_RUN:
-                if existing.get("lyra_status") != status:
-                    print(f"  Would update: {fid} -> {linear_state_name}")
-                    updated += 1
-                else:
-                    skipped += 1
-                continue
-
             issue = get_issue(existing["linear_id"])
-            current_linear_name = (
-                (issue or {}).get("state") or {}
-            ).get("name", "")
-            map_stale = existing.get("lyra_status") != status
-            linear_out_of_sync = current_linear_name != linear_state_name
 
-            if linear_out_of_sync and state_id:
-                linear_derived = LINEAR_TO_LYRA_STATUS.get(current_linear_name)
-                linear_derived_rank = (
-                    _lyra_rank(linear_derived) if linear_derived is not None else None
-                )
-                finding_rank = _lyra_rank(status)
-                prev_status = existing.get("lyra_status")
-                prev_rank = _lyra_rank(prev_status) if prev_status else None
-                lyra_regressed = (
-                    prev_rank is not None and finding_rank < prev_rank
-                )
-                would_regress_linear = (
-                    linear_derived_rank is not None
-                    and not lyra_regressed
-                    and finding_rank < linear_derived_rank
-                )
-                if would_regress_linear:
-                    implied = linear_derived or "?"
+            # Deleted/restored issues: API returns no issue; drop map entry and recreate below.
+            if not issue:
+                ident = existing.get("identifier", fid)
+                if DRY_RUN:
                     print(
-                        f"  Skipped push (would regress Linear): "
-                        f"{existing.get('identifier', fid)} stays {current_linear_name!r}; "
-                        f"LYRA {status!r} is behind Linear (implies {implied!r}). "
-                        f"Run pull or set LYRA status to match."
+                        f"  Would drop stale mapping and create (Linear issue missing/deleted): "
+                        f"{ident}"
                     )
-                    skipped += 1
-                elif update_issue_state(existing["linear_id"], state_id):
+                    created += 1
+                    continue
+                print(
+                    f"  Stale mapping (issue deleted or missing in Linear): {ident} — recreating."
+                )
+                del mappings[fid]
+                # Fall through to the unmapped create path.
+            else:
+                if DRY_RUN:
+                    if existing.get("lyra_status") != status:
+                        print(f"  Would update: {fid} -> {linear_state_name}")
+                        updated += 1
+                    else:
+                        skipped += 1
+                    continue
+
+                current_linear_name = (
+                    issue.get("state") or {}
+                ).get("name", "")
+                map_stale = existing.get("lyra_status") != status
+                linear_out_of_sync = current_linear_name != linear_state_name
+
+                if linear_out_of_sync and state_id:
+                    linear_derived = LINEAR_TO_LYRA_STATUS.get(current_linear_name)
+                    linear_derived_rank = (
+                        _lyra_rank(linear_derived) if linear_derived is not None else None
+                    )
+                    finding_rank = _lyra_rank(status)
+                    prev_status = existing.get("lyra_status")
+                    prev_rank = _lyra_rank(prev_status) if prev_status else None
+                    lyra_regressed = (
+                        prev_rank is not None and finding_rank < prev_rank
+                    )
+                    would_regress_linear = (
+                        linear_derived_rank is not None
+                        and not lyra_regressed
+                        and finding_rank < linear_derived_rank
+                    )
+                    if would_regress_linear:
+                        implied = linear_derived or "?"
+                        print(
+                            f"  Skipped push (would regress Linear): "
+                            f"{existing.get('identifier', fid)} stays {current_linear_name!r}; "
+                            f"LYRA {status!r} is behind Linear (implies {implied!r}). "
+                            f"Run pull or set LYRA status to match."
+                        )
+                        skipped += 1
+                    elif update_issue_state(existing["linear_id"], state_id):
+                        print(
+                            f"  Updated: {existing.get('identifier', fid)} "
+                            f"{current_linear_name!r} -> {linear_state_name} (LYRA {status})"
+                        )
+                        updated += 1
+                    else:
+                        print(
+                            f"  WARN: Could not set {existing.get('identifier', fid)} "
+                            f"to {linear_state_name}"
+                        )
+                elif linear_out_of_sync and not state_id:
                     print(
-                        f"  Updated: {existing.get('identifier', fid)} "
-                        f"{current_linear_name!r} -> {linear_state_name} (LYRA {status})"
+                        f"  WARN: {fid} should be {linear_state_name!r} in Linear but team has no state "
+                        f"with that name (current: {current_linear_name!r}). Check LYRA_TO_LINEAR_STATUS."
+                    )
+                elif map_stale:
+                    print(
+                        f"  Synced map: {fid} lyra_status -> {status} "
+                        f"(Linear already {current_linear_name!r})"
                     )
                     updated += 1
                 else:
-                    print(
-                        f"  WARN: Could not set {existing.get('identifier', fid)} "
-                        f"to {linear_state_name}"
-                    )
-            elif linear_out_of_sync and not state_id:
-                print(
-                    f"  WARN: {fid} should be {linear_state_name!r} in Linear but team has no state "
-                    f"with that name (current: {current_linear_name!r}). Check LYRA_TO_LINEAR_STATUS."
-                )
-            elif map_stale:
-                print(
-                    f"  Synced map: {fid} lyra_status -> {status} "
-                    f"(Linear already {current_linear_name!r})"
-                )
-                updated += 1
-            else:
-                skipped += 1
+                    skipped += 1
 
-            existing["lyra_status"] = status
-            existing["last_synced"] = NOW
-            continue
+                existing["lyra_status"] = status
+                existing["last_synced"] = NOW
+                continue
 
         # New finding: do not open Linear issues for terminal LYRA statuses
         if status in ("fixed_verified", "wont_fix", "duplicate"):

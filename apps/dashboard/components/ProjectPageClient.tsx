@@ -79,7 +79,6 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     projectsError,
     hostMisconfigured,
     setHostMisconfigured,
-    loginHint,
     setLoginHint,
     fetchProjectByName,
   } = usePortfolioProjects();
@@ -202,6 +201,7 @@ export function ProjectPageClient({ projectName, initialFindingId }: ProjectPage
     return (
       <DashboardRouteShell activeView="portfolio" onAuditSynced={onAuditSynced}>
         <RetryableError
+          title="Could not load project"
           message={projectsError}
           hint="Failed to load this project. Please check your connection and try again."
           onRetry={() => {

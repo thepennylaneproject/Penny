@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { createPostgresPool } from "@/lib/postgres";
-import { markRepairJobRunning } from "@/lib/maintenance-store";
 import { getRepository } from "@/lib/repository-instance";
 import { jobsStoreConfigured } from "@/lib/orchestration-jobs";
 import { apiErrorMessage } from "@/lib/api-error";

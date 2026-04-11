@@ -6,6 +6,7 @@
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { validateRepairServiceBearer } from "./repair-auth.ts";
 
 interface RepairCallbackPayload {
   repair_job_id: string;
@@ -15,6 +16,16 @@ interface RepairCallbackPayload {
   pr_number?: number;
   pr_url?: string;
   error_message?: string;
+}
+
+function bearerTokensEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const bufA = enc.encode(a);
+  const bufB = enc.encode(b);
+  if (bufA.length !== bufB.length) {
+    return false;
+  }
+  return crypto.subtle.timingSafeEqual(bufA, bufB);
 }
 
 export const handler = async (req: Request): Promise<Response> => {
@@ -37,7 +48,7 @@ export const handler = async (req: Request): Promise<Response> => {
     const token = authHeader.substring(7);
     const expectedToken = Deno.env.get("REPAIR_SERVICE_SECRET");
 
-    if (token !== expectedToken) {
+    if (!expectedToken || !bearerTokensEqual(token, expectedToken)) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401,
       });

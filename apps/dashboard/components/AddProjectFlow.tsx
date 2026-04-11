@@ -7,7 +7,7 @@
  * Users select a mode → provide details → confirm → done.
  */
 
-import { useState, useRef, type CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import type { Project } from "@/lib/types";
 import type { ImportSummary } from "@/lib/import-summary";
 import {
@@ -19,9 +19,6 @@ import {
   ONBOARDING_STEP_GUIDANCE,
   validateOnboardingData,
 } from "@/lib/onboarding-machine";
-import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { UI_COPY } from "@/lib/ui-copy";
-
 interface AddProjectFlowProps {
   onImport: (project: Project) => Promise<ImportSummary>;
   onOnboardRepository: (input: {
@@ -88,8 +85,7 @@ export function AddProjectFlow({
   const [error, setError] = useState<string>("");
   const [submitting, setSubmitting] = useState(false);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
-  const [discardOpen, setDiscardOpen] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [, setDiscardOpen] = useState(false);
 
   const isDirty =
     (data.projectName?.trim().length ?? 0) > 0 ||

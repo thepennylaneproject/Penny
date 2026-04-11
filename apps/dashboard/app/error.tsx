@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect } from "react";
-import Link from "next/link";
 import * as Sentry from "@sentry/nextjs";
+import { DashboardRouteShell } from "@/components/DashboardRouteShell";
 
 export default function Error({
   error,
@@ -17,37 +17,50 @@ export default function Error({
   }, [error]);
 
   return (
-    <div
-      style={{
-        minHeight:       "60vh",
-        display:         "flex",
-        flexDirection:   "column",
-        alignItems:      "center",
-        justifyContent:  "center",
-        padding:         "2rem",
-        fontFamily:      "var(--font-mono), ui-monospace, monospace",
-      }}
-    >
-      <h1 style={{ fontSize: "15px", fontWeight: 500, marginBottom: "0.75rem" }}>
-        Something went wrong
-      </h1>
-      <p style={{ fontSize: "12px", color: "var(--ink-text-3)", marginBottom: "1.25rem", maxWidth: "360px", textAlign: "center" }}>
-        {process.env.NODE_ENV === "production"
-          ? "An unexpected error occurred. Please try again or return to the portfolio."
-          : error.message || "An unexpected error occurred."}
-      </p>
-      <div style={{ display: "flex", gap: "0.75rem" }}>
+    <DashboardRouteShell activeView="portfolio">
+      <div style={{ maxWidth: "440px" }}>
+        <div
+          style={{
+            fontSize: "9px",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase",
+            color: "var(--ink-text-4)",
+            marginBottom: "0.5rem",
+          }}
+        >
+          Error
+        </div>
+        <h1 style={{ fontSize: "15px", fontWeight: 500, margin: "0 0 0.75rem" }}>
+          Something went wrong
+        </h1>
+        <p
+          style={{
+            fontSize: "12px",
+            color: "var(--ink-text-3)",
+            lineHeight: 1.55,
+            marginBottom: "1rem",
+          }}
+        >
+          {process.env.NODE_ENV === "production"
+            ? "An unexpected error occurred. Please try again or use the sidebar to return to the portfolio."
+            : error.message || "An unexpected error occurred."}
+        </p>
         <button
           type="button"
           onClick={() => reset()}
-          style={{ fontSize: "12px", padding: "6px 14px" }}
+          style={{
+            padding: "6px 14px",
+            fontSize: "12px",
+            backgroundColor: "var(--ink-button-bg)",
+            color: "var(--ink-button-text)",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
         >
           Try again
         </button>
-        <Link href="/" style={{ fontSize: "12px", padding: "6px 14px", alignSelf: "center" }}>
-          Portfolio
-        </Link>
       </div>
-    </div>
+    </DashboardRouteShell>
   );
 }

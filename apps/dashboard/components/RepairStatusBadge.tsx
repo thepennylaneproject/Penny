@@ -13,7 +13,6 @@ import {
   REPAIR_STATUS_GUIDANCE,
   REPAIR_STATUS_COLOR,
   estimateTimeRemaining,
-  isRepairTerminal,
 } from "@/lib/repair-status-machine";
 
 interface RepairStatusBadgeProps {

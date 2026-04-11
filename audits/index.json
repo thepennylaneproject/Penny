@@ -1,1 +1,18 @@
-{"runs":[]}
+{
+  "runs": [
+    {
+      "run_id": "synthesized-20260411-161232",
+      "kind": "synthesizer_output",
+      "timestamp": "2026-04-11T16:14:04Z",
+      "artifact": "audits/runs/2026-04-11/synthesized-20260411-161232.json",
+      "source_suites": [
+        "logic",
+        "data",
+        "ux",
+        "performance",
+        "security",
+        "deploy"
+      ]
+    }
+  ]
+}

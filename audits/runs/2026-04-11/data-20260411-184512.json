@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.1.0",
+  "kind": "agent_output",
+  "suite": "data",
+  "run_id": "data-20260411-184512",
+  "agent": {
+    "name": "schema-auditor",
+    "role": "Read-only review of database schema, RLS, migrations, and alignment with TypeScript and API layers.",
+    "inputs_used": [
+      "audits/open_findings.json",
+      "audits/findings/TEMPLATE.md",
+      "audits/artifacts/_run_/typecheck.txt",
+      "packages/shared-types/src/index.ts",
+      "apps/dashboard/lib/supabase.ts",
+      "apps/dashboard/lib/types.ts",
+      "apps/dashboard/lib/orchestration-jobs.ts",
+      "apps/dashboard/app/api/bulk-operations/linear-sync/route.ts",
+      "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+      "supabase/migrations/20260402163739_lyra_schema.sql",
+      "supabase/migrations/20260402163740_rls_policies.sql",
+      "supabase/migrations/20260403102352_penny_projects.sql",
+      "supabase/migrations/20260403104948_penny_repair_tables.sql",
+      "supabase/migrations/20260403105735_penny_manifests_linear.sql",
+      "supabase/migrations/20260403110028_fix_audit_table_schemas.sql",
+      "supabase/migrations/20260407175738_remote_schema.sql",
+      "supabase/migrations/20260408120000_penny_tables_rls.sql",
+      "supabase/migrations/20260410120000_model_usage_rls_policies.sql",
+      "supabase/migrations/20260410140000_restore_penny_project_fkeys_not_valid.sql",
+      "services/repair/api/routes/repair.py"
+    ],
+    "stop_conditions_hit": []
+  },
+  "coverage": {
+    "files_examined": 20,
+    "files_skipped": [
+      "Full `tsc` output (audits/artifacts/_run_/typecheck.txt is a stub; TypeScript may be installed only at workspace root)",
+      "Live database verification queries (no DB connection in this audit)",
+      "All supabase/functions handlers (not required for core table/RLS mapping)"
+    ],
+    "coverage_complete": false,
+    "incomplete_reason": "Typecheck artifact does not contain compiler diagnostics; no runtime SQL was executed against Postgres. Review focused on migrations and application source."
+  },
+  "findings": [
+    {
+      "id": "f-529390fe",
+      "category": "schema",
+      "title": "Linear sync API routes reference a table that is never created in migrations",
+      "description": "POST handlers for bulk Linear sync insert into `penny_linear_sync_new` with columns `(project_name, finding_id, linear_issue_id, linear_team_key)` and `ON CONFLICT (project_name, finding_id)`. No migration in `supabase/migrations/` defines `penny_linear_sync_new`. The only related object is `penny_linear_sync` in 20260403105735_penny_manifests_linear.sql, with a different shape (single-row-per-project `state` JSONB, PK `project_name` only). Deployed databases will raise undefined_table errors when these routes run.",
+      "severity": "blocker",
+      "priority": "P0",
+      "type": "bug",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "apps/dashboard/app/api/bulk-operations/linear-sync/route.ts",
+          "symbol": "POST",
+          "content": "INSERT INTO penny_linear_sync_new (project_name, finding_id, linear_issue_id, linear_team_key)"
+        },
+        {
+          "hook_type": "query",
+          "content": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'penny_linear%';"
+        }
+      ]
+    },
+    {
+      "id": "f-0ffa74a0",
+      "category": "auth",
+      "title": "Dashboard server Supabase client uses the service role key, bypassing RLS",
+      "description": "`createSupabaseServerClient` builds the JS client with `SUPABASE_SERVICE_ROLE_KEY`. In Supabase, the service role bypasses row level security. Policies on `projects`, `findings`, `audit_runs`, and related tables therefore do not constrain queries from API routes that use this client. Multi-tenant isolation must rely entirely on application-level checks (middleware, explicit filters). This contradicts comments in 20260408120000_penny_tables_rls.sql that imply end-user JWT usage for dashboard routes.",
+      "severity": "major",
+      "priority": "P1",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "medium",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "apps/dashboard/lib/supabase.ts",
+          "symbol": "createSupabaseServerClient",
+          "content": "return createClient(config.url, config.serviceRoleKey, {"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260408120000_penny_tables_rls.sql",
+          "content": "Client access: dashboard routes using createSupabaseServerClient use the end-user JWT (authenticated);"
+        }
+      ]
+    },
+    {
+      "id": "f-234bc482",
+      "category": "types",
+      "title": "Finding.confidence is a number in shared types but TEXT in the canonical SQL schema",
+      "description": "`packages/shared-types` defines `Finding.confidence` as `number` (0.0–1.0). The initial LYRA migration defines `findings.confidence` as `TEXT` with a comment suggesting enum-like strings ('evidence', 'inference', 'speculation'). Python repair API uses string confidence in places and optional numeric breakdowns. This drift can cause silent coercion bugs or invalid inserts if not normalized at boundaries.",
+      "severity": "major",
+      "priority": "P1",
+      "type": "debt",
+      "status": "open",
+      "confidence": "evidence",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "packages/shared-types/src/index.ts",
+          "symbol": "Finding",
+          "content": "confidence: number; // 0.0-1.0"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260402163739_lyra_schema.sql",
+          "content": "confidence TEXT, -- 'evidence', 'inference', 'speculation'"
+        },
+        {
+          "hook_type": "data_shape",
+          "content": "TS: number vs SQL: text — requires explicit mapping layer or schema change"
+        }
+      ]
+    },
+    {
+      "id": "f-63dfd289",
+      "category": "security",
+      "title": "lane_* tables grant broad privileges to the anon role",
+      "description": "20260407175738_remote_schema.sql grants DELETE, INSERT, UPDATE, SELECT, etc. on `lane_embeddings`, `lane_messages`, `lane_runs`, and `lane_sessions` to `anon`. RLS policies restrict rows to `auth.uid() = user_id`, which usually blocks unauthenticated access, but broad grants increase blast radius if policies are misconfigured or bypassed. Prefer minimal grants (e.g. authenticated-only) unless anon access is explicitly required.",
+      "severity": "minor",
+      "priority": "P2",
+      "type": "debt",
+      "status": "open",
+      "confidence": "inference",
+      "estimated_effort": "small",
+      "hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260407175738_remote_schema.sql",
+          "content": "grant delete on table \"public\".\"lane_embeddings\" to \"anon\";"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260407175738_remote_schema.sql",
+          "content": "create policy \"lane_embeddings_owner_access\" ... using ((auth.uid() = user_id))"
+        }
+      ]
+    }
+  ],
+  "rollups": {
+    "by_severity": { "blocker": 1, "major": 2, "minor": 1, "nit": 0 },
+    "by_category": { "schema": 1, "auth": 1, "types": 1, "security": 1 },
+    "by_type": { "bug": 1, "debt": 3, "enhancement": 0, "question": 0 },
+    "by_status": { "open": 4, "accepted": 0, "in_progress": 0, "fixed_pending_verify": 0, "fixed_verified": 0, "wont_fix": 0, "deferred": 0, "duplicate": 0, "converted_to_enhancement": 0 }
+  },
+  "next_actions": [
+    "Add a migration that creates the table and constraints expected by `linear-sync` routes (or rename queries to use `penny_linear_sync` and store per-finding mappings inside `state` JSONB with documented shape).",
+    "Either switch server-side Supabase usage to a user-scoped JWT where RLS should apply, or document and audit that every route using `createSupabaseServerClient` enforces tenant isolation without relying on RLS.",
+    "Align `findings.confidence` representation across SQL, TypeScript, and Python (single canonical type plus boundary mappers).",
+    "Re-run a real `tsc` or monorepo typecheck and attach output under `audits/artifacts/_run_/typecheck.txt` for the next audit pass."
+  ]
+}

@@ -80,6 +80,9 @@ export interface ProofHook {
 
 // ─── Finding ───────────────────────────────────────────────────────
 
+/** Matches `findings.confidence` TEXT and audits/schema/audit-output.schema.json */
+export type FindingConfidence = 'evidence' | 'inference' | 'speculation';
+
 export interface Finding {
   id: string; // Format: f-xxx (deterministic SHA-256 based)
   project_id: string;
@@ -89,7 +92,7 @@ export interface Finding {
   priority: Priority;
   type: FindingType;
   status: FindingStatus;
-  confidence: number; // 0.0-1.0
+  confidence: FindingConfidence;
   title: string;
   description: string;
   file_path?: string;

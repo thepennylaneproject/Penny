@@ -1,0 +1,261 @@
+{
+  "mappings": {
+    "f-c91e4a62": {
+      "linear_id": "a06618f1-4ff0-4fdc-92fd-cb03eca26643",
+      "identifier": "PLP-683",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-683/minor-no-single-startup-validation-for-all-required-environment",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:14:05Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-d3d3fdd2": {
+      "linear_id": "8e5d7a26-68db-45b6-aba7-f4c16f8e0e3f",
+      "identifier": "PLP-707",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-707/major-routing-api-returns-http-200-with-default-config-when-file",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-a7a396b7": {
+      "linear_id": "362ff5c5-08b5-462d-99c1-c2db1f9224af",
+      "identifier": "PLP-708",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-708/major-captured-typecheck-artifact-is-not-a-real-typescript-compile",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-8d67bd48": {
+      "linear_id": "66a7f32b-024e-4443-99c9-be32cbc03b68",
+      "identifier": "PLP-709",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-709/minor-deep-link-useeffect-omits-setfilter-from-dependency-array",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-123d7064": {
+      "linear_id": "0bdc9928-ec21-43f4-9802-a2913a92e444",
+      "identifier": "PLP-710",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-710/minor-worker-audit-metrics-uses-explicit-any-casts-around",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-c940b282": {
+      "linear_id": "60bf1ba5-743d-4746-bb46-b98603a89713",
+      "identifier": "PLP-711",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-711/nit-unused-symbols-in-worker-process-job-and-related-modules",
+      "lyra_status": "open",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T16:54:15Z"
+    },
+    "f-c8974f96": {
+      "linear_id": "fd8b6781-0b31-4699-8ea7-9b3c64447929",
+      "identifier": "PLP-712",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-712/minor-should-engine-routing-ever-succeed-with-http-200-after-a-read",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-529390fe": {
+      "linear_id": "519e07dd-34c9-48d8-827e-cfe1d9e8c119",
+      "identifier": "PLP-713",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-713/blocker-linear-sync-api-routes-reference-a-table-that-is-never-created",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-0ffa74a0": {
+      "linear_id": "5038480e-9c02-4ae9-9791-cb6f9e9cc4d6",
+      "identifier": "PLP-714",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-714/major-dashboard-server-supabase-client-uses-the-service-role-key",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-234bc482": {
+      "linear_id": "e3883c03-e73f-484f-ac59-2b4ae6417e52",
+      "identifier": "PLP-715",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-715/major-findingconfidence-is-a-number-in-shared-types-but-text-in-the",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-63dfd289": {
+      "linear_id": "b6c7d1d3-e4d9-4dd6-beb2-699a68538302",
+      "identifier": "PLP-716",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-716/minor-lane-tables-grant-broad-privileges-to-the-anon-role",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-614d997a": {
+      "linear_id": "5ce141ef-cbc9-4c41-935d-7ab7254fa572",
+      "identifier": "PLP-717",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-717/minor-retryableerror-heading-says-portfolio-on-project-detail-load",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-525cd915": {
+      "linear_id": "f2bc1b6b-deee-44d6-a8f5-4b91c63b963c",
+      "identifier": "PLP-718",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-718/minor-no-custom-not-found-page-in-app-directory",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-95c0cbf2": {
+      "linear_id": "66694908-1bc1-4601-9364-9041035cb299",
+      "identifier": "PLP-719",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-719/minor-no-route-level-loadingtsx-for-dashboard-segments",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-e07e7ea6": {
+      "linear_id": "cc4ddaf7-9c50-4d07-a205-b316d8d4cf6b",
+      "identifier": "PLP-720",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-720/minor-document-product-voice-and-tone-for-penny-ui",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-e1eefd4f": {
+      "linear_id": "2e497255-efd6-4365-97ab-22c817e604be",
+      "identifier": "PLP-721",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-721/nit-project-not-found-eyebrow-uses-lowercase-project",
+      "lyra_status": "open",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T16:54:15Z"
+    },
+    "f-e417cf52": {
+      "linear_id": "8af3a235-c088-4809-a2d4-65b75ced2274",
+      "identifier": "PLP-722",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-722/minor-repairs-engine-initial-load-is-plain-loading-text",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-ee1e10da": {
+      "linear_id": "93c6e2ab-67ac-4736-9942-1c0d16ca00b2",
+      "identifier": "PLP-723",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-723/nit-empty-routing-table-message-uses-informal-lowercase",
+      "lyra_status": "open",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T16:54:15Z"
+    },
+    "f-3bbfbe6f": {
+      "linear_id": "55fb9d11-a1df-421b-b58c-c68182ae98df",
+      "identifier": "PLP-724",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-724/minor-segment-error-ui-drops-app-chrome-sidebar",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-6da7f951": {
+      "linear_id": "901a7d25-217f-477a-97b6-25418b3a9055",
+      "identifier": "PLP-725",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-725/major-linear-sync-all-issues-one-insert-per-finding-and-leaves-batch",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-a0973cda": {
+      "linear_id": "596889a6-36c4-4898-a52f-0743f1c47364",
+      "identifier": "PLP-726",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-726/minor-repair-job-list-queries-use-select",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-4e0bb50c": {
+      "linear_id": "cc21f452-b948-4487-8f22-25f611f3fa56",
+      "identifier": "PLP-727",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-727/minor-orchestration-audit-lists-use-select-on-job-and-run-tables",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-2b5f4082": {
+      "linear_id": "622ada5d-6a5d-4c6e-950c-c17fa62f0d5f",
+      "identifier": "PLP-728",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-728/minor-loadproject-and-saveproject-pay-an-identity-resolution-query",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-bb4b525e": {
+      "linear_id": "d775efc9-dd0b-43c1-885c-f3cb69ad5cf6",
+      "identifier": "PLP-729",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-729/minor-worker-pg-pool-max-may-cap-concurrent-db-work",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-42b6aa3d": {
+      "linear_id": "4e751756-c5e6-40fe-b404-6f7f64e2763d",
+      "identifier": "PLP-730",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-730/minor-intelligence-audit-uses-one-wide-llm-pass-over-full-anchor",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-75f94008": {
+      "linear_id": "1f9a79a4-41be-447d-a8c4-35931a43f89c",
+      "identifier": "PLP-731",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-731/nit-turbo-remote-caching-disabled-in-recorded-build",
+      "lyra_status": "open",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T16:54:15Z"
+    },
+    "f-a9726f2f": {
+      "linear_id": "6280230d-a9d8-4433-adbb-033760fc304d",
+      "identifier": "PLP-732",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-732/blocker-ingest-edge-function-has-no-caller-authentication",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-1958c58a": {
+      "linear_id": "3b452724-3b04-494b-890f-3d099ff66489",
+      "identifier": "PLP-733",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-733/major-empty-repair-service-secret-accepts-empty-bearer-token",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-28c39310": {
+      "linear_id": "1809d03a-dadc-4492-9863-8dd6ebdcfa44",
+      "identifier": "PLP-734",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-734/major-penny-allow-open-api-disables-dashboard-api-authentication",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-cabdbd5c": {
+      "linear_id": "094bf2ed-ab03-4308-9652-9f47de86ad02",
+      "identifier": "PLP-735",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-735/minor-bearer-secrets-compared-with-plain-equality",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-c83198bb": {
+      "linear_id": "e0b3b5c6-3cd9-45ca-93a2-ff644bf797a7",
+      "identifier": "PLP-736",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-736/minor-ci-does-not-build-or-test-the-python-repair-service",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    },
+    "f-41230594": {
+      "linear_id": "d4ccec7e-ca8f-41e5-8387-a273889a3c72",
+      "identifier": "PLP-737",
+      "url": "https://linear.app/the-penny-lane-project/issue/PLP-737/minor-lint-reports-many-warnings-while-ci-still-passes",
+      "lyra_status": "fixed_pending_verify",
+      "created_at": "2026-04-11T16:54:15Z",
+      "last_synced": "2026-04-11T17:20:50Z"
+    }
+  },
+  "last_sync": "2026-04-11T17:20:50Z"
+}

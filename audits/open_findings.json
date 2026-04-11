@@ -1,1 +1,1827 @@
-[]
+{
+  "open_findings": [
+    {
+      "finding_id": "f-d3d3fdd2",
+      "type": "bug",
+      "category": "error-masking",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "inference",
+      "title": "Routing API returns HTTP 200 with default config when file-backed config throws",
+      "description": "GET /api/engine/routing catches any error from readFileRoutingConfig/buildRoutingConfig, logs it, then responds with NextResponse.json(buildRoutingConfig(), { status: 200 }). Callers and caches see a successful response and cannot distinguish failure from a valid empty/default routing configuration, which can hide misconfiguration or disk/read errors in production.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Catch block returns 200 with default buildRoutingConfig() after logging the error.",
+          "file": "apps/dashboard/app/api/engine/routing/route.ts",
+          "symbol": "GET",
+          "start_line": 4,
+          "end_line": 11
+        }
+      ],
+      "impact": "Operators and UIs may assume routing is valid when the engine is actually using fallbacks after a failed read; debugging production routing issues becomes harder and monitoring based on HTTP status will not fire.",
+      "suggested_fix": {
+        "approach": "On configuration read failure, return 503 or 500 with a structured error body, or include a boolean flag such as ok:false / source:'fallback' in the JSON while still returning a safe default if the product requires a body. Align with other engine routes that surface errors.",
+        "affected_files": [
+          "apps/dashboard/app/api/engine/routing/route.ts"
+        ],
+        "estimated_effort": "small",
+        "risk_notes": "Clients that assume 200 always means file-backed config may need to handle new status codes or response fields.",
+        "tests_needed": [
+          "Add route test: mock readFileRoutingConfig to throw; assert status and payload contract."
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Derived from static review of route handler."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-707): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-707): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-a7a396b7",
+      "type": "debt",
+      "category": "tooling",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Captured typecheck artifact is not a real TypeScript compile",
+      "description": "audits/artifacts/_run_/typecheck.txt contains the npm stub message 'This is not the tsc command you are looking for' instead of tsc --noEmit output. The audit batch therefore has no static type-check signal for this run, so type errors could ship without appearing in artifacts.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "typecheck.txt shows wrong tsc stub; no project typecheck output.",
+          "artifact_path": "audits/artifacts/_run_/typecheck.txt"
+        },
+        {
+          "hook_type": "command",
+          "summary": "Root package.json defines turbo typecheck; artifact capture did not invoke project tsc successfully.",
+          "command": "npm run typecheck (expected: turbo run typecheck / per-package tsc --noEmit)",
+          "expected": "TypeScript compiler diagnostics or empty success from tsc --noEmit",
+          "actual": "Stub message from mistaken global/wrong tsc on PATH"
+        }
+      ],
+      "impact": "Logic and typing regressions in dashboard/worker/packages may go undetected until runtime or a later CI run.",
+      "suggested_fix": {
+        "approach": "Ensure the audit pipeline runs typecheck from repo root with devDependencies (e.g. npx --no-install tsc or turbo run typecheck after npm ci) and fix PATH/npx so the wrong 'tsc' package is never invoked.",
+        "affected_files": [
+          "audits/setup.sh",
+          "package.json"
+        ],
+        "estimated_effort": "small",
+        "tests_needed": [
+          "Re-run capture; confirm typecheck.txt contains tsc output or clean exit."
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Evidence from audits/artifacts/_run_/typecheck.txt"
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-708): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-708): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-8d67bd48",
+      "type": "debt",
+      "category": "react-hooks",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Deep-link useEffect omits setFilter from dependency array",
+      "description": "eslint react-hooks/exhaustive-deps flags ProjectView: the effect that auto-selects a finding and calls setFilter('all') lists [initialFindingId, findings] but not setFilter. setFilter is recreated each render (not useCallback), so the effect can theoretically see a stale setter reference in edge cases; aligning with exhaustive-deps reduces subtle React 18 strict-mode or future refactors risk.",
+      "proof_hooks": [
+        {
+          "hook_type": "error_text",
+          "summary": "Lint reported missing dependency setFilter on useEffect in ProjectView.",
+          "error_text": "React Hook useEffect has a missing dependency: 'setFilter'. Either include it or remove the dependency array",
+          "file": "apps/dashboard/components/ProjectView.tsx"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Effect calls setFilter without listing it in deps.",
+          "file": "apps/dashboard/components/ProjectView.tsx",
+          "symbol": "ProjectView",
+          "start_line": 125,
+          "end_line": 136
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "Lint output records warning at ProjectView.tsx line 136.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Low probability of stale filter state when combining deep links with session storage filter changes; mostly maintainability and lint compliance.",
+      "suggested_fix": {
+        "approach": "Wrap setFilter in useCallback with stable deps, or add setFilter to the dependency array per ESLint, and verify deep-link + filter behavior in the UI.",
+        "affected_files": [
+          "apps/dashboard/components/ProjectView.tsx"
+        ],
+        "estimated_effort": "trivial",
+        "tests_needed": [
+          "Optional component test: initialFindingId + findings triggers setFilter('all') and selection."
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Matches lint.txt warning for ProjectView.tsx"
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-709): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-709): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-123d7064",
+      "type": "debt",
+      "category": "type-safety",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Worker audit metrics uses explicit any casts around logAuditMetrics",
+      "description": "process-job.ts uses `as any` when passing LLM metric objects to logAuditMetrics (and similar patterns elsewhere per lint). That bypasses compile-time checks: a wrong property name or shape would only fail at runtime or in downstream cost code.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Cast to any for AuditLlmResult-like object passed to logAuditMetrics.",
+          "file": "apps/worker/src/process-job.ts",
+          "symbol": "process-job",
+          "start_line": 1257,
+          "end_line": 1269
+        },
+        {
+          "hook_type": "artifact_ref",
+          "summary": "ESLint reports @typescript-eslint/no-explicit-any at multiple lines in process-job.ts.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Incorrect token or model fields could silently produce wrong cost accounting or failed inserts without a type error at build time.",
+      "suggested_fix": {
+        "approach": "Define a narrow interface matching logAuditMetrics expectations and map llm fields explicitly; remove as any.",
+        "affected_files": [
+          "apps/worker/src/process-job.ts"
+        ],
+        "estimated_effort": "small",
+        "tests_needed": [
+          "Unit test or type-only test that metrics object matches logAuditMetrics signature."
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Confirmed from file read and lint.txt any warnings"
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-710): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-710): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c940b282",
+      "type": "debt",
+      "category": "dead-code",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Unused symbols in worker process-job and related modules",
+      "description": "ESLint reports unused imports and locals (e.g. loadPrompts, selectExhaustiveness, resolveLLMTier, unused auditAgent parameters) in apps/worker/src/process-job.ts and other worker files. These increase noise and can hide real mistakes when warnings are ignored.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "lint.txt lists unused vars and any in process-job.ts and peer worker files.",
+          "artifact_path": "audits/artifacts/_run_/lint.txt"
+        }
+      ],
+      "impact": "Noise in CI; reviewers may miss new warnings; dead branches may imply incomplete features.",
+      "suggested_fix": {
+        "approach": "Remove or prefix with underscore unused bindings; wire up or delete dead helpers.",
+        "affected_files": [
+          "apps/worker/src/process-job.ts",
+          "apps/worker/src/context.ts",
+          "apps/worker/src/llm-router.ts",
+          "apps/worker/src/repair-client.ts"
+        ],
+        "estimated_effort": "small",
+        "tests_needed": [
+          "npm run lint in apps/worker clean."
+        ]
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "From lint.txt unused-var warnings"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c8974f96",
+      "type": "question",
+      "category": "api-behavior",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "speculation",
+      "title": "Should engine routing ever succeed with HTTP 200 after a read failure?",
+      "description": "Product intent is unclear: returning 200 with a default routing config may be deliberate so the dashboard never breaks when the file is missing, or it may be accidental. Confirm with owners whether clients should receive an explicit degraded/fallback signal.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Same catch block as f-d3d3fdd2; behavior ambiguity requires product decision.",
+          "file": "apps/dashboard/app/api/engine/routing/route.ts",
+          "symbol": "GET",
+          "start_line": 4,
+          "end_line": 11
+        }
+      ],
+      "impact": "Drives whether f-d3d3fdd2 is a bug or accepted resilience pattern.",
+      "suggested_fix": {
+        "approach": "Document intended contract in code comment or OpenAPI; then either keep 200 with a visible fallback flag or change status codes.",
+        "estimated_effort": "trivial"
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T14:30:52Z",
+          "actor": "runtime-bug-hunter",
+          "event": "created",
+          "notes": "Ambiguous requirement; not a verified runtime failure."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-712): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-712): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-529390fe",
+      "type": "bug",
+      "category": "schema",
+      "severity": "blocker",
+      "priority": "P0",
+      "confidence": "evidence",
+      "title": "Linear sync API routes reference a table that is never created in migrations",
+      "description": "POST handlers for bulk Linear sync insert into `penny_linear_sync_new` with columns `(project_name, finding_id, linear_issue_id, linear_team_key)` and `ON CONFLICT (project_name, finding_id)`. No migration in `supabase/migrations/` defines `penny_linear_sync_new`. The only related object is `penny_linear_sync` in 20260403105735_penny_manifests_linear.sql, with a different shape (single-row-per-project `state` JSONB, PK `project_name` only). Deployed databases will raise undefined_table errors when these routes run.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "apps/dashboard/app/api/bulk-operations/linear-sync/route.ts",
+          "symbol": "POST",
+          "content": "INSERT INTO penny_linear_sync_new (project_name, finding_id, linear_issue_id, linear_team_key)",
+          "summary": "[code_ref] INSERT INTO penny_linear_sync_new (project_name, finding_id, linear_issue_id, linear_team_key)"
+        },
+        {
+          "hook_type": "query",
+          "content": "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'penny_linear%';",
+          "summary": "[query] SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name LIKE 'penny_linear%';"
+        }
+      ],
+      "impact": "See description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "schema-auditor",
+          "event": "created",
+          "notes": "From data suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized schema-auditor output: finding_id, proof_hooks.summary, history, suggested_fix defaults per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-713): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-713): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-0ffa74a0",
+      "type": "debt",
+      "category": "auth",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Dashboard server Supabase client uses the service role key, bypassing RLS",
+      "description": "`createSupabaseServerClient` builds the JS client with `SUPABASE_SERVICE_ROLE_KEY`. In Supabase, the service role bypasses row level security. Policies on `projects`, `findings`, `audit_runs`, and related tables therefore do not constrain queries from API routes that use this client. Multi-tenant isolation must rely entirely on application-level checks (middleware, explicit filters). This contradicts comments in 20260408120000_penny_tables_rls.sql that imply end-user JWT usage for dashboard routes.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "apps/dashboard/lib/supabase.ts",
+          "symbol": "createSupabaseServerClient",
+          "content": "return createClient(config.url, config.serviceRoleKey, {",
+          "summary": "[code_ref] return createClient(config.url, config.serviceRoleKey, {"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260408120000_penny_tables_rls.sql",
+          "content": "Client access: dashboard routes using createSupabaseServerClient use the end-user JWT (authenticated);",
+          "summary": "[code_ref] Client access: dashboard routes using createSupabaseServerClient use the end-user JWT (authenticated);"
+        }
+      ],
+      "impact": "See description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "medium",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "schema-auditor",
+          "event": "created",
+          "notes": "From data suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized schema-auditor output: finding_id, proof_hooks.summary, history, suggested_fix defaults per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-714): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-714): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-234bc482",
+      "type": "debt",
+      "category": "types",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Finding.confidence is a number in shared types but TEXT in the canonical SQL schema",
+      "description": "`packages/shared-types` defines `Finding.confidence` as `number` (0.0\u20131.0). The initial LYRA migration defines `findings.confidence` as `TEXT` with a comment suggesting enum-like strings ('evidence', 'inference', 'speculation'). Python repair API uses string confidence in places and optional numeric breakdowns. This drift can cause silent coercion bugs or invalid inserts if not normalized at boundaries.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "packages/shared-types/src/index.ts",
+          "symbol": "Finding",
+          "content": "confidence: number; // 0.0-1.0",
+          "summary": "[code_ref] confidence: number; // 0.0-1.0"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260402163739_lyra_schema.sql",
+          "content": "confidence TEXT, -- 'evidence', 'inference', 'speculation'",
+          "summary": "[code_ref] confidence TEXT, -- 'evidence', 'inference', 'speculation'"
+        },
+        {
+          "hook_type": "data_shape",
+          "content": "TS: number vs SQL: text \u2014 requires explicit mapping layer or schema change",
+          "summary": "[data_shape] TS: number vs SQL: text \u2014 requires explicit mapping layer or schema change"
+        }
+      ],
+      "impact": "See description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "schema-auditor",
+          "event": "created",
+          "notes": "From data suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized schema-auditor output: finding_id, proof_hooks.summary, history, suggested_fix defaults per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-715): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-715): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-63dfd289",
+      "type": "debt",
+      "category": "security",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "title": "lane_* tables grant broad privileges to the anon role",
+      "description": "20260407175738_remote_schema.sql grants DELETE, INSERT, UPDATE, SELECT, etc. on `lane_embeddings`, `lane_messages`, `lane_runs`, and `lane_sessions` to `anon`. RLS policies restrict rows to `auth.uid() = user_id`, which usually blocks unauthenticated access, but broad grants increase blast radius if policies are misconfigured or bypassed. Prefer minimal grants (e.g. authenticated-only) unless anon access is explicitly required.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260407175738_remote_schema.sql",
+          "content": "grant delete on table \"public\".\"lane_embeddings\" to \"anon\";",
+          "summary": "[code_ref] grant delete on table \"public\".\"lane_embeddings\" to \"anon\";"
+        },
+        {
+          "hook_type": "code_ref",
+          "file": "supabase/migrations/20260407175738_remote_schema.sql",
+          "content": "create policy \"lane_embeddings_owner_access\" ... using ((auth.uid() = user_id))",
+          "summary": "[code_ref] create policy \"lane_embeddings_owner_access\" ... using ((auth.uid() = user_id))"
+        }
+      ],
+      "impact": "See description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "schema-auditor",
+          "event": "created",
+          "notes": "From data suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized schema-auditor output: finding_id, proof_hooks.summary, history, suggested_fix defaults per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-716): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-716): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-614d997a",
+      "type": "bug",
+      "category": "ux-copy",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "RetryableError heading says portfolio on project detail load failure",
+      "description": "ProjectPageClient uses RetryableError with a project-specific hint, but the component hard-codes the H1 as Could not load portfolio, which mislabels the context when the user is on /projects/[name].",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/AppReadinessUI.tsx",
+          "symbol": "RetryableError",
+          "start_line": 93,
+          "end_line": 144,
+          "summary": "code_ref \u2014 apps/dashboard/components/AppReadinessUI.tsx \u2014 RetryableError"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/ProjectPageClient.tsx",
+          "symbol": "ProjectPageClient",
+          "start_line": 201,
+          "end_line": 213,
+          "summary": "code_ref \u2014 apps/dashboard/components/ProjectPageClient.tsx \u2014 ProjectPageClient"
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/projects/<name> (after auth, when fetch fails with empty projects)",
+          "summary": "ui_path \u2014 /projects/<name> (after auth, when fetch fails with empty projects)"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-717): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-717): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-525cd915",
+      "type": "enhancement",
+      "category": "ux-routes",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "No custom not-found page in app directory",
+      "description": "apps/dashboard has no not-found.tsx; unknown URLs fall back to the default Next.js 404 without Penny navigation or voice-aligned copy.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "value": "glob: apps/dashboard/**/not-found.tsx \u2192 0 files",
+          "summary": "artifact_ref \u2014 glob: apps/dashboard/**/not-found.tsx \u2192 0 files"
+        },
+        {
+          "hook_type": "artifact_ref",
+          "value": "build.txt route list includes /_not-found (framework default)",
+          "summary": "artifact_ref \u2014 build.txt route list includes /_not-found (framework default)"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-718): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-718): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-95c0cbf2",
+      "type": "enhancement",
+      "category": "ux-loading",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "inference",
+      "title": "No route-level loading.tsx for dashboard segments",
+      "description": "There is no loading.tsx under apps/dashboard/app; first navigation relies on client bundles and per-page skeletons. Adding segment loading UI could improve perceived performance and consistency across routes.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "value": "glob: apps/dashboard/**/loading.tsx \u2192 0 files",
+          "summary": "artifact_ref \u2014 glob: apps/dashboard/**/loading.tsx \u2192 0 files"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/page.tsx",
+          "symbol": "Home",
+          "start_line": 233,
+          "end_line": 238,
+          "summary": "code_ref \u2014 apps/dashboard/app/page.tsx \u2014 Home"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-719): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-719): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-e07e7ea6",
+      "type": "question",
+      "category": "ux-voice",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "inference",
+      "title": "Document product voice and tone for Penny UI",
+      "description": "UI_COPY centralizes many strings, but there is no single documented voice (e.g. formal vs conversational, when to use title case in section labels, monospace vs sans for body). A short voice doc would reduce drift as new surfaces ship.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/ui-copy.ts",
+          "symbol": "UI_COPY",
+          "start_line": 1,
+          "end_line": 40,
+          "summary": "code_ref \u2014 apps/dashboard/lib/ui-copy.ts \u2014 UI_COPY"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/layout.tsx",
+          "symbol": "metadata",
+          "start_line": 8,
+          "end_line": 14,
+          "summary": "code_ref \u2014 apps/dashboard/app/layout.tsx \u2014 metadata"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "medium",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-720): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-720): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-e1eefd4f",
+      "type": "debt",
+      "category": "ux-copy",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Project-not-found eyebrow uses lowercase project",
+      "description": "ProjectMissingState uses an uppercase-styled eyebrow with the literal project while other screens use labels like Portfolio or Engine (title-style). Align casing or use a shared pattern.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/ProjectPageClient.tsx",
+          "symbol": "ProjectMissingState",
+          "start_line": 31,
+          "end_line": 42,
+          "summary": "code_ref \u2014 apps/dashboard/components/ProjectPageClient.tsx \u2014 ProjectMissingState"
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/projects/<missing-name>",
+          "summary": "ui_path \u2014 /projects/<missing-name>"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "trivial",
+        "tests_needed": []
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-e417cf52",
+      "type": "debt",
+      "category": "ux-loading",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Repairs engine initial load is plain loading text",
+      "description": "EngineView shows a minimal loading\u2026 span while other views use PageLoadingSkeleton or richer layout placeholders, causing inconsistent perceived polish on /repairs.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/EngineView.tsx",
+          "symbol": "EngineView",
+          "start_line": 163,
+          "end_line": 168,
+          "summary": "code_ref \u2014 apps/dashboard/components/EngineView.tsx \u2014 EngineView"
+        },
+        {
+          "hook_type": "ui_path",
+          "value": "/repairs",
+          "summary": "ui_path \u2014 /repairs"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-722): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-722): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-ee1e10da",
+      "type": "debt",
+      "category": "ux-copy",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Empty routing table message uses informal lowercase",
+      "description": "When routes are empty and there is no error, the UI shows no routing config found without sentence case or terminal punctuation, unlike surrounding copy.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/EngineView.tsx",
+          "symbol": "EngineView",
+          "start_line": 310,
+          "end_line": 340,
+          "summary": "code_ref \u2014 apps/dashboard/components/EngineView.tsx \u2014 EngineView"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "trivial",
+        "tests_needed": []
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-3bbfbe6f",
+      "type": "enhancement",
+      "category": "ux-error",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "title": "Segment error UI drops app chrome (sidebar)",
+      "description": "app/error.tsx renders a standalone layout without Shell, so recoverable errors in nested routes remove navigation until the user follows Portfolio. Consider nested error boundaries or wrapping error UI with shell for wayfinding.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/error.tsx",
+          "symbol": "Error",
+          "start_line": 19,
+          "end_line": 52,
+          "summary": "code_ref \u2014 apps/dashboard/app/error.tsx \u2014 Error"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/components/Shell.tsx",
+          "symbol": "Shell",
+          "start_line": 371,
+          "end_line": 382,
+          "summary": "code_ref \u2014 apps/dashboard/components/Shell.tsx \u2014 Shell"
+        }
+      ],
+      "impact": "UX consistency and user trust; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "medium",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "ux-flow-auditor",
+          "event": "created",
+          "notes": "From UX suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized ux-flow-auditor output: finding_id, proof_hooks.summary, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-724): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-724): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-6da7f951",
+      "type": "debt",
+      "category": "db",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Linear sync-all issues one INSERT per finding and leaves batch upsert dead",
+      "description": "Linear sync-all issues one INSERT per finding and leaves batch upsert dead. POST /api/bulk-operations/linear-sync-all runs Promise.all of per-finding INSERTs per project while allProjectNames/allFindingIds stay empty, so the UNNEST batch block never runs. Large portfolios can stress the pool with many round-trips.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+          "line_start": 59,
+          "line_end": 91,
+          "summary": "code_ref \u2014 apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts",
+          "line_start": 101,
+          "line_end": 112,
+          "summary": "code_ref \u2014 apps/dashboard/app/api/bulk-operations/linear-sync-all/route.ts"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "medium",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-725): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-725): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-a0973cda",
+      "type": "debt",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Repair job list queries use SELECT *",
+      "description": "Repair job list queries use SELECT *. Postgres helpers select all columns from penny_repair_jobs. Payload-heavy jsonb columns inflate memory and network when only a subset is needed for list UIs.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/maintenance-store.ts",
+          "line_start": 57,
+          "line_end": 65,
+          "summary": "code_ref \u2014 apps/dashboard/lib/maintenance-store.ts"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/maintenance-store.ts",
+          "line_start": 129,
+          "line_end": 137,
+          "summary": "code_ref \u2014 apps/dashboard/lib/maintenance-store.ts"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-726): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-726): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-4e0bb50c",
+      "type": "debt",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Orchestration audit lists use SELECT * on job and run tables",
+      "description": "Orchestration audit lists use SELECT * on job and run tables. listRecentAuditJobs, listRecentAuditRuns, and project-scoped variants fetch full rows. Consider explicit column lists aligned to rowJob/rowRun mappers to reduce I/O as payload columns grow.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/dashboard/lib/orchestration-jobs.ts",
+          "line_start": 222,
+          "line_end": 281,
+          "summary": "code_ref \u2014 apps/dashboard/lib/orchestration-jobs.ts"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-727): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-727): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-2b5f4082",
+      "type": "debt",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "title": "loadProject and saveProject pay an identity-resolution query before the main read/write",
+      "description": "loadProject and saveProject pay an identity-resolution query before the main read/write. resolveCanonicalProjectIdentity runs a regexp-heavy WHERE on penny_projects before SELECT project_json or UPSERT. Each load/save does at least two database round-trips.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 18,
+          "line_end": 60,
+          "summary": "code_ref \u2014 apps/worker/src/db.ts"
+        },
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 213,
+          "line_end": 272,
+          "summary": "code_ref \u2014 apps/worker/src/db.ts"
+        },
+        {
+          "hook_type": "query",
+          "note": "Run EXPLAIN (ANALYZE, BUFFERS) on resolveCanonicalProjectIdentity's SELECT with production-like row counts and typical name/repo parameters; do not guess plan shape.",
+          "summary": "query \u2014 Run EXPLAIN (ANALYZE, BUFFERS) on resolveCanonicalProjectIdentity's SELECT with production-like row counts and typical name/repo parameters; do not guess plan shape."
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "medium",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-728): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-728): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-bb4b525e",
+      "type": "question",
+      "category": "db",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "speculation",
+      "title": "Worker pg Pool max may cap concurrent DB work",
+      "description": "Worker pg Pool max may cap concurrent DB work. createPool sets max: 5. Under parallel portfolio work or many concurrent claim/complete paths, queueing may add latency; validate against expected job concurrency.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/db.ts",
+          "line_start": 95,
+          "line_end": 99,
+          "summary": "code_ref \u2014 apps/worker/src/db.ts"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-729): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-729): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-42b6aa3d",
+      "type": "debt",
+      "category": "llm_cost",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Intelligence audit uses one wide LLM pass over full anchor context",
+      "description": "Intelligence audit uses one wide LLM pass over full anchor context. intelligence runs buildIntelligenceContext and a single auditWithLane before domain passes. Cost and latency scale with repository size and prompt length; monitor token metrics already partially logged.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "file_path": "apps/worker/src/process-job.ts",
+          "line_start": 1203,
+          "line_end": 1233,
+          "summary": "code_ref \u2014 apps/worker/src/process-job.ts"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "large",
+        "tests_needed": []
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-730): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-730): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-75f94008",
+      "type": "enhancement",
+      "category": "ci",
+      "severity": "nit",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Turbo remote caching disabled in recorded build",
+      "description": "Turbo remote caching disabled in recorded build. build.txt shows Remote caching disabled, increasing repeated CI or local build wall time versus a cache-enabled pipeline.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "file_path": "audits/artifacts/_run_/build.txt",
+          "line_start": 8,
+          "line_end": 8,
+          "summary": "artifact_ref \u2014 audits/artifacts/_run_/build.txt"
+        },
+        {
+          "hook_type": "command",
+          "text": "pnpm run build",
+          "summary": "command \u2014 pnpm run build"
+        }
+      ],
+      "impact": "Performance, cost, or scalability; see description.",
+      "suggested_fix": {
+        "approach": "See synthesizer merged notes and agent description.",
+        "affected_files": [],
+        "estimated_effort": "small",
+        "tests_needed": []
+      },
+      "status": "open",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "performance-cost-auditor",
+          "event": "created",
+          "notes": "From performance suite agent output."
+        },
+        {
+          "timestamp": "2026-04-11T16:12:32Z",
+          "actor": "synthesizer",
+          "event": "note_added",
+          "notes": "Normalized performance agent output: finding_id, proof_hooks from hooks, history, suggested_fix per LYRA 1.1.0."
+        }
+      ]
+    },
+    {
+      "finding_id": "f-a9726f2f",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "blocker",
+      "priority": "P0",
+      "confidence": "evidence",
+      "title": "Ingest edge function has no caller authentication",
+      "description": "The `ingest-audit` Supabase Edge Function creates a `supabase-js` client with `SUPABASE_SERVICE_ROLE_KEY` and upserts `audit_runs`, `findings`, and `orchestration_events` from the request body. There is no verification of a shared secret, Supabase JWT, or other caller credential in the handler. Attack scenario: anyone who can invoke the deployed function URL (URL discovery, leaked project ref, or browser/CORS context if exposed) sends a crafted JSON body and overwrites or poisons audit results and findings for arbitrary `project_id` values, corrupting compliance data and downstream repair/orchestration decisions.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Handler uses service role and writes without auth check.",
+          "file": "supabase/functions/ingest-audit/index.ts",
+          "symbol": "serve",
+          "start_line": 10,
+          "end_line": 84
+        },
+        {
+          "hook_type": "repro_steps",
+          "summary": "Unauthenticated POST path to ingest.",
+          "steps": [
+            "Deploy or point at the ingest-audit function endpoint.",
+            "POST JSON with project_id and synthesizer_payload matching expected shape.",
+            "Observe 200 and rows inserted/updated in audit_runs/findings without any Authorization validation in code."
+          ]
+        }
+      ],
+      "repro_steps": [
+        "POST to the edge function URL with a valid synthesizer-shaped body.",
+        "Confirm writes succeed without presenting a secret or user JWT in application logic."
+      ],
+      "impact": "Full integrity loss for audit data tied to this pipeline: fake findings, deleted accountability, and wrong repair triggers for projects.",
+      "suggested_fix": {
+        "approach": "Require a server-only secret (compare timing-safe), or verify Supabase JWT with role checks, or disable public invocation and rely on Supabase function JWT verification in project config\u2014ensure code and platform config agree.",
+        "affected_files": [
+          "supabase/functions/ingest-audit/index.ts"
+        ],
+        "estimated_effort": "small",
+        "risk_notes": "Breaking change for any caller until they send the new credential.",
+        "tests_needed": [
+          "Integration test: unauthenticated request rejected",
+          "Authenticated pipeline still ingests"
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Evidence from static review of edge function source."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-732): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-732): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-1958c58a",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "Empty REPAIR_SERVICE_SECRET accepts empty Bearer token",
+      "description": "`repair-callback` compares `Authorization` Bearer text to `Deno.env.get('REPAIR_SERVICE_SECRET')`. If the secret is set to an empty string in deployment, `token !== expectedToken` is false when both are empty, so the handler accepts `Authorization: Bearer ` with no secret. Attack scenario: misconfiguration (empty env in Supabase secrets) leaves the callback open; an attacker invokes the function and updates arbitrary `repair_job_id` rows via the service-role client.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Bearer compared to env; no reject when secret missing or empty before compare.",
+          "file": "supabase/functions/repair-callback/index.ts",
+          "symbol": "handler",
+          "start_line": 28,
+          "end_line": 44
+        }
+      ],
+      "repro_steps": [
+        "Set REPAIR_SERVICE_SECRET to empty in the function environment.",
+        "POST with Header Authorization: Bearer (empty token after prefix).",
+        "Observe 200 and repair_jobs update if id exists."
+      ],
+      "impact": "Unauthorized updates to repair job status, PR metadata, and orchestration_events linkage.",
+      "suggested_fix": {
+        "approach": "Reject early if `!expectedToken?.trim()` with 503; use timing-safe compare for secrets.",
+        "affected_files": [
+          "supabase/functions/repair-callback/index.ts"
+        ],
+        "estimated_effort": "trivial",
+        "tests_needed": [
+          "Missing secret returns 503",
+          "Empty bearer rejected"
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Logic review of callback auth branch."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-733): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-733): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-28c39310",
+      "type": "bug",
+      "category": "auth-bypass",
+      "severity": "major",
+      "priority": "P1",
+      "confidence": "evidence",
+      "title": "penny_ALLOW_OPEN_API disables dashboard API authentication",
+      "description": "When neither `DASHBOARD_API_SECRET` nor `SUPABASE_JWT_SECRET` is set, production allows all `/api/*` traffic if `penny_ALLOW_OPEN_API` is `1` or `true`. `proxy.ts` logs a warning but still calls `next()`. Attack scenario: operator mistake or compromised env leaves the dashboard API fully open; any client can read or mutate project state exposed by those routes with no shared secret or user session.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "Open API branch returns next() for all API routes.",
+          "file": "apps/dashboard/proxy.ts",
+          "symbol": "proxy",
+          "start_line": 115,
+          "end_line": 131
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Flag enables open API in production when no secrets.",
+          "file": "apps/dashboard/lib/dashboard-secret.ts",
+          "symbol": "isOpenApiAllowedWithoutSecret",
+          "start_line": 23,
+          "end_line": 27
+        }
+      ],
+      "repro_steps": [
+        "Unset DASHBOARD_API_SECRET and SUPABASE_JWT_SECRET in a production-like build.",
+        "Set penny_ALLOW_OPEN_API=true.",
+        "Call any /api/* route without Authorization and observe success."
+      ],
+      "impact": "Unauthorized access to dashboard-backed data and actions (project CRUD, orchestration, imports) depending on route behavior.",
+      "suggested_fix": {
+        "approach": "Remove or gate `penny_ALLOW_OPEN_API` behind explicit local-only hostname; fail closed in production regardless of flag; alert on startup.",
+        "affected_files": [
+          "apps/dashboard/lib/dashboard-secret.ts",
+          "apps/dashboard/proxy.ts"
+        ],
+        "estimated_effort": "small",
+        "risk_notes": "May break intentional staging setups; document migration."
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Documented intentional DX escape hatch with production hazard."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-734): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-734): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-cabdbd5c",
+      "type": "bug",
+      "category": "timing-leak",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "Bearer secrets compared with plain equality",
+      "description": "Repair service `require_auth` and the repair-callback use `!=` / `!==` for bearer tokens. Attack scenario: local timing side channels are usually low risk on cloud runtimes, but network attackers with very fine-grained timing to the same instance could theoretically learn bytes; primary practical concern is consistency with crypto best practices for long-lived shared secrets.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "String compare for bearer token.",
+          "file": "services/repair/api/auth.py",
+          "symbol": "require_auth",
+          "start_line": 16,
+          "end_line": 30
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "String compare for callback bearer.",
+          "file": "supabase/functions/repair-callback/index.ts",
+          "symbol": "handler",
+          "start_line": 37,
+          "end_line": 44
+        }
+      ],
+      "impact": "Marginal risk of secret byte leakage via timing; defense-in-depth gap versus constant-time compare.",
+      "suggested_fix": {
+        "approach": "Use timing-safe comparison (e.g. `hmac.compare_digest` in Python; SubtleCrypto or hex compare loop in Deno) after normalizing encoding once.",
+        "affected_files": [
+          "services/repair/api/auth.py",
+          "supabase/functions/repair-callback/index.ts"
+        ],
+        "estimated_effort": "small",
+        "risk_notes": "None significant if only fixing comparison."
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T12:00:00.000Z",
+          "actor": "security-and-privacy-auditor",
+          "event": "created",
+          "notes": "Pairing Python and Deno bearer checks."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-735): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-735): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c83198bb",
+      "type": "debt",
+      "category": "ci-coverage-gap",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "evidence",
+      "title": "CI does not build or test the Python repair service",
+      "description": "GitHub Actions runs `pnpm lint`, `typecheck`, `test`, and `build` for the pnpm/Turbo workspaces only. `services/repair` is deployed via Docker on Railway (`services/repair/railway.toml`, `services/repair/Dockerfile`) but has no CI step to `docker build` or run Python tests. Broken `requirements.txt` or Dockerfile changes can reach production without failing PR checks.",
+      "proof_hooks": [
+        {
+          "hook_type": "code_ref",
+          "summary": "CI job only runs pnpm commands; no repair service step.",
+          "file": ".github/workflows/ci.yml",
+          "symbol": "checks",
+          "start_line": 24,
+          "end_line": 37
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Repair image built from Dockerfile on Railway.",
+          "file": "services/repair/railway.toml",
+          "symbol": "build",
+          "start_line": 1,
+          "end_line": 4
+        }
+      ],
+      "impact": "Regressions in the repair API image or dependencies may ship undetected until deploy or runtime failure.",
+      "suggested_fix": {
+        "approach": "Add a CI job (or step) that builds `services/repair` with Docker and optionally runs `pytest` or `python -m compileall` if tests exist.",
+        "affected_files": [
+          ".github/workflows/ci.yml",
+          "services/repair/Dockerfile"
+        ],
+        "estimated_effort": "small",
+        "tests_needed": [
+          "CI green on a PR that only touches services/repair/"
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Compared Turbo package list in build.txt with CI scope."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-736): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-736): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-41230594",
+      "type": "debt",
+      "category": "lint-quality",
+      "severity": "minor",
+      "priority": "P3",
+      "confidence": "evidence",
+      "title": "Lint reports many warnings while CI still passes",
+      "description": "Latest captured `pnpm lint` output shows 17 worker warnings and 19 dashboard warnings (unused symbols, `no-explicit-any`, hooks deps). ESLint exits zero on warnings, so CI does not block merges on this debt.",
+      "proof_hooks": [
+        {
+          "hook_type": "artifact_ref",
+          "summary": "Lint log shows 17 + 19 problems, all warnings.",
+          "file": "audits/artifacts/_run_/lint.txt"
+        },
+        {
+          "hook_type": "command",
+          "summary": "CI runs lint without `--max-warnings 0`.",
+          "command": "pnpm lint",
+          "expected": "Optional: fail on warnings if policy requires",
+          "actual": "Exit 0 with warnings (typical ESLint default)"
+        }
+      ],
+      "impact": "Unused code and `any` types accumulate; harder refactors and more runtime risk in hot paths over time.",
+      "suggested_fix": {
+        "approach": "Triage warnings, fix or prefix unused bindings with `_`, replace `any` incrementally; optionally add `--max-warnings 0` to lint scripts or CI once the backlog is cleared.",
+        "affected_files": [
+          "apps/worker/src/process-job.ts",
+          "apps/dashboard/package.json"
+        ],
+        "estimated_effort": "medium",
+        "risk_notes": "Turning warnings into errors will fail CI until the backlog is addressed."
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Evidence from audits/artifacts/_run_/lint.txt"
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-737): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-737): In Review -> fixed_pending_verify"
+        }
+      ]
+    },
+    {
+      "finding_id": "f-c91e4a62",
+      "type": "enhancement",
+      "category": "env-validation",
+      "severity": "minor",
+      "priority": "P2",
+      "confidence": "inference",
+      "title": "No single startup validation for all required environment variables",
+      "description": "`.env.example` documents many variables. Some paths validate configuration when used (for example `readDatabaseConfig` in `lib/postgres.ts`, and `proxy.ts` guards API auth), but there is no one central schema (for example Zod or explicit checks at process start) that fails fast in every deploy context if critical vars are missing or malformed.",
+      "proof_hooks": [
+        {
+          "hook_type": "config_key",
+          "summary": "Large template without a single validating entrypoint.",
+          "file": ".env.example"
+        },
+        {
+          "hook_type": "code_ref",
+          "summary": "Middleware returns 503 when secrets missing only for protected API paths logic.",
+          "file": "apps/dashboard/proxy.ts",
+          "symbol": "proxy",
+          "start_line": 109,
+          "end_line": 131
+        }
+      ],
+      "impact": "Misconfigured production deploys may partially work or fail late on specific routes instead of at boot with a clear list of missing keys.",
+      "suggested_fix": {
+        "approach": "Add a small env schema module validated once when the server starts (or in `instrumentation.ts` if used), listing required vars per deployment profile.",
+        "affected_files": [
+          "apps/dashboard/lib/env.ts",
+          "apps/worker/src/index.ts"
+        ],
+        "estimated_effort": "medium",
+        "tests_needed": [
+          "Unit test: missing required env produces deterministic startup error"
+        ]
+      },
+      "status": "fixed_pending_verify",
+      "history": [
+        {
+          "timestamp": "2026-04-11T16:10:45Z",
+          "actor": "build-deploy-auditor",
+          "event": "created",
+          "notes": "Inferred from distributed validation vs centralized schema."
+        },
+        {
+          "timestamp": "2026-04-11T17:00:55Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-683): In Progress -> in_progress"
+        },
+        {
+          "timestamp": "2026-04-11T17:20:50Z",
+          "actor": "linear-sync",
+          "event": "note_added",
+          "notes": "Status synced from Linear (PLP-683): In Review -> fixed_pending_verify"
+        }
+      ]
+    }
+  ],
+  "last_updated": "2026-04-11T17:20:50Z",
+  "run_id": "synthesized-20260411-161232"
+}

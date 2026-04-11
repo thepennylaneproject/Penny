@@ -1,6 +1,6 @@
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { join, extname, dirname, resolve } from "node:path";
+import { join, extname, resolve } from "node:path";
 
 const TEXT_EXT = new Set([
   ".ts",
@@ -333,7 +333,7 @@ export function buildIntelligenceContext(
   );
 
   // Prisma schema
-  scanForPattern(repoRoot, 0, 4, (name, rel) =>
+  scanForPattern(repoRoot, 0, 4, (name, _rel) =>
     name.endsWith(".prisma") ? 80 : false
   );
 

@@ -9,7 +9,7 @@ import { recordDurableEventBestEffort } from "@/lib/durable-state";
  * Bulk sync findings to Linear issues. This operation:
  * 1. Takes a list of finding IDs and a project name
  * 2. Queries Linear API to create/update corresponding issues
- * 3. Stores the mapping in penny_linear_sync table
+ * 3. Stores per-finding rows in penny_linear_sync_new (queued for background sync)
  *
  * Request body:
  *   {

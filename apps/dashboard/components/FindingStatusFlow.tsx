@@ -12,7 +12,6 @@ import {
   STATUS_TRANSITIONS,
   TRANSITION_LABELS,
   STATUS_GUIDANCE,
-  getStatusCategory,
 } from "@/lib/finding-status-machine";
 
 interface FindingStatusFlowProps {
@@ -28,7 +27,6 @@ export function FindingStatusFlow({
 }: FindingStatusFlowProps) {
   const nextStatuses = STATUS_TRANSITIONS[currentStatus];
   const guidance = STATUS_GUIDANCE[currentStatus];
-  const category = getStatusCategory(currentStatus);
 
   if (nextStatuses.length === 0) {
     return (

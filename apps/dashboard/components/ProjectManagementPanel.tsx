@@ -213,7 +213,7 @@ export function ProjectManagementPanel({
     setError(null);
     try {
       await removeProject(project);
-    } catch (e) {
+    } catch {
       // Error is already handled in the hook's onRemoveError callback
     }
   }

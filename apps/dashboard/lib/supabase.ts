@@ -1,7 +1,9 @@
 /**
  * Supabase Client for Penny v3.0
- * Replaces direct pg.Pool connection with Supabase JS client
- * Uses service role key on the server side for unrestricted access
+ * Replaces direct pg.Pool connection with Supabase JS client.
+ *
+ * - **User-scoped** (`createSupabaseUserClient`): anon key + user JWT — RLS applies (dashboard API routes).
+ * - **Service role** (`createSupabaseServiceRoleClient`): bypasses RLS — workers, scripts, dev-only fallbacks only.
  */
 
 import { createClient } from '@supabase/supabase-js';
@@ -29,10 +31,10 @@ export function readSupabaseConfig(): SupabaseConfig {
 }
 
 /**
- * Create a server-side Supabase client with service role key
- * Use this in API routes and server components
+ * Server-side client with service role key — **bypasses RLS**.
+ * Use for workers, ingestion, and explicit dev-only paths; not for authenticated dashboard tenant APIs.
  */
-export function createSupabaseServerClient(): SupabaseClient | null {
+export function createSupabaseServiceRoleClient(): SupabaseClient | null {
   const config = readSupabaseConfig();
 
   const missing: string[] = [];
@@ -40,13 +42,43 @@ export function createSupabaseServerClient(): SupabaseClient | null {
   if (!config.serviceRoleKey) missing.push('SUPABASE_SERVICE_ROLE_KEY');
 
   if (missing.length > 0) {
-    console.warn('Supabase server client not configured. Missing:', missing.join(', '));
+    console.warn('Supabase service role client not configured. Missing:', missing.join(', '));
     return null;
   }
 
   return createClient(config.url, config.serviceRoleKey, {
     auth: {
       persistSession: false,
+    },
+  });
+}
+
+/**
+ * User-scoped server client — **RLS applies** (JWT in Authorization is forwarded to Postgres).
+ */
+export function createSupabaseUserClient(accessToken: string): SupabaseClient | null {
+  const config = readSupabaseConfig();
+
+  const missing: string[] = [];
+  if (!config.url) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
+  if (!config.anonKey) missing.push('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+
+  if (missing.length > 0) {
+    console.warn('Supabase user client not configured. Missing:', missing.join(', '));
+    return null;
+  }
+
+  const token = accessToken.trim();
+  if (!token) return null;
+
+  return createClient(config.url, config.anonKey, {
+    auth: {
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
     },
   });
 }
@@ -77,16 +109,16 @@ export function createSupabaseBrowserClient(): SupabaseClient | null {
 }
 
 /**
- * Singleton server client instance
+ * Singleton service-role server client (bypasses RLS).
  */
-let serverClientInstance: SupabaseClient | null = null;
+let serviceRoleClientInstance: SupabaseClient | null = null;
 let browserClientInstance: SupabaseClient | null = null;
 
-export function getSupabaseServerClient(): SupabaseClient | null {
-  if (!serverClientInstance) {
-    serverClientInstance = createSupabaseServerClient();
+export function getSupabaseServiceRoleClient(): SupabaseClient | null {
+  if (!serviceRoleClientInstance) {
+    serviceRoleClientInstance = createSupabaseServiceRoleClient();
   }
-  return serverClientInstance;
+  return serviceRoleClientInstance;
 }
 
 export function getSupabaseBrowserClient(): SupabaseClient | null {
